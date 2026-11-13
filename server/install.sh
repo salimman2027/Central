@@ -86,6 +86,8 @@ systemctl restart nq-calls
 # المرحلة 2 (تحليل تسجيلات المكالمات): NQ_PHASE2=1 bash install.sh  (بيتفتكر بعد كده)
 [[ "${NQ_PHASE2:-}" == 1 ]] && touch "$CONF/phase2"
 [[ -f "$CONF/phase2" ]] && NQ_PHASE2=1
+# لو faster-whisper متركّب قبل كده يبقى المرحلة 2 شغالة
+"$APP/venv/bin/python" -c "import faster_whisper" 2>/dev/null && { NQ_PHASE2=1; touch "$CONF/phase2"; }
 if [[ "${NQ_PHASE2:-}" == 1 ]]; then
   echo "== phase 2: call-recording analysis"
   apt-get install -y -qq ffmpeg >/dev/null
