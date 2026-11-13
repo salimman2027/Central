@@ -33,6 +33,14 @@ TRUNK = "PJSIP/" + os.environ.get("NQ_TRUNK", "dinastar1")
 app = FastAPI(title="NQ Calls", docs_url=None, redoc_url=None)
 
 
+@app.middleware("http")
+async def no_cache(request, call_next):
+    resp = await call_next(request)
+    if request.url.path.startswith("/api/") and "recording" not in request.url.path:
+        resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 # ---------------- DB ----------------
 def db_conf() -> dict:
     """بيانات الدخول من /etc/freepbx.conf (نفس اللي FreePBX بيستخدمها)"""

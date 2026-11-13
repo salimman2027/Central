@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>NQ Phone</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script>(function(){var t;try{t=localStorage.getItem('nq_theme')}catch(e){}if(!t)t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();
+function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=t;try{localStorage.setItem('nq_theme',t)}catch(e){}}</script>
 <style>
   :root {
     --bg:#f4f6f8; --card:#fff; --fg:#14202e; --muted:#6b7684; --line:#e3e8ee;
@@ -206,6 +208,27 @@
   #toast { background:rgba(10,16,30,.95) !important; color:var(--fg) !important; border:1px solid rgba(25,230,193,.35); }
   @media (min-width: 620px) { body.web { background:radial-gradient(900px 500px at 80% -10%,rgba(25,230,193,.18),transparent 60%),radial-gradient(800px 500px at 0% 60%,rgba(111,76,255,.18),transparent 60%),#04070f; }
     body.web .screen { background:rgba(8,13,26,.92) !important; border:1px solid var(--line); box-shadow:0 30px 80px -20px rgba(0,0,0,.9),0 0 0 1px rgba(25,230,193,.08); } }
+
+  /* ---------- وضع فاتح ---------- */
+  .themebtn { padding:8px 12px; border-radius:99px; border:1px solid var(--line); background:var(--card); color:var(--fg); font-size:13px; }
+  .i-light { display:none; } html[data-theme=light] .i-dark { display:none; } html[data-theme=light] .i-light { display:inline; }
+  html[data-theme=light] { --bg:#eef3f8; --card:rgba(255,255,255,.8); --fg:#0c1626; --muted:#5b6b80; --line:rgba(20,50,90,.12); --pri:#0aa58c; --ok:#11a865; --grad:linear-gradient(135deg,#0aa58c,#2b7de0); }
+  html[data-theme=light] body { background:radial-gradient(700px 420px at 100% -5%,rgba(10,165,140,.14),transparent 60%),radial-gradient(600px 380px at -10% 40%,rgba(111,76,255,.08),transparent 60%),#eef3f8; }
+  html[data-theme=light] input, html[data-theme=light] select, html[data-theme=light] textarea { background:#fff; color-scheme:light; }
+  html[data-theme=light] .topbar, html[data-theme=light] .tabbar { background:rgba(255,255,255,.75); }
+  html[data-theme=light] .display .num { background:linear-gradient(180deg,#0c1626,#41546e); -webkit-background-clip:text; background-clip:text; }
+  html[data-theme=light] .key { background:#fff; border-color:rgba(20,50,90,.1); box-shadow:0 4px 14px -8px rgba(20,50,90,.4); }
+  html[data-theme=light] .iconbtn { background:#fff; }
+  html[data-theme=light] .btn, html[data-theme=light] .chip.sel, html[data-theme=light] .seg button.sel, html[data-theme=light] .mini.call { color:#fff; }
+  html[data-theme=light] .round.green svg { fill:#fff; }
+  html[data-theme=light] .sheet { background:rgba(255,255,255,.97); }
+  html[data-theme=light] .sheet-bg { background:rgba(20,30,50,.35); }
+  html[data-theme=light] .kgrid .v { background:linear-gradient(180deg,#0c1626,#0aa58c); -webkit-background-clip:text; background-clip:text; }
+  html[data-theme=light] .card { box-shadow:0 10px 30px -18px rgba(20,50,90,.4); }
+  html[data-theme=light] #toast { background:#0c1626 !important; color:#fff !important; }
+  html[data-theme=light] .seg, html[data-theme=light] .mini.x, html[data-theme=light] .logrow .ic { background:rgba(20,50,90,.06); }
+  @media (min-width: 620px) { html[data-theme=light] body.web { background:radial-gradient(900px 500px at 80% -10%,rgba(10,165,140,.16),transparent 60%),#e6edf4; }
+    html[data-theme=light] body.web .screen { background:rgba(255,255,255,.9) !important; box-shadow:0 30px 80px -30px rgba(20,50,90,.45); } }
 </style>
 </head>
 <body>
@@ -234,7 +257,8 @@
 <section id="scrSettings" class="screen" style="background:var(--bg);padding:20px 20px 40px;overflow:auto">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <button class="iconbtn" onclick="show('scrDial')" aria-label="رجوع">→</button>
-    <h2 style="margin:0;font-size:20px">الإعدادات</h2>
+    <h2 style="margin:0;font-size:20px;flex:1">الإعدادات</h2>
+    <button class="themebtn" onclick="toggleTheme()" aria-label="فاتح / غامق"><span class="i-dark">🌙 غامق</span><span class="i-light">☀️ فاتح</span></button>
   </div>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 14px">
     <div class="switch">
