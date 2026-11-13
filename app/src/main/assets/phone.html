@@ -1127,7 +1127,7 @@ const NQSim = {
     const t = ms => ms ? new Date(ms).toLocaleString("ar-EG", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "numeric" }) : "—";
     el.innerHTML = !st.enabled ? "متوقف" :
       (!st.perms ? '<span style="color:var(--bad)">⚠️ محتاج إذن سجل المكالمات والملفات الصوتية</span>' :
-      `✔ اترفع ${st.count} تسجيل · آخر رفع: ${t(st.lastUpload)}` + (st.error ? ` · <span style="color:var(--bad)">${st.error}</span>` : "")) +
+      `✔ اترفع ${st.count} تسجيل · آخر رفع: ${t(st.lastUpload)} · آخر فحص: ${t(st.lastRun)}` + (st.error ? `<br><span style="color:var(--bad)">${st.error}</span>` : "") + (st.info ? `<br>${st.info}` : "")) +
       (st.enabled ? ' <button class="mini call" style="padding:4px 10px;width:auto;height:auto;border-radius:99px" onclick="Android.simSyncNow();toast(\'بيدوّر على تسجيلات جديدة…\')">⟳ ارفع دلوقتي</button>' : "");
   },
   refresh() { if (IS_APP && Android.simUploadStatus) try { this.render(JSON.parse(Android.simUploadStatus())); } catch (e) {} }

@@ -46,6 +46,8 @@ object SimRecSync {
             .put("lastUpload", p.getLong("lastUpload", 0))
             .put("lastRun", p.getLong("lastRun", 0))
             .put("error", p.getString("error", "") ?: "")
+            .put("info", p.getString("info", "") ?: "")
+            .put("calls", p.getInt("calls", 0))
             .toString()
     }
 
@@ -94,13 +96,16 @@ object SimRecSync {
 
         var newSince = since
         var error = ""
+        var info = ""
+        val fmt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
         for (call in calls) {
             val key = call.start.toString()
             if (key in done) { newSince = maxOf(newSince, call.start); continue }
             val end = call.start + call.durSec * 1000
-            if (now < end + 20_000) break // المسجّل لسه بيكتب الملف
+            if (now < end + 20_000) { info = "مكالمة ${fmt.format(call.start)} لسه خالصة — هيرفعها كمان شوية"; break }
             val rec = findRecording(ctx, call, end, usedMedia)
             if (rec == null) {
+                info = "مكالمة ${fmt.format(call.start)} مع ${call.number}: ملقتش ليها ملف تسجيل على الموبايل — اتأكد إن تسجيل المكالمات التلقائي شغال"
                 // بعد 20 دقيقة من غير تسجيل → المكالمة دي مكانش ليها تسجيل
                 if (now > end + 20 * 60_000) { done += key; newSince = maxOf(newSince, call.start) }
                 continue
@@ -109,6 +114,7 @@ object SimRecSync {
             when (code) {
                 200 -> {
                     done += key; usedMedia += rec.id.toString(); newSince = maxOf(newSince, call.start)
+                    info = "آخر مكالمة اترفعت: ${fmt.format(call.start)} مع ${call.number}"
                     p.edit().putInt("count", p.getInt("count", 0) + 1).putLong("lastUpload", now).apply()
                 }
                 401 -> { error = "رقم التحويلة أو الباسورد غلط"; break }
@@ -120,7 +126,8 @@ object SimRecSync {
         val keep = done.sortedBy { it.toLongOrNull() ?: 0 }.takeLast(500).toSet()
         p.edit().putLong("since", maxOf(since, newSince - 60 * 60_000))
             .putStringSet("done", keep).putStringSet("media", usedMedia.toList().takeLast(500).toSet())
-            .putLong("lastRun", now).putString("error", error).apply()
+            .putLong("lastRun", now).putString("error", error).putString("info", info)
+            .putInt("calls", calls.size).apply()
     }
 
     private fun digits(s: String) = s.filter { it.isDigit() }
