@@ -25,7 +25,7 @@ fi
 
 echo "== packages"
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y -qq python3-venv python3-pip ffmpeg apache2-utils >/dev/null
+apt-get install -y -qq python3-venv python3-pip apache2-utils >/dev/null
 
 echo "== app files"
 mkdir -p "$APP" "$CONF" "$DATA/analysis"
@@ -74,10 +74,15 @@ systemctl daemon-reload
 systemctl enable -q nq-calls
 systemctl restart nq-calls
 
-echo "== weekly analysis (Saturday 06:00 Riyadh = 03:00 UTC)"
-cat > /etc/cron.d/nq-calls <<EOF
+# المرحلة 2 (تحليل تسجيلات المكالمات): NQ_PHASE2=1 bash install.sh
+if [[ "${NQ_PHASE2:-}" == 1 ]]; then
+  echo "== phase 2: call-recording analysis"
+  apt-get install -y -qq ffmpeg >/dev/null
+  "$APP/venv/bin/pip" install -q -r "$SRC/requirements-phase2.txt"
+  cat > /etc/cron.d/nq-calls <<EOF
 0 3 * * 6 $RUN_USER set -a; . $CONF/env; nice -n 19 $APP/venv/bin/python $APP/analyzer.py --last-week >> $DATA/weekly.log 2>&1
 EOF
+fi
 
 echo "== web (https://$HOST/calls)"
 if [[ -n "${NQ_DASH_PASSWORD:-}" ]]; then
