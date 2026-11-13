@@ -130,7 +130,9 @@ tr.team td{background:#F7FBFB;font-weight:700;color:var(--teal-d)}
   .report{box-shadow:none;width:auto;margin:0;padding:0}
   @page{size:A4 landscape;margin:10mm}
 }
-@media(max-width:1000px){.grid,.set-grid{grid-template-columns:1fr}.report{width:auto}}
+@media(max-width:1000px){.grid,.set-grid{grid-template-columns:1fr}.report{width:auto;padding:14px}.rh{flex-wrap:wrap;gap:10px}}
+@media screen and (max-width:1000px){.report{overflow-x:auto;max-width:100%}.report table{min-width:900px}}
+html,body{max-width:100%;overflow-x:hidden}
 </style>
 </head>
 <body>

@@ -80,7 +80,9 @@ systemctl daemon-reload
 systemctl enable -q nq-calls
 systemctl restart nq-calls
 
-# المرحلة 2 (تحليل تسجيلات المكالمات): NQ_PHASE2=1 bash install.sh
+# المرحلة 2 (تحليل تسجيلات المكالمات): NQ_PHASE2=1 bash install.sh  (بيتفتكر بعد كده)
+[[ "${NQ_PHASE2:-}" == 1 ]] && touch "$CONF/phase2"
+[[ -f "$CONF/phase2" ]] && NQ_PHASE2=1
 if [[ "${NQ_PHASE2:-}" == 1 ]]; then
   echo "== phase 2: call-recording analysis"
   apt-get install -y -qq ffmpeg >/dev/null
@@ -154,6 +156,14 @@ grep -qE '^\s*Listen\s+443' /etc/apache2/ports.conf /etc/apache2/conf-enabled/*.
 a2ensite -q nq-calls >/dev/null
 apachectl configtest
 systemctl reload apache2
+
+# أمر تحديث سريع: sudo nq-update
+cat > /usr/local/bin/nq-update <<'UPD'
+#!/bin/bash
+set -e
+cd /tmp && rm -rf Central && git clone -q https://github.com/salimman2027/Central && bash Central/server/install.sh
+UPD
+chmod 755 /usr/local/bin/nq-update
 
 echo "== check"
 for i in 1 2 3 4 5 6 7 8 9 10; do
