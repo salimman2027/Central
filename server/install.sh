@@ -95,7 +95,9 @@ if [[ -n "${NQ_DASH_PASSWORD:-}" ]]; then
   htpasswd -bcB "$CONF/htpasswd" admin "$NQ_DASH_PASSWORD" 2>/dev/null
 fi
 [[ -f "$CONF/htpasswd" ]] || { echo "!! no dashboard password set (NQ_DASH_PASSWORD)"; exit 1; }
-chown root:www-data "$CONF/htpasswd"; chmod 640 "$CONF/htpasswd"
+# FreePBX بيشغّل Apache بيوزر asterisk مش www-data
+WEB_GROUP=$( . /etc/apache2/envvars 2>/dev/null; echo "${APACHE_RUN_GROUP:-www-data}" )
+chown root:"$WEB_GROUP" "$CONF/htpasswd"; chmod 640 "$CONF/htpasswd"
 
 CERT=/etc/asterisk/keys/integration/certificate.pem
 KEY=/etc/asterisk/keys/integration/webserver.key
@@ -156,5 +158,6 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
 done
 curl -fsS http://127.0.0.1:8090/api/config >/dev/null && echo "service OK"
 D=$(date +%F)
-curl -fsS "http://127.0.0.1:8090/api/calls?from=$D&to=$D" | head -c 300; echo
+curl -sS "http://127.0.0.1:8090/api/calls?from=$D&to=$D" | head -c 400; echo
+journalctl -u nq-calls -n 8 --no-pager 2>/dev/null | grep -iE "error|exception" | tail -3 || true
 echo "DONE  ->  https://$HOST/calls/   (user: admin)"
