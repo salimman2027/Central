@@ -159,6 +159,67 @@ class MainActivity : Activity() {
     }
 
     /** صفحة التليفون بتكلّم التطبيق من هنا */
+    private var pdfView: WebView? = null
+
+    private fun writeDownload(name: String, mime: String, bytes: ByteArray): Uri {
+        if (Build.VERSION.SDK_INT >= 29) {
+            val v = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                put(android.provider.MediaStore.Downloads.MIME_TYPE, mime)
+            }
+            val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v)!!
+            contentResolver.openOutputStream(uri)!!.use { it.write(bytes) }
+            return uri
+        }
+        @Suppress("DEPRECATION")
+        val dir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+        dir.mkdirs()
+        val f = java.io.File(dir, name); f.writeBytes(bytes)
+        return Uri.fromFile(f)
+    }
+
+    private fun openFile(uri: Uri, mime: String) {
+        try {
+            if (uri.scheme == "file") {
+                @Suppress("DEPRECATION")
+                android.os.StrictMode.setVmPolicy(android.os.StrictMode.VmPolicy.Builder().build())
+            }
+            val i = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(Intent.createChooser(i, "فتح الملف").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(this, "الملف في التنزيلات — مفيش برنامج يفتحه", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun makePdf(name: String, html: String) {
+        val v = WebView(this)
+        pdfView = v
+        v.settings.javaScriptEnabled = false
+        v.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                val attrs = android.print.PrintAttributes.Builder()
+                    .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4.asLandscape())
+                    .setResolution(android.print.PrintAttributes.Resolution("pdf", "pdf", 600, 600))
+                    .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS).build()
+                val tmp = java.io.File(cacheDir, "report.pdf")
+                android.print.PdfPrint(attrs).print(view.createPrintDocumentAdapter(name), tmp) { ok ->
+                    runOnUiThread {
+                        var saved = false
+                        if (ok) try {
+                            val uri = writeDownload(name, "application/pdf", tmp.readBytes())
+                            saved = true
+                            openFile(uri, "application/pdf")
+                        } catch (_: Exception) {}
+                        web.evaluateJavascript("window.onFileSaved && onFileSaved($saved)", null)
+                        pdfView?.destroy(); pdfView = null
+                    }
+                }
+            }
+        }
+        v.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+    }
+
     inner class Bridge {
         @JavascriptInterface fun onIncoming(number: String) {
             if (PhoneService.instance != null) PhoneService.incoming(number)
@@ -226,6 +287,17 @@ class MainActivity : Activity() {
                 }
                 "Download/$name"
             } catch (e: Exception) { "" }
+        }
+
+        @JavascriptInterface fun saveAndOpen(name: String, mime: String, b64: String): Boolean = try {
+            val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+            val uri = writeDownload(name, mime, bytes)
+            runOnUiThread { openFile(uri, mime) }
+            true
+        } catch (e: Exception) { false }
+
+        @JavascriptInterface fun savePdf(name: String, html: String) {
+            runOnUiThread { makePdf(name, html) }
         }
 
         @JavascriptInterface fun setSpeaker(on: Boolean) {

@@ -310,7 +310,7 @@
   <div class="card" id="sTarget"></div>
   <div class="kgrid" id="sKpis"></div>
   <div class="card"><b>نتايج المكالمات</b><div id="sOut" style="margin-top:6px"></div></div>
-  <button class="btn" onclick="NQStats.download()">📥 تنزيل التقرير (Excel)</button>
+  <button class="btn" onclick="NQStats.download()">📥 تنزيل التقرير (Excel / PDF)</button>
 </section>
 
 <div class="sheet-bg" id="viaSheet" onclick="if(event.target===this)NQVia.close()">
@@ -320,6 +320,15 @@
     <button class="opt" id="viaPbx" onclick="NQVia.pick('pbx')"><b>☎️</b><div>من السنترال<small>بيتسجّل ويظهر في اللوحة ويطلع من شريحة الشركة</small></div></button>
     <button class="opt" onclick="NQVia.pick('sim')"><b>📱</b><div>من شريحتي<small>من خط الموبايل الشخصي — مش بيتسجّل على السنترال</small></div></button>
     <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-top:6px"><input type="checkbox" id="viaRemember" style="width:auto"> افتكر اختياري ومتسألنيش تاني</label>
+  </div>
+</div>
+
+<div class="sheet-bg" id="fmtSheet" onclick="if(event.target===this)this.classList.remove('on')">
+  <div class="sheet">
+    <h3>تنزيل التقرير</h3>
+    <div class="n" style="direction:rtl">اختار الصيغة — الملف هيتحفظ في التنزيلات ويتفتح على طول</div>
+    <button class="opt" onclick="NQStats.exportAs('xlsx')"><b>📗</b><div>Excel<small>جدول تقدر تفلتر وترتّب فيه</small></div></button>
+    <button class="opt" onclick="NQStats.exportAs('pdf')"><b>📕</b><div>PDF<small>تقرير جاهز للطباعة والإرسال</small></div></button>
   </div>
 </div>
 
@@ -334,6 +343,7 @@
 <audio id="remoteAudio" autoplay></audio>
 
 <script src="jssip.min.js"></script>
+<script src="xlsx.mini.min.js"></script>
 <script>
 /* ===================================================================
    NQ Phone — تليفون السنترال
@@ -873,32 +883,72 @@ const NQStats = {
     $("sOut").innerHTML = Object.keys(oc).length ? Object.entries(oc).map(([o, n]) => `<div class="orow"><span>${o}</span><b>${n}</b></div>`).join("")
       : '<div style="color:var(--muted);font-size:13px">لسه مفيش ملخصات. فعّل "وضع موظف CRM" من الإعدادات.</div>';
   },
-  download() {
+  /* بيانات التقرير — نفس الأعمدة للـ Excel والـ PDF */
+  table() {
     const rows = this.rows();
-    if (!rows.length) { toast("مفيش مكالمات في الفترة دي"); return; }
-    const q = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
     const [from, to] = this.range();
     const ans = rows.filter(r => r.answered); const talk = ans.reduce((a, r) => a + (r.duration || 0), 0);
-    const lines = [
-      [q("تقرير مكالمات — تحويلة " + (NQPhone.ext || "")), q(this.label() + ": " + isoDay(from) + " → " + isoDay(to))].join(","),
-      [q("إجمالي المكالمات"), rows.length, q("اتردّ عليها"), ans.length, q("وقت الكلام"), q(fmtDur(talk))].join(","),
-      "",
-      ["م", "اسم العميل", "التاريخ", "الوقت", "الرقم", "النوع", "مدة المكالمة", "نتيجة المكالمة", "ملخص حالة العميل", "ميعاد المتابعة", "حرارة العميل (AI)", "احتمال الشراء (AI)", "توقع الذكاء الاصطناعي", "الخطوة الجاية (AI)"].map(q).join(",")
-    ];
-    rows.forEach((r, i) => {
+    const head = ["م", "اسم العميل", "التاريخ", "الوقت", "الرقم", "النوع", "مدة المكالمة", "نتيجة المكالمة", "ملخص حالة العميل", "ميعاد المتابعة", "حرارة العميل (AI)", "احتمال الشراء (AI)", "توقع الذكاء الاصطناعي", "الخطوة الجاية (AI)"];
+    const body = rows.map((r, i) => {
       const t = new Date(r.started); const tg = r.customer ? null : NQTargets.findByNumber(r.number);
-      lines.push([i + 1, q(r.customer || (tg && tg.customer) || ""), q(isoDay(t)), q(t.toTimeString().slice(0, 5)), q(r.number),
-        q((r.direction === "out" ? "صادرة" : "واردة") + (r.via === "sim" ? " (شريحتي)" : "")), q(r.answered ? fmtDur(r.duration) : "لم يتم الرد"),
-        q(r.outcome || ""), q(r.summary || ""), q(r.followUp || ""),
-        q(r.ai && r.ai.temperature || ""), q(r.ai && r.ai.buy_probability != null ? r.ai.buy_probability + "%" : ""),
-        q(r.ai && r.ai.expectation || ""), q(r.ai && r.ai.next_action || "")].join(","));
+      return [i + 1, r.customer || r.name || (tg && tg.customer) || "", isoDay(t), t.toTimeString().slice(0, 5), r.number,
+        (r.direction === "out" ? "صادرة" : "واردة") + (r.via === "sim" ? " (شريحتي)" : ""), r.answered ? fmtDur(r.duration) : "لم يتم الرد",
+        r.outcome || "", r.summary || "", r.followUp || "",
+        (r.ai && r.ai.temperature) || "", r.ai && r.ai.buy_probability != null ? r.ai.buy_probability + "%" : "",
+        (r.ai && r.ai.expectation) || "", (r.ai && r.ai.next_action) || ""];
     });
-    const csv = "\ufeff" + lines.join("\r\n");
-    const name = `NQ-calls-${NQPhone.ext || ""}-${this.period}-${isoDay(new Date())}.csv`;
-    if (window.Android && Android.saveFile) { const where = Android.saveFile(name, csv); toast(where ? "اتحفظ في التنزيلات ✓" : "تعذّر الحفظ"); }
-    else { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = name; a.click(); }
+    return { head, body, from, to, total: rows.length, answered: ans.length, talk };
+  },
+  fileName(ext) { return `NQ-calls-${NQPhone.ext || "sim"}-${this.period}-${isoDay(new Date())}.${ext}`; },
+  download() {
+    if (!this.rows().length) { toast("مفيش مكالمات في الفترة دي"); return; }
+    $("fmtSheet").classList.add("on");
+  },
+  exportAs(kind) {
+    $("fmtSheet").classList.remove("on");
+    const T = this.table();
+    const title = `تقرير مكالمات — ${NQPhone.ext ? "تحويلة " + NQPhone.ext : "NQ Phone"}`;
+    const period = `${this.label()}: ${isoDay(T.from)} → ${isoDay(T.to)}`;
+    if (kind === "xlsx") {
+      const aoa = [[title, "", period], ["إجمالي المكالمات", T.total, "اتردّ عليها", T.answered, "وقت الكلام", fmtDur(T.talk)], [], T.head, ...T.body];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = [4, 22, 11, 7, 13, 14, 11, 14, 45, 12, 12, 12, 45, 35].map(w => ({ wch: w }));
+      const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{ RTL: true }] };
+      XLSX.utils.book_append_sheet(wb, ws, "المكالمات");
+      const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      if (window.Android && Android.saveAndOpen) {
+        const b64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+        const ok = Android.saveAndOpen(this.fileName("xlsx"), mime, b64);
+        toast(ok ? "اتحفظ في التنزيلات ✓" : "تعذّر الحفظ");
+      } else XLSX.writeFile(wb, this.fileName("xlsx"));
+      return;
+    }
+    // PDF: صفحة HTML منسّقة والتطبيق بيحوّلها لـ PDF
+    const esc = v => String(v ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const cols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12];
+    const numCols = [2, 3, 4, 6];
+    const rowsHtml = T.body.map(r => "<tr>" + cols.map(i => `<td${numCols.includes(i) ? ' class="n"' : ""}>${esc(r[i])}</td>`).join("") + "</tr>").join("");
+    const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><style>
+      @page { size: A4 landscape; margin: 10mm; }
+      body { font-family: sans-serif; color:#14202e; font-size:10.5px; margin:0; }
+      .hd { display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #0f7c7a; padding-bottom:8px; margin-bottom:10px; }
+      .lg { width:44px; height:44px; border-radius:9px; background:#0f7c7a; color:#fff; font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; }
+      h1 { font-size:18px; margin:0; } .sub { color:#6b7684; font-size:11px; }
+      .kp { display:flex; gap:18px; background:#e7f3f2; border-radius:8px; padding:7px 12px; margin-bottom:10px; font-size:11.5px; }
+      table { width:100%; border-collapse:collapse; } th { background:#0f7c7a; color:#fff; padding:6px 4px; font-size:10.5px; }
+      td { border-bottom:1px solid #d5e2e1; padding:5px 4px; vertical-align:top; } tr:nth-child(even) td { background:#f7fbfb; }
+      td.n { direction:ltr; text-align:right; white-space:nowrap; } .ft { text-align:center; color:#6b7684; margin-top:10px; font-size:10px; }
+      </style></head><body>
+      <div class="hd"><div style="display:flex;gap:10px;align-items:center"><div class="lg">NQ</div><div><h1>${esc(title)}</h1><div class="sub">الجودة الوطنية لتقنية المعلومات</div></div></div>
+      <div class="sub" style="text-align:left">${esc(period)}<br>تاريخ الطباعة: ${esc(new Date().toLocaleString("en-GB"))}</div></div>
+      <div class="kp"><span>إجمالي المكالمات: <b>${T.total}</b></span><span>اتردّ عليها: <b>${T.answered}</b></span><span>وقت الكلام: <b>${fmtDur(T.talk)}</b></span></div>
+      <table><tr>${cols.map(i => `<th>${esc(T.head[i])}</th>`).join("")}</tr>${rowsHtml}</table>
+      <div class="ft">NQ Phone</div></body></html>`;
+    if (window.Android && Android.savePdf) { toast("بيجهّز الـ PDF…"); Android.savePdf(this.fileName("pdf"), html); }
+    else { const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); w.print(); } }
   }
 };
+window.onFileSaved = ok => toast(ok ? "اتحفظ في التنزيلات ✓" : "تعذّر حفظ الملف");
 document.querySelectorAll("#sSeg button").forEach(b => b.onclick = () => { NQStats.period = b.dataset.p; NQStats.render(); });
 
 /* ---------- start ---------- */
