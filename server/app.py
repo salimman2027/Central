@@ -40,8 +40,10 @@ def db_conf() -> dict:
         return dict(host=os.environ.get("NQ_DB_HOST", "localhost"), user=os.environ["NQ_DB_USER"],
                     password=os.environ.get("NQ_DB_PASS", ""))
     txt = Path("/etc/freepbx.conf").read_text()
-    get = lambda k: re.search(rf"\['{k}'\]\s*=\s*['\"]([^'\"]*)['\"]", txt).group(1)
-    return dict(host=get("AMPDBHOST"), user=get("AMPDBUSER"), password=get("AMPDBPASS"))
+    def get(k, default=""):
+        m = re.search(rf"""\[\s*['"]{k}['"]\s*\]\s*=\s*['"]([^'"]*)['"]""", txt)
+        return m.group(1) if m else default
+    return dict(host=get("AMPDBHOST", "localhost"), user=get("AMPDBUSER", "freepbxuser"), password=get("AMPDBPASS"))
 
 
 def query(sql: str, args: tuple, database: str | None = None) -> list:
