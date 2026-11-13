@@ -14,7 +14,16 @@ android {
         versionCode = 2
         versionName = "1.1"
     }
+    signingConfigs {
+        create("fixed") {
+            storeFile = file("docscanner.keystore")
+            storePassword = "docscanner"
+            keyAlias = "docscanner"
+            keyPassword = "docscanner"
+        }
+    }
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("fixed") }
         release { isMinifyEnabled = false }
     }
     compileOptions {
