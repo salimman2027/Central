@@ -17,6 +17,7 @@
   #status b.on { color:var(--ok); } #status b.off { color:var(--bad); }
   #callinfo { min-height:22px; font-weight:600; margin:6px 0 10px; direction:ltr; text-align:center; }
   #login, #dialer { display:none; }
+  .lbl { display:block; font-size:12px; color:var(--muted); margin:0 2px 4px; }
   .full { width:100%; }
 </style>
 </head>
@@ -31,6 +32,22 @@
     <div class="row"><input id="ext" placeholder="رقم التحويلة (مثلًا 101)"></div>
     <div class="row"><input id="pwd" type="password" placeholder="باسورد التحويلة"></div>
     <button class="full" onclick="NQPhone.login(ext.value.trim(), pwd.value)">دخول</button>
+    <details id="srvBox" style="margin-top:14px">
+      <summary style="cursor:pointer;color:var(--muted);font-size:14px">⚙ إعدادات السيرفر</summary>
+      <div style="margin-top:10px">
+        <label class="lbl">عنوان السيرفر</label>
+        <div class="row"><input id="srvHost" placeholder="3.89.245.93.sslip.io"></div>
+        <label class="lbl">البورت</label>
+        <div class="row"><input id="srvPort" inputmode="numeric" placeholder="8089"></div>
+        <label class="lbl">المسار</label>
+        <div class="row"><input id="srvPath" placeholder="/ws"></div>
+        <div class="row">
+          <button class="gray" style="flex:1" onclick="NQSettings.reset()">الافتراضي</button>
+          <button style="flex:1" onclick="NQSettings.save()">حفظ</button>
+        </div>
+        <div id="srvMsg" style="font-size:13px;color:var(--muted)"></div>
+      </div>
+    </details>
   </div>
 
   <!-- لوحة الاتصال -->
@@ -62,10 +79,39 @@
        NQPhone.onIncoming = (num) => {...}      فتح ملف العميل عند الرنين
        NQPhone.onCallEnded = (info) => {...}    تسجيل المكالمة في الـ CRM
    ===================================================================== */
-const CONFIG = {
-  wss:    ["wss://3.89.245.93.sslip.io:8089/ws", "wss://3.89.245.93.sslip.io/ws"],
-  domain: "3.89.245.93.sslip.io",
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+/* إعدادات السيرفر: الافتراضي هنا، والمستخدم يقدر يغيّرها من "⚙ إعدادات السيرفر" */
+const DEFAULT_SERVER = { host: "3.89.245.93.sslip.io", port: "8089", path: "/ws" };
+const CONFIG = { wss: [], domain: "", iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+const NQSettings = {
+  load() {
+    let s = {};
+    try { s = JSON.parse(localStorage.getItem("nq_server") || "{}"); } catch (e) {}
+    return { ...DEFAULT_SERVER, ...s };
+  },
+  apply(s) {
+    const path = s.path.startsWith("/") ? s.path : "/" + s.path;
+    CONFIG.domain = s.host;
+    CONFIG.wss = [`wss://${s.host}${s.port && s.port !== "443" ? ":" + s.port : ""}${path}`];
+    if (s.port !== "443") CONFIG.wss.push(`wss://${s.host}${path}`); // احتياطي على 443
+    $("srvHost").value = s.host; $("srvPort").value = s.port; $("srvPath").value = path;
+  },
+  save() {
+    const s = {
+      host: $("srvHost").value.trim().replace(/^wss?:\/\//, "").replace(/\/.*$/, ""),
+      port: $("srvPort").value.trim() || "443",
+      path: $("srvPath").value.trim() || "/ws"
+    };
+    if (!s.host) { $("srvMsg").textContent = "اكتب عنوان السيرفر"; return; }
+    try { localStorage.setItem("nq_server", JSON.stringify(s)); } catch (e) {}
+    this.apply(s);
+    $("srvMsg").textContent = "اتحفظ ✓ — اضغط دخول";
+  },
+  reset() {
+    try { localStorage.removeItem("nq_server"); } catch (e) {}
+    this.apply(DEFAULT_SERVER);
+    $("srvMsg").textContent = "رجعت للإعدادات الافتراضية ✓";
+  }
 };
 
 const $ = id => document.getElementById(id);
@@ -219,6 +265,7 @@ const NQPhone = {
   }
 };
 window.NQPhone = NQPhone;
+NQSettings.apply(NQSettings.load());
 NQPhone._status(false);
 // دخول تلقائي بآخر تحويلة اتسجّلت على الجهاز
 try { const s = JSON.parse(localStorage.getItem("nq_login") || "null"); if (s) NQPhone.login(s.ext, s.password); } catch (e) {}
