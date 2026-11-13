@@ -306,6 +306,9 @@ def _run_job(d_from: str, d_to: str):
 def analyze(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(alias="to")):
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise HTTPException(400, "مفتاح Claude API مش متضاف على السيرفر")
+    import importlib.util
+    if not importlib.util.find_spec("faster_whisper"):
+        raise HTTPException(400, "تحليل التسجيلات (المرحلة 2) لسه مش متركّب على السيرفر")
     with JOB_LOCK:
         if JOB["running"]:
             raise HTTPException(409, "في تحليل شغّال بالفعل")
