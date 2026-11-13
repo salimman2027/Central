@@ -290,7 +290,7 @@ JOB_LOCK = threading.Lock()
 
 
 def _run_job(d_from: str, d_to: str):
-    cmd = ["nice", "-n", "19", sys.executable, str(HERE / "analyzer.py"), "--from", d_from, "--to", d_to]
+    cmd = ["nice", "-n", "19", sys.executable, str(HERE / "analyzer.py"), "--from", d_from, "--to", d_to, "--min-sec", "10"]
     env = dict(os.environ, NQ_AI_OUT=str(ANALYSIS_DIR))
     try:
         p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=6 * 3600)

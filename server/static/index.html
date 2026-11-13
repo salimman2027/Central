@@ -458,7 +458,7 @@ async function pollAI(){
     const j=await (await fetch(API_BASE+'/analyze/status')).json();
     if(!AI_ENABLED) setNote('⚠️ التحليل مش متفعّل: مفتاح Claude API مش متضاف على السيرفر.');
     else if(j.running){ setNote(`⏳ التحليل شغّال للفترة ${esc(j.range?.[0])} → ${esc(j.range?.[1])} (بدأ ${esc((j.started||'').slice(11,16))}). ممكن تقفل الصفحة، هيكمّل لوحده.`); $('aRun').disabled=true; clearTimeout(aiPoll); aiPoll=setTimeout(pollAI,15000); }
-    else { $('aRun').disabled=!AI_ENABLED; setNote(j.finished?`✔ آخر تحليل خلص ${esc(j.finished.slice(0,16).replace('T',' '))}. بيتحلّل لوحده كمان كل سبت الساعة 6 الصبح.`:'التحليل بيشتغل لوحده كل سبت الساعة 6 الصبح، أو اضغط الزرار لأي فترة.'); if(j.finished&&aiPoll){aiPoll=null;loadAI();} }
+    else { $('aRun').disabled=!AI_ENABLED; setNote(j.finished?`✔ آخر تحليل خلص ${esc(j.finished.slice(0,16).replace('T',' '))}. بيتحلّل لوحده كمان كل سبت الساعة 6 الصبح.`+(j.log?`<pre style="white-space:pre-wrap;margin:8px 0 0;font-size:12px;direction:rtl">${esc(j.log.trim().split('\n').filter(l=>!/^\s*(File|Traceback|\^)/.test(l)).slice(-4).join('\n'))}</pre>`:''):'التحليل بيشتغل لوحده كل سبت الساعة 6 الصبح، أو اضغط الزرار لأي فترة.'); if(j.finished&&aiPoll){aiPoll=null;loadAI();} }
   }catch(e){ setNote('تعذّر معرفة حالة التحليل: '+esc(e.message)); }
 }
 async function runAI(){
