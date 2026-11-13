@@ -88,6 +88,10 @@ tr.team td{background:#F7FBFB;font-weight:700;color:var(--teal-d)}
 .tg input:checked+span:before{right:22px}
 .tree{background:#F7FBFB;border:1px dashed var(--border);border-radius:8px;padding:10px 14px;font-family:Consolas,monospace;font-size:12.5px;direction:ltr;text-align:left;line-height:1.7}
 .note{background:#FFF8EC;border:1px solid #F3D9A9;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.7}
+.ai-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:12px;position:sticky;top:0;z-index:3}
+.ai-bar .sp{flex:1}
+.ai-card.pending{border-style:dashed}
+.ai-card input.pick{width:20px;height:20px;accent-color:#0f7c7a;flex-shrink:0}
 .ai-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px}
 .ai-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-bottom:1px solid #E8EEEE;padding-bottom:8px;margin-bottom:10px}
 .ai-score{font-size:26px;font-weight:800;color:var(--teal);min-width:70px;text-align:center}
@@ -232,9 +236,15 @@ tr.team td{background:#F7FBFB;font-weight:700;color:var(--teal-d)}
   <div class="filters">
     <div class="f"><label>من تاريخ</label><input type="date" id="aFrom"></div>
     <div class="f"><label>إلى تاريخ</label><input type="date" id="aTo"></div>
-    <div class="f"><label>المندوب</label><select id="aRep"></select></div>
-    <button class="btn" onclick="loadAI()">عرض النتايج</button>
-    <button class="btn o" id="aRun" onclick="runAI()">🤖 حلّل المكالمات في الفترة دي</button>
+    <div class="f"><label>المندوب</label><select id="aRep" onchange="renderAI()"></select></div>
+    <button class="btn" onclick="loadAI()">عرض المكالمات</button>
+  </div>
+  <div class="ai-bar" id="aBar">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="aAll" onchange="aiSelectAll(this.checked)"> تحديد الكل</label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="aOnlyNew" onchange="renderAI()"> اللي لسه متحلّلتش بس</label>
+    <span class="sp"></span>
+    <span class="muted" id="aSelInfo"></span>
+    <button class="btn o" id="aRun" onclick="runAI()">🤖 حلّل المحدد</button>
   </div>
   <div class="note" id="aNote" style="margin-bottom:14px"></div>
   <div class="kpis" id="aKpis"></div>
@@ -453,30 +463,67 @@ function initAI(){
   pollAI();
 }
 function setNote(html){$('aNote').innerHTML=html}
+let AI_RUNNING=false;
 async function pollAI(){
   try{
     const j=await (await fetch(API_BASE+'/analyze/status')).json();
+    AI_RUNNING=!!j.running;
     if(!AI_ENABLED) setNote('⚠️ التحليل مش متفعّل: مفتاح Claude API مش متضاف على السيرفر.');
-    else if(j.running){ setNote(`⏳ التحليل شغّال للفترة ${esc(j.range?.[0])} → ${esc(j.range?.[1])} (بدأ ${esc((j.started||'').slice(11,16))}). ممكن تقفل الصفحة، هيكمّل لوحده.`); $('aRun').disabled=true; clearTimeout(aiPoll); aiPoll=setTimeout(pollAI,15000); }
-    else { $('aRun').disabled=!AI_ENABLED; setNote(j.finished?`✔ آخر تحليل خلص ${esc(j.finished.slice(0,16).replace('T',' '))}. بيتحلّل لوحده كمان كل سبت الساعة 6 الصبح.`+(j.log?`<pre style="white-space:pre-wrap;margin:8px 0 0;font-size:12px;direction:rtl">${esc(j.log.trim().split('\n').filter(l=>!/^\s*(File|Traceback|\^)/.test(l)).slice(-4).join('\n'))}</pre>`:''):'التحليل بيشتغل لوحده كل سبت الساعة 6 الصبح، أو اضغط الزرار لأي فترة.'); if(j.finished&&aiPoll){aiPoll=null;loadAI();} }
+    else if(j.running){
+      setNote(`⏳ التحليل شغّال (${esc(j.range?.[0]||'')}${j.range?.[1]?' → '+esc(j.range[1]):''}) — بدأ ${esc((j.started||'').slice(11,16))}. النتايج بتظهر تحت كل مكالمة أول ما تخلص، وممكن تقفل الصفحة.`);
+      clearTimeout(aiPoll); aiPoll=setTimeout(()=>{loadAI();pollAI();},10000);
+    } else {
+      const log=(j.log||'').trim().split('\n').filter(l=>l&&!/^\s*(File|Traceback|\^|from |import )/.test(l)).slice(-3).join('\n');
+      setNote(j.finished?`✔ آخر تحليل خلص ${esc(j.finished.slice(0,16).replace('T',' '))}.`+(log?`<pre style="white-space:pre-wrap;margin:8px 0 0;font-size:12px;direction:rtl">${esc(log)}</pre>`:'')
+        :'اختار الفترة ← "عرض المكالمات" ← علّم على المكالمات (أو تحديد الكل) ← "حلّل المحدد". وكل سبت الساعة 6 الصبح بيتحلّل الأسبوع لوحده.');
+      if(j.finished&&aiPoll){aiPoll=null;AI_WAIT.clear();loadAI();}
+    }
+    aiSelInfo();
   }catch(e){ setNote('تعذّر معرفة حالة التحليل: '+esc(e.message)); }
 }
 async function runAI(){
-  const r=await fetch(`${API_BASE}/analyze?from=${$('aFrom').value}&to=${$('aTo').value}`,{method:'POST'});
+  const ids=[...AI_SEL];
+  if(!ids.length){setNote('اختار مكالمة واحدة على الأقل (أو "تحديد الكل").');return}
+  const r=await fetch(`${API_BASE}/analyze`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});
   if(!r.ok){const e=await r.json().catch(()=>({}));setNote('⚠️ '+esc(e.detail||r.status));return}
+  ids.forEach(i=>AI_WAIT.add(i)); AI_SEL.clear(); renderAI();
   aiPoll=1; pollAI();
 }
+let AI_ROWS=[], AI_SEL=new Set(), AI_WAIT=new Set();
 async function loadAI(){
   $('aList').innerHTML='<div class="muted">جاري التحميل…</div>';
-  let rows=[];
-  try{ const r=await fetch(`${API_BASE}/analysis?from=${$('aFrom').value}&to=${$('aTo').value}`); if(!r.ok) throw new Error('API '+r.status); rows=await r.json(); }
-  catch(e){ $('aList').innerHTML=`<div class="note">تعذّر تحميل النتايج: ${esc(e.message)}</div>`; return; }
-  const rp=$('aRep').value; rows=rows.filter(x=>REPS.some(r=>r.id===x.call.ext)&&(!rp||x.call.ext==rp));
+  const q=`from=${$('aFrom').value}&to=${$('aTo').value}`;
+  let calls=[],an=[];
+  try{
+    const [r1,r2]=await Promise.all([fetch(`${API_BASE}/calls?${q}`),fetch(`${API_BASE}/analysis?${q}`)]);
+    if(!r1.ok) throw new Error('API '+r1.status); calls=await r1.json(); an=r2.ok?await r2.json():[];
+  }catch(e){ $('aList').innerHTML=`<div class="note">تعذّر تحميل المكالمات: ${esc(e.message)}</div>`; return; }
+  const byId={}; an.forEach(x=>byId[x.call.id]=x);
+  AI_ROWS=calls.filter(c=>c.hasRecording).map(c=>({call:c,analysis:byId[c.id]?.analysis||null,transcript:byId[c.id]?.transcript||[]}));
+  AI_ROWS.forEach(x=>{ if(x.analysis) AI_WAIT.delete(x.call.id); });
+  AI_SEL=new Set([...AI_SEL].filter(id=>AI_ROWS.some(x=>x.call.id===id)));
+  renderAI();
+}
+function aiVisible(){
+  const rp=$('aRep').value, onlyNew=$('aOnlyNew').checked;
+  return AI_ROWS.filter(x=>REPS.some(r=>r.id===x.call.ext)&&(!rp||x.call.ext==rp)&&(!onlyNew||!x.analysis));
+}
+function aiSelectAll(on){ aiVisible().forEach(x=>on?AI_SEL.add(x.call.id):AI_SEL.delete(x.call.id)); renderAI(); }
+function aiToggle(id,on){ on?AI_SEL.add(id):AI_SEL.delete(id); aiSelInfo(); }
+function aiSelInfo(){
+  const vis=aiVisible(); const n=AI_SEL.size;
+  $('aSelInfo').textContent=n?`${n} مكالمة محددة`:`${vis.length} مكالمة متسجّلة`;
+  $('aRun').disabled=!AI_ENABLED||!n||AI_RUNNING;
+  $('aRun').textContent=n?`🤖 حلّل المحدد (${n})`:'🤖 حلّل المحدد';
+  $('aAll').checked=vis.length>0&&vis.every(x=>AI_SEL.has(x.call.id));
+}
+function renderAI(){
+  const all=aiVisible(); const rows=all.filter(x=>x.analysis);
   const sc=rows.map(x=>+x.analysis.agent_score).filter(v=>!isNaN(v));
   const cnt=k=>rows.filter(x=>x.analysis.outcome===k).length;
   const sent=k=>rows.filter(x=>x.analysis.customer_sentiment===k).length;
   $('aKpis').innerHTML=`
-   <div class="kpi"><div class="l">مكالمات متحلّلة</div><div class="v">${rows.length}</div></div>
+   <div class="kpi"><div class="l">مكالمات متحلّلة</div><div class="v">${rows.length}</div><div class="s">من ${all.length} متسجّلة</div></div>
    <div class="kpi green"><div class="l">متوسط تقييم المناديب</div><div class="v">${sc.length?Math.round(sc.reduce((a,b)=>a+b,0)/sc.length):'—'}</div><div class="s">من 100</div></div>
    <div class="kpi blue"><div class="l">بيع / مهتم</div><div class="v">${cnt('بيع')+cnt('مهتم')}</div><div class="s">بيع ${cnt('بيع')} — مهتم ${cnt('مهتم')}</div></div>
    <div class="kpi orange"><div class="l">يحتاج متابعة</div><div class="v">${cnt('يحتاج متابعة')}</div></div>
@@ -485,20 +532,24 @@ async function loadAI(){
   $('aRepTbl').innerHTML='<tr><th>المندوب</th><th>الفريق</th><th class="c">مكالمات متحلّلة</th><th class="c">متوسط التقييم</th><th class="c">بيع/مهتم</th><th class="c">يحتاج متابعة</th><th class="c">متضايق</th></tr>'+
    Object.entries(by).map(([e,l])=>{const r=repOf(+e);const s=l.map(x=>+x.analysis.agent_score).filter(v=>!isNaN(v));const avg=s.length?Math.round(s.reduce((a,b)=>a+b,0)/s.length):0;
     return `<tr><td>${esc(r.name)}</td><td>${esc(teamOf(r.team)?.name||'')}</td><td class="c">${l.length}</td><td><div style="display:flex;align-items:center;gap:6px"><div class="bar ${avg<50?'low':avg<75?'mid':''}"><b style="width:${avg}%"></b></div><b>${avg}</b></div></td><td class="c">${l.filter(x=>['بيع','مهتم'].includes(x.analysis.outcome)).length}</td><td class="c">${l.filter(x=>x.analysis.outcome==='يحتاج متابعة').length}</td><td class="c">${l.filter(x=>x.analysis.customer_sentiment==='متضايق').length}</td></tr>`}).join('');
-  $('aList').innerHTML=rows.length?rows.map(x=>{const a=x.analysis,c=x.call,r=repOf(c.ext),t=new Date(c.time);
+  $('aList').innerHTML=all.length?all.map(x=>{const a=x.analysis,c=x.call,r=repOf(c.ext),t=new Date(c.time);
+    const head=`<div class="ai-head"><input type="checkbox" class="pick" ${AI_SEL.has(c.id)?'checked':''} onchange="aiToggle('${esc(c.id)}',this.checked)" title="اختار المكالمة دي للتحليل">
+      ${a?`<div class="ai-score">${esc(a.agent_score??'—')}<small>تقييم الموظف</small></div>`:''}
+      <div style="flex:1"><b>${esc(r.name)}</b> <span class="muted">${c.dir==='out'?'↗ صادرة':'↙ واردة'} · <span style="direction:ltr;display:inline-block">${esc(c.number)}</span> · ${dmy(t)} ${tm(t)} · ${ms(c.talkSec)}</span>
+      ${a?`<br><span class="badge b-out">${esc(a.outcome||'')}</span> <span class="badge ${a.customer_sentiment==='متضايق'?'b-miss':a.customer_sentiment==='راضي'?'b-ans':'b-no'}">${esc(a.customer_sentiment||'')}</span>`:''}</div>
+      <button class="play" title="سماع التسجيل" onclick="openRecById('${esc(c.id)}','${esc(r.name)} ← ${esc(c.number)}')">▶</button></div>`;
+    if(!a) return `<div class="ai-card pending">${head}<div class="muted">${AI_WAIT.has(c.id)?'⏳ بيتحلّل دلوقتي…':'لسه متحلّلتش — علّم عليها ودوس "حلّل المحدد"'}</div></div>`;
     const chk=(a.checklist||[]).map(k=>`<li class="${k.done?'ok':'no'}">${k.done?'✔':'✖'} ${esc(k.item)}${k.evidence?` <span class="muted">— ${esc(k.evidence)}</span>`:''}</li>`).join('');
     const tasks=(a.follow_up_tasks||[]).map(k=>`<li>${esc(k.task)}${k.due?' — '+esc(k.due):''}</li>`).join('')||'<li>—</li>';
     const tr=(x.transcript||[]).map(l=>`<div><span>${l.start}s</span> ${esc(l.text)}</div>`).join('');
-    return `<div class="ai-card"><div class="ai-head"><div class="ai-score">${esc(a.agent_score??'—')}<small>تقييم الموظف</small></div>
-      <div style="flex:1"><b>${esc(r.name)}</b> <span class="muted">${c.dir==='out'?'↗ صادرة':'↙ واردة'} · <span style="direction:ltr;display:inline-block">${esc(c.number)}</span> · ${dmy(t)} ${tm(t)} · ${ms(c.talkSec)}</span><br>
-      <span class="badge b-out">${esc(a.outcome||'')}</span> <span class="badge ${a.customer_sentiment==='متضايق'?'b-miss':a.customer_sentiment==='راضي'?'b-ans':'b-no'}">${esc(a.customer_sentiment||'')}</span></div>
-      <button class="play" title="سماع التسجيل" onclick="openRecById('${esc(c.id)}','${esc(r.name)} ← ${esc(c.number)}')">▶</button></div>
+    return `<div class="ai-card">${head}
       <p style="margin:0 0 10px">${esc(a.summary||'')}</p>
       <div class="ai-cols"><div><b class="muted">نقط التقييم</b><ul class="ai-chk">${chk}</ul></div>
       <div><b class="muted">نصيحة للمندوب</b><p style="margin:4px 0 10px">${esc(a.coaching_tip||'')}</p><b class="muted">مهام متابعة</b><ul style="margin:4px 0">${tasks}</ul>
       ${(a.objections||[]).length?`<b class="muted">اعتراضات العميل</b><ul style="margin:4px 0">${a.objections.map(o=>`<li>${esc(o)}</li>`).join('')}</ul>`:''}</div></div>
       <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">نص المكالمة</summary><div class="tr">${tr}</div></details></div>`}).join('')
-   :'<div class="note">مفيش مكالمات متحلّلة في الفترة دي. اضغط "حلّل المكالمات في الفترة دي".</div>';
+   :'<div class="note">مفيش مكالمات متسجّلة في الفترة دي.</div>';
+  aiSelInfo();
 }
 function openRecById(id,info){
   $('mInfo').textContent=info;

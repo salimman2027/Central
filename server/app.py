@@ -289,8 +289,8 @@ JOB = {"running": False, "started": None, "finished": None, "log": "", "range": 
 JOB_LOCK = threading.Lock()
 
 
-def _run_job(d_from: str, d_to: str):
-    cmd = ["nice", "-n", "19", sys.executable, str(HERE / "analyzer.py"), "--from", d_from, "--to", d_to, "--min-sec", "10"]
+def _run_job(args: list):
+    cmd = ["nice", "-n", "19", sys.executable, str(HERE / "analyzer.py"), *args]
     env = dict(os.environ, NQ_AI_OUT=str(ANALYSIS_DIR))
     try:
         p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=6 * 3600)
@@ -303,18 +303,39 @@ def _run_job(d_from: str, d_to: str):
 
 
 @app.post("/api/analyze")
-def analyze(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(alias="to")):
+async def analyze(request: Request, date_from: dt.date | None = Query(None, alias="from"),
+                  date_to: dt.date | None = Query(None, alias="to")):
+    """يحلّل مكالمات محددة (JSON: {"ids": [...]}) أو كل مكالمات الفترة"""
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise HTTPException(400, "مفتاح Claude API مش متضاف على السيرفر")
     import importlib.util
     if not importlib.util.find_spec("faster_whisper"):
         raise HTTPException(400, "تحليل التسجيلات (المرحلة 2) لسه مش متركّب على السيرفر")
+    ids = []
+    try:
+        body = await request.json()
+        ids = [str(i) for i in (body or {}).get("ids", [])][:500]
+    except Exception:  # noqa: BLE001
+        pass
+    if ids:
+        files = []
+        for i in ids:
+            try:
+                files.append(str(_recording_path(_recording_row(i))))
+            except HTTPException:
+                pass
+        if not files:
+            raise HTTPException(404, "المكالمات المختارة مفيهاش تسجيلات على السيرفر")
+        args, rng = ["--redo", "--min-sec", "0", *files], [f"{len(files)} مكالمة", ""]
+    elif date_from and date_to:
+        args, rng = ["--from", str(date_from), "--to", str(date_to), "--min-sec", "10"], [str(date_from), str(date_to)]
+    else:
+        raise HTTPException(400, "اختار مكالمات أو فترة")
     with JOB_LOCK:
         if JOB["running"]:
             raise HTTPException(409, "في تحليل شغّال بالفعل")
-        JOB.update(running=True, started=dt.datetime.now(TZ).isoformat(), finished=None, log="",
-                   range=[str(date_from), str(date_to)])
-    threading.Thread(target=_run_job, args=(str(date_from), str(date_to)), daemon=True).start()
+        JOB.update(running=True, started=dt.datetime.now(TZ).isoformat(), finished=None, log="", range=rng)
+    threading.Thread(target=_run_job, args=(args,), daemon=True).start()
     return JOB
 
 
