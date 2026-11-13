@@ -59,6 +59,11 @@ class MainActivity : Activity() {
             }
             return
         }
+        if (requestCode == 6) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) startDictation(dictLang)
+            else { js("window.onDictEnd && onDictEnd()"); micSettingsHint() }
+            return
+        }
         if (requestCode == 2) {
             val n = pendingSimNumber ?: return
             pendingSimNumber = null
@@ -69,6 +74,75 @@ class MainActivity : Activity() {
     }
 
     private var pendingMic: PermissionRequest? = null
+
+    // ---------- إملاء مستمر: بيفضل يسمع لحد ما الموظف يدوس توقف (من غير ليميت) ----------
+    private var sr: android.speech.SpeechRecognizer? = null
+    private var dictating = false
+    private var dictLang = "ar-EG"
+
+    private fun js(code: String) = web.evaluateJavascript(code, null)
+
+    private fun startDictation(lang: String) {
+        dictLang = lang
+        if (!android.speech.SpeechRecognizer.isRecognitionAvailable(this)) { js("window.onDictation && onDictation(null)"); return }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 6); return
+        }
+        dictating = true
+        sr?.destroy()
+        sr = android.speech.SpeechRecognizer.createSpeechRecognizer(this).apply {
+            setRecognitionListener(object : android.speech.RecognitionListener {
+                override fun onResults(b: Bundle?) {
+                    val t = b?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
+                    if (t.isNotBlank()) js("window.onDictChunk && onDictChunk(" + org.json.JSONObject.quote(t) + ")")
+                    if (dictating) listen() else endDictation()
+                }
+                override fun onPartialResults(b: Bundle?) {
+                    val t = b?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
+                    js("window.onDictPartial && onDictPartial(" + org.json.JSONObject.quote(t) + ")")
+                }
+                override fun onError(error: Int) {
+                    if (!dictating) { endDictation(); return }
+                    when (error) {
+                        android.speech.SpeechRecognizer.ERROR_NO_MATCH,
+                        android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> listen()
+                        android.speech.SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
+                        android.speech.SpeechRecognizer.ERROR_CLIENT -> web.postDelayed({ if (dictating) listen() }, 400)
+                        else -> { dictating = false; endDictation() }
+                    }
+                }
+                override fun onReadyForSpeech(p: Bundle?) {}
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(v: Float) {}
+                override fun onBufferReceived(b: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onEvent(t: Int, p: Bundle?) {}
+            })
+        }
+        listen()
+    }
+
+    private fun listen() {
+        val i = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, dictLang)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
+        try { sr?.startListening(i) } catch (e: Exception) { dictating = false; endDictation() }
+    }
+
+    private fun stopDictation() {
+        if (!dictating) { endDictation(); return }
+        dictating = false
+        try { sr?.stopListening() } catch (_: Exception) {}
+        web.postDelayed({ if (sr != null) endDictation() }, 2500) // لو الخدمة مرجّعتش نتيجة
+    }
+
+    private fun endDictation() {
+        sr?.destroy(); sr = null
+        js("window.onDictEnd && onDictEnd()")
+    }
 
     /** الويب فيو عاوز المايك: لو أندرويد سحب الإذن (زي "المرة دي بس") نطلبه تاني بدل ما المكالمة تفشل */
     private fun grantMic(request: PermissionRequest) {
@@ -267,22 +341,9 @@ class MainActivity : Activity() {
         }
 
         /** يسجّل كلام بالمايك ويحوّله لنص عربي */
-        @JavascriptInterface fun dictate(lang: String) {
-            runOnUiThread {
-                val i = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, lang)
-                    .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "قول ملخص المكالمة")
-                try {
-                    @Suppress("DEPRECATION")
-                    startActivityForResult(i, 4)
-                } catch (e: Exception) {
-                    web.evaluateJavascript("window.onDictation && onDictation(null)", null)
-                }
-            }
-        }
+        @JavascriptInterface fun dictate(lang: String) { runOnUiThread { startDictation(lang) } }
+        @JavascriptInterface fun dictateStop() { runOnUiThread { stopDictation() } }
 
-        /** يفتح جهات الاتصال ويرجّع الاسم والرقم */
         @JavascriptInterface fun pickContact() {
             runOnUiThread {
                 @Suppress("DEPRECATION")

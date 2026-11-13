@@ -620,9 +620,12 @@ const NQNotes = {
   },
   skip() { this.current = null; show("scrDial"); },
   ai: null,
+  rec: false, said: "",
   dictate() {
     if (!window.Android || !Android.dictate) { toast("التسجيل بالصوت شغّال من التطبيق بس"); return; }
-    $("micBtn").classList.add("rec"); $("micBtn").textContent = "🎙 بيسمعك…";
+    if (this.rec) { Android.dictateStop(); $("micBtn").textContent = "⏳ بيخلّص…"; return; }
+    this.rec = true; this.said = $("noteSummary").value.trim();
+    $("micBtn").classList.add("rec"); $("micBtn").textContent = "⏹ بيسمعك… دوس للإيقاف";
     Android.dictate(NQPrefs.get("voiceLang", "ar-EG"));
   },
   async insight() {
@@ -641,7 +644,7 @@ const NQNotes = {
       if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
       this.ai = j; this.renderAI(j);
     } catch (e) {
-      card.textContent = "تعذّر التحليل: " + e.message;
+      card.textContent = "تعذّر التحليل: " + (/fetch|404|502|503/i.test(e.message) ? "خدمة التحليل لسه مش متركّبة على السيرفر" : e.message);
     } finally { $("aiBtn").disabled = false; }
   },
   renderAI(a) {
@@ -723,12 +726,19 @@ const NQVia = {
 };
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && NQVia.pending) setTimeout(() => NQVia.back(), 600); });
 
-window.onDictation = function (text) {
+window.onDictation = function (text) { // null = مفيش خدمة تحويل صوت
+  NQNotes.rec = false; $("micBtn").classList.remove("rec"); $("micBtn").textContent = "🎙 سجّل بصوتك";
+  if (text === null) toast("خدمة تحويل الصوت لنص مش موجودة على الموبايل — نزّل تطبيق Google");
+};
+window.onDictPartial = function (t) { $("noteSummary").value = (NQNotes.said ? NQNotes.said + " " : "") + t; };
+window.onDictChunk = function (t) {
+  NQNotes.said = (NQNotes.said ? NQNotes.said + " " : "") + t; $("noteSummary").value = NQNotes.said;
+};
+window.onDictEnd = function () {
+  const was = NQNotes.rec; NQNotes.rec = false;
   $("micBtn").classList.remove("rec"); $("micBtn").textContent = "🎙 سجّل بصوتك";
-  if (text === null) { toast("خدمة تحويل الصوت لنص مش موجودة على الموبايل — نزّل تطبيق Google"); return; }
-  if (!text) return;
-  const ta = $("noteSummary"); ta.value = (ta.value ? ta.value.trim() + " " : "") + text;
-  if (NQPhone.ext && NQPhone.pass) NQNotes.insight(); // يحلّل لوحده بعد التسجيل
+  if (NQNotes.said) $("noteSummary").value = NQNotes.said;
+  if (was && NQNotes.said && NQPhone.ext && NQPhone.pass) NQNotes.insight(); // يحلّل لوحده بعد التسجيل
 };
 
 /* ---------- call history (on this phone) ---------- */
