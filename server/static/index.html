@@ -437,7 +437,7 @@ async function loadCalls(from,to){
   const rows=await r.json();
   CALLS=rows.filter(c=>REPS.some(x=>x.id===c.ext)).map(c=>({
     id:c.id, t:new Date(c.time), rep:c.ext, dir:c.dir, st:c.status, dur:c.talkSec, ring:c.ringSec,
-    num:c.number, cust:(c.note&&c.note.customer)||c.customer||'—', rec:!!c.hasRecording, ai:!!c.analyzed, tx:!!c.transcribed, sup:c.supNote||'', note:c.note||null
+    num:c.number, cust:(c.note&&c.note.customer)||c.customer||'—', rec:!!c.hasRecording, ai:!!c.analyzed, tx:!!c.transcribed, sup:c.supNote||'', sim:c.source==='sim', note:c.note||null
   })).sort((a,b)=>b.t-a.t);
   loadedRange=key;
 }
@@ -562,7 +562,7 @@ function renderLog(){
     const r=repOf(c.rep);
     return `<tr id="row-${esc(c.id)}"><td class="c">${(logPage-1)*PS+i+1}</td><td>${dmy(c.t)} ${c.t.toLocaleTimeString('en-GB')}</td><td>${r.name}</td><td>${teamOf(r.team).name}</td>
     <td style="direction:ltr;text-align:right">${c.num}</td><td>${c.cust}</td>
-    <td><span class="badge ${c.dir==='out'?'b-out':'b-in'}">${c.dir==='out'?'↗ صادرة':'↙ واردة'}</span></td>
+    <td><span class="badge ${c.dir==='out'?'b-out':'b-in'}">${c.dir==='out'?'↗ صادرة':'↙ واردة'}</span>${c.sim?' <span class="badge b-no" title="من شريحة الموظف — اترفعت من التطبيق">📱 شريحة</span>':''}</td>
     <td><span class="badge ${stBadge(c.st)}">${c.st}</span></td><td class="c">${ms(c.ring)}</td><td class="c">${c.dur?ms(c.dur):'—'}</td>
     <td class="c">${c.rec?callActs(c.id,{ai:c.ai,tx:c.tx,sup:c.sup}):'—'}</td>
     <td style="white-space:normal;min-width:220px;max-width:340px">${c.note?`${c.note.outcome?`<span class="badge b-out">${esc(c.note.outcome)}</span> `:''}${esc((c.note.summary||'').slice(0,140))}${c.note.followUp?`<div class="muted">متابعة: ${esc(c.note.followUp)}</div>`:''}`:'<span class="muted">—</span>'}</td></tr>`}).join('');
@@ -691,7 +691,7 @@ function renderAI(){
   $('aList').innerHTML=all.length?all.map(x=>{const a=x.analysis,c=x.call,r=repOf(c.ext),t=new Date(c.time);
     const head=`<div class="ai-head"><input type="checkbox" class="pick" ${AI_SEL.has(c.id)?'checked':''} onchange="aiToggle('${esc(c.id)}',this.checked)" title="اختار المكالمة دي للتحليل">
       ${a?`<div class="ai-score">${esc(a.agent_score??'—')}<small>تقييم الموظف</small></div>`:''}
-      <div style="flex:1"><b>${esc(r.name)}</b> <span class="muted">${c.dir==='out'?'↗ صادرة':'↙ واردة'} · <span style="direction:ltr;display:inline-block">${esc(c.number)}</span> · ${dmy(t)} ${tm(t)} · ${ms(c.talkSec)}</span>
+      <div style="flex:1"><b>${esc(r.name)}</b> ${c.source==='sim'?'<span class="badge b-no">📱 شريحة</span> ':''}<span class="muted">${c.dir==='out'?'↗ صادرة':'↙ واردة'} · <span style="direction:ltr;display:inline-block">${esc(c.number)}</span> · ${dmy(t)} ${tm(t)} · ${ms(c.talkSec)}</span>
       ${a?`<br><span class="badge b-out">${esc(a.outcome||'')}</span> <span class="badge ${a.customer_sentiment==='متضايق'?'b-miss':a.customer_sentiment==='راضي'?'b-ans':'b-no'}">${esc(a.customer_sentiment||'')}</span>`:''}</div>
       ${callActs(c.id,{ai:!!a,tx:c.transcribed,sup:c.supNote,noAi:true})}</div>`;
     if(!a){

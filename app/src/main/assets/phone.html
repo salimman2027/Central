@@ -274,6 +274,13 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <div><b>🎯 تارجت المكالمات اليومي</b><div style="color:var(--muted);font-size:12px">عدد المكالمات المطلوبة في اليوم — بيظهر في "إنجازي"</div></div>
     <input id="sGoal" type="number" inputmode="numeric" class="ltr" style="width:90px;text-align:center" placeholder="60" onchange="NQPrefs.set('dailyGoal', +this.value||0); toast('اتحفظ ✓')">
   </div>
+  <div class="app-only" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 14px;margin-top:12px">
+    <div class="switch">
+      <div><b>📼 رفع تسجيلات مكالمات الشريحة</b><small>بياخد التسجيل اللي مسجّل الموبايل عمله لكل مكالمة من شريحتك ويرفعه على السيرفر عشان يتحلل. فعّل الأول "تسجيل المكالمات تلقائيًا" في تطبيق الاتصال.</small></div>
+      <label class="tg"><input type="checkbox" id="simUp" onchange="NQSim.toggle(this.checked)"><span></span></label>
+    </div>
+    <div id="simSt" style="font-size:12px;color:var(--muted);padding:4px 0 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"></div>
+  </div>
   <div class="app-only" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px">
     <b>الاتصال من</b>
     <select id="callVia" style="margin-top:8px" onchange="NQPrefs.set('callVia', this.value); NQVia.chip()">
@@ -530,6 +537,7 @@ window.onContactPicked = function (name, number) {
 };
 function toggleCallPad() { $("callPad").classList.toggle("on"); $("cPad").classList.toggle("on"); }
 function showSettings() {
+  try { NQSim.refresh(); } catch (e) {}
   $("crmMode").checked = NQPrefs.get("crm", false);
   $("crmIn").checked = NQPrefs.get("crmIn", true);
   $("callVia").value = NQPrefs.get("callVia", "ask");
@@ -548,6 +556,7 @@ const NQPhone = {
     if (typeof JsSIP === "undefined") return this._err("مكتبة الاتصال مش محمّلة");
     this._err("جاري الاتصال بالسنترال…");
     store.set("nq_login", { ext, password });
+    if (NQPrefs.get("simUpload", false)) NQSim.cfg(true);
     this.ext = ext; this.pass = password;
     if (this.ua) { try { this.ua.stop(); } catch (e) {} }
     const sockets = CONFIG.wss.map((u, i) => ({ socket: new JsSIP.WebSocketInterface(u), weight: 10 - i }));
@@ -1097,6 +1106,31 @@ const NQStats = {
 window.onFileSaved = ok => toast(ok ? "اتحفظ في التنزيلات ✓" : "تعذّر حفظ الملف");
 document.querySelectorAll("#sSeg button").forEach(b => b.onclick = () => { NQStats.period = b.dataset.p; NQStats.render(); });
 
+/* ---------- رفع تسجيلات مكالمات الشريحة ---------- */
+const NQSim = {
+  cfg(on) {
+    if (!IS_APP || !Android.setSimUpload) return;
+    const l = store.get("nq_login", {}) || {};
+    Android.setSimUpload(NQSettings.load().host, l.ext || "", l.password || "", !!on);
+  },
+  toggle(on) {
+    const l = store.get("nq_login", {}) || {};
+    if (on && !(l.ext && l.password)) { toast("حط رقم التحويلة والباسورد الأول"); $("simUp").checked = false; return; }
+    NQPrefs.set("simUpload", on); this.cfg(on);
+    if (on) toast("اتفعّل — هيرفع تسجيلات مكالمات الشريحة لوحده");
+  },
+  render(st) {
+    const el = $("simSt"); if (!el || !st) return;
+    const t = ms => ms ? new Date(ms).toLocaleString("ar-EG", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "numeric" }) : "—";
+    el.innerHTML = !st.enabled ? "متوقف" :
+      (!st.perms ? '<span style="color:var(--bad)">⚠️ محتاج إذن سجل المكالمات والملفات الصوتية</span>' :
+      `✔ اترفع ${st.count} تسجيل · آخر رفع: ${t(st.lastUpload)}` + (st.error ? ` · <span style="color:var(--bad)">${st.error}</span>` : "")) +
+      (st.enabled ? ' <button class="mini call" style="padding:4px 10px;width:auto;height:auto;border-radius:99px" onclick="Android.simSyncNow();toast(\'بيدوّر على تسجيلات جديدة…\')">⟳ ارفع دلوقتي</button>' : "");
+  },
+  refresh() { if (IS_APP && Android.simUploadStatus) try { this.render(JSON.parse(Android.simUploadStatus())); } catch (e) {} }
+};
+window.onSimStatus = st => NQSim.render(st);
+
 /* ---------- start ---------- */
 buildPad($("keypad"), dialKey);
 buildPad($("callPad"), d => NQPhone.dtmf(d));
@@ -1106,6 +1140,7 @@ NQSettings.apply(NQSettings.load());
   show("scrDial"); NQVia.chip();
   if (s && s.ext && s.password) { $("ext").value = s.ext; $("pwd").value = s.password; NQPhone.ext = s.ext; NQPhone._reg(false); NQPhone.login(s.ext, s.password); }
   else NQPhone._reg(false);
+  if ($("simUp")) { $("simUp").checked = !!NQPrefs.get("simUpload", false); if ($("simUp").checked) NQSim.cfg(true); NQSim.refresh(); }
 })();
 window.NQPhone = NQPhone;
 </script>

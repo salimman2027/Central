@@ -59,6 +59,17 @@ class MainActivity : Activity() {
             }
             return
         }
+        if (requestCode == 7) {
+            if (SimRecSync.hasPermissions(this)) SimRecSync.runAsync(this) { simStatusToJs() }
+            else android.app.AlertDialog.Builder(this)
+                .setTitle("محتاج إذن")
+                .setMessage("عشان يلاقي تسجيلات مكالمات الشريحة ويرفعها، اسمح للتطبيق بـ: سجل المكالمات، والملفات الصوتية. افتح الإعدادات ← الأذونات.")
+                .setPositiveButton("فتح الإعدادات") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+                }.setNegativeButton("إلغاء", null).show()
+            simStatusToJs()
+            return
+        }
         if (requestCode == 6) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) startDictation(dictLang)
             else { js("window.onDictEnd && onDictEnd()"); micSettingsHint() }
@@ -71,6 +82,15 @@ class MainActivity : Activity() {
             if (granted) placeSimCall(n)
             else startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(n))))
         }
+    }
+
+    private fun simStatusToJs() = runOnUiThread {
+        web.evaluateJavascript("window.onSimStatus && onSimStatus(" + SimRecSync.statusJson(this) + ")", null)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        SimRecSync.runAsync(this) { simStatusToJs() } // بعد ما يرجع من مكالمة شريحة
     }
 
     private var pendingMic: PermissionRequest? = null
@@ -393,6 +413,22 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun savePdf(name: String, html: String) {
             runOnUiThread { makePdf(name, html) }
+        }
+
+        @JavascriptInterface fun setSimUpload(host: String, ext: String, pass: String, enabled: Boolean) {
+            SimRecSync.configure(this@MainActivity, host, ext, pass, enabled)
+            runOnUiThread {
+                if (enabled && !SimRecSync.hasPermissions(this@MainActivity)) {
+                    requestPermissions(SimRecSync.neededPermissions(), 7)
+                } else if (enabled) {
+                    SimRecSync.runAsync(this@MainActivity) { simStatusToJs() }
+                }
+                simStatusToJs()
+            }
+        }
+        @JavascriptInterface fun simUploadStatus(): String = SimRecSync.statusJson(this@MainActivity)
+        @JavascriptInterface fun simSyncNow() {
+            SimRecSync.runAsync(this@MainActivity) { simStatusToJs() }
         }
 
         @JavascriptInterface fun appVersion(): String = try {

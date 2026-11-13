@@ -8,6 +8,7 @@ NQ Calls — خدمة لوحة المكالمات على سيرفر السنتر
 import datetime as dt
 import hmac
 import json
+import shutil
 import time
 import os
 import re
@@ -27,6 +28,10 @@ DATA_DIR = Path(os.environ.get("NQ_DATA", "/var/lib/nq-calls"))
 ANALYSIS_DIR = DATA_DIR / "analysis"
 NOTES_DIR = DATA_DIR / "notes"
 SUP_FILE = DATA_DIR / "supervisor-notes.json"
+SIM_DIR = DATA_DIR / "mobile"            # تسجيلات مكالمات الشريحة اللي التطبيق بيرفعها
+SIM_INDEX = SIM_DIR / "index.jsonl"
+SIM_LOCK = threading.Lock()
+AUDIO_OK = {".wav", ".mp3", ".m4a", ".mp4", ".ogg", ".webm", ".aac", ".amr", ".3gp", ".opus", ".flac"}
 try:
     SUP_NOTES = json.loads(SUP_FILE.read_text(encoding="utf-8"))
 except Exception:  # noqa: BLE001
@@ -193,6 +198,44 @@ INSIGHT_PROMPT = """أنت مستشار مبيعات خبير لشركة "الج
 }}"""
 
 
+@app.post("/app/upload")
+async def app_upload(request: Request):
+    """التطبيق بيرفع تسجيل مكالمة الشريحة (الملف في الـ body والبيانات في الهيدرز)"""
+    h = request.headers
+    ext, pw = h.get("x-ext", ""), h.get("x-pass", "")
+    if not check_ext_password(ext, pw):
+        raise HTTPException(401, "رقم التحويلة أو الباسورد غلط")
+    number = re.sub(r"[^\d+]", "", h.get("x-number", ""))[:20] or "unknown"
+    try:
+        start_ms = int(h.get("x-start", "0")); duration = int(h.get("x-duration", "0"))
+    except ValueError:
+        raise HTTPException(400, "بيانات غلط")
+    direction = "in" if h.get("x-dir") == "in" else "out"
+    suffix = Path(h.get("x-filename", "rec.m4a")).suffix.lower()
+    if suffix not in AUDIO_OK:
+        raise HTTPException(400, "نوع الملف مش صوت")
+    cid = f"sim-{ext}-{start_ms}"
+    if cid in load_sim_calls():
+        return {"ok": True, "id": cid, "dup": True}
+    body = await request.body()
+    if not body or len(body) > 60 * 1024 * 1024:
+        raise HTTPException(413, "الملف فاضي أو كبير جدًا")
+    t = dt.datetime.fromtimestamp(start_ms / 1000, dt.timezone.utc)
+    rel = Path(f"{t:%Y}/{t:%m}") / f"{direction}-{number}-{ext}-{t:%Y%m%d}-{t:%H%M%S}-sim{start_ms}{suffix}"
+    dest = SIM_DIR / rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(body)
+    if suffix in {".amr", ".3gp"} and shutil.which("ffmpeg"):  # صيغ مش كل خدمات التحويل بتقبلها
+        mp3 = dest.with_suffix(".mp3")
+        if subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(dest), str(mp3)]).returncode == 0:
+            dest.unlink(missing_ok=True); dest = mp3; rel = rel.with_suffix(".mp3")
+    rec = dict(id=cid, ext=ext, number=number, start=start_ms, duration=duration, dir=direction,
+               file=str(rel), uploaded=dt.datetime.now(TZ).isoformat())
+    with SIM_LOCK, open(SIM_INDEX, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return {"ok": True, "id": cid}
+
+
 @app.post("/app/insight")
 async def app_insight(request: Request):
     """تحليل سريع لملخص مكالمة واحدة (التطبيق بيطلبه بعد المكالمة)"""
@@ -276,8 +319,49 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
                                        or (ANALYSIS_DIR / (stem(rec) + ".json")).exists()),
             supNote=(SUP_NOTES.get(main["uniqueid"]) or {}).get("text", ""),
         ))
+    # مكالمات الشريحة اللي اترفعت من التطبيق
+    for r in load_sim_calls().values():
+        t = dt.datetime.fromtimestamp(r["start"] / 1000, dt.timezone.utc)
+        if not (start <= t.replace(tzinfo=None) < end):
+            continue
+        st = Path(r["file"]).stem
+        out.append(dict(
+            id=r["id"], time=t.isoformat(), ext=int(r["ext"]), dir=r["dir"], status="تم الرد",
+            talkSec=int(r.get("duration") or 0), ringSec=0, number=r["number"], customer=None,
+            note=match_note(notes_all, int(r["ext"]), r["number"], t), source="sim",
+            hasRecording=True, rec=st,
+            analyzed=(ANALYSIS_DIR / (st + ".json")).exists(),
+            transcribed=(ANALYSIS_DIR / (st + ".tr.json")).exists() or (ANALYSIS_DIR / (st + ".json")).exists(),
+            supNote=(SUP_NOTES.get(r["id"]) or {}).get("text", ""),
+        ))
     out.sort(key=lambda c: c["time"], reverse=True)
     return out
+
+
+def load_sim_calls() -> dict:
+    out = {}
+    try:
+        with open(SIM_INDEX, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line)
+                    out[r["id"]] = r
+                except Exception:  # noqa: BLE001
+                    pass
+    except FileNotFoundError:
+        pass
+    return out
+
+
+def rec_file(call_id: str) -> Path:
+    """مسار ملف التسجيل لأي مكالمة — سنترال أو شريحة"""
+    if call_id.startswith("sim-"):
+        r = load_sim_calls().get(call_id)
+        p = SIM_DIR / r["file"] if r else None
+        if not p or not p.exists():
+            raise HTTPException(404, "ملف التسجيل مش موجود على السيرفر")
+        return p
+    return _recording_path(_recording_row(call_id))
 
 
 def _recording_row(call_id: str) -> dict:
@@ -302,8 +386,10 @@ def _recording_path(row: dict) -> Path:
 
 @app.get("/api/recording/{call_id}")
 def recording(call_id: str, download: int = 0):
-    p = _recording_path(_recording_row(call_id))
-    return FileResponse(p, media_type="audio/wav", filename=p.name if download else None)
+    p = rec_file(call_id)
+    mt = {".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".mp4": "audio/mp4", ".ogg": "audio/ogg", ".opus": "audio/ogg",
+          ".webm": "audio/webm", ".aac": "audio/aac", ".amr": "audio/amr", ".3gp": "audio/3gpp", ".flac": "audio/flac"}
+    return FileResponse(p, media_type=mt.get(p.suffix.lower(), "audio/wav"), filename=p.name if download else None)
 
 
 # ---------------- AI analysis ----------------
@@ -343,7 +429,7 @@ async def analyze(request: Request, date_from: dt.date | None = Query(None, alia
         files = []
         for i in ids:
             try:
-                files.append(str(_recording_path(_recording_row(i))))
+                files.append(str(rec_file(i)))
             except HTTPException:
                 pass
         if not files:
@@ -383,8 +469,7 @@ def analysis(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(
     for c in calls(date_from, date_to):
         if not c["analyzed"]:
             continue
-        row = _recording_row(c["id"])
-        f = ANALYSIS_DIR / (stem(row["recordingfile"]) + ".json")
+        f = ANALYSIS_DIR / (c["rec"] + ".json")
         try:
             r = json.loads(f.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
@@ -399,7 +484,7 @@ def call_detail(call_id: str):
     """النص والتحليل وملاحظة المدير لمكالمة واحدة"""
     out = {"transcript": [], "analysis": None, "supNote": (SUP_NOTES.get(call_id) or {}).get("text", "")}
     try:
-        st = stem(_recording_row(call_id)["recordingfile"])
+        st = rec_file(call_id).stem
     except HTTPException:
         return out
     for f in (ANALYSIS_DIR / (st + ".json"), ANALYSIS_DIR / (st + ".tr.json")):

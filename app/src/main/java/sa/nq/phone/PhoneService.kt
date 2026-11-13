@@ -70,6 +70,16 @@ class PhoneService : Service() {
         @Suppress("DEPRECATION")
         wifi = (applicationContext.getSystemService(WIFI_SERVICE) as WifiManager)
             .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "nq:phone").apply { setReferenceCounted(false); acquire() }
+        syncHandler.postDelayed(syncTick, 15_000)
+    }
+
+    // كل دقيقتين: يرفع تسجيلات مكالمات الشريحة الجديدة
+    private val syncHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val syncTick = object : Runnable {
+        override fun run() {
+            SimRecSync.runAsync(this@PhoneService)
+            syncHandler.postDelayed(this, 120_000)
+        }
     }
 
     private fun startAsForeground() {
@@ -143,6 +153,7 @@ class PhoneService : Service() {
     }
 
     override fun onDestroy() {
+        syncHandler.removeCallbacks(syncTick)
         instance = null
         stopRinging()
         wake?.release(); wifi?.release()
