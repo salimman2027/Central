@@ -705,7 +705,7 @@ function renderAI(){
     }
     const chk=(a.checklist||[]).map(k=>`<li class="${k.done?'ok':'no'}">${k.done?'✔':'✖'} ${esc(k.item)}${k.evidence?` <span class="muted">— ${esc(k.evidence)}</span>`:''}</li>`).join('');
     const tasks=(a.follow_up_tasks||[]).map(k=>`<li>${esc(k.task)}${k.due?' — '+esc(k.due):''}</li>`).join('')||'<li>—</li>';
-    const tr=(x.transcript||[]).map(l=>`<div><span>${l.start}s</span> ${esc(l.text)}</div>`).join('');
+    const tr=(x.transcript||[]).map(l=>`<div><span>${l.start!=null?l.start+"s":"•"}</span> ${esc(l.text)}</div>`).join('');
     return `<div class="ai-card" id="row-${esc(c.id)}">${head}
       <p style="margin:0 0 10px">${esc(a.summary||'')}</p>
       <div class="ai-cols"><div><b class="muted">نقط التقييم</b><ul class="ai-chk">${chk}</ul></div>
@@ -778,7 +778,7 @@ async function callPanel(id,kind){
     return;
   }
   if(kind==='text'){
-    if(d.transcript&&d.transcript.length){p.innerHTML=`${x}<b>📝 نص المكالمة</b><div class="tr" style="margin-top:8px">${d.transcript.map(l=>`<div><span>${l.start}s</span> ${esc(l.text)}</div>`).join('')}</div>
+    if(d.transcript&&d.transcript.length){p.innerHTML=`${x}<b>📝 نص المكالمة</b><div class="tr" style="margin-top:8px">${d.transcript.map(l=>`<div><span>${l.start!=null?l.start+"s":"•"}</span> ${esc(l.text)}</div>`).join('')}</div>
       <div class="pnl-btns"><button class="btn o" onclick="callJob('${esc(id)}','ai')">🤖 حلّل المكالمة</button></div>`;return}
     p.innerHTML=`${x}<b>📝 نص المكالمة</b><div class="pnl-btns"><span class="muted">لسه متحوّلتش لنص.</span><button class="btn" onclick="callJob('${esc(id)}','transcript')">⚡ حوّل لنص دلوقتي</button></div>`;
     return;
@@ -793,7 +793,7 @@ function aiBlock(a,tr){
     <div><span class="badge b-out">${esc(a.outcome||'')}</span> <span class="badge ${a.customer_sentiment==='متضايق'?'b-miss':a.customer_sentiment==='راضي'?'b-ans':'b-no'}">${esc(a.customer_sentiment||'')}</span></div></div>
     <p>${esc(a.summary||'')}</p><div class="ai-cols"><div><b class="muted">نقط التقييم</b><ul class="ai-chk">${chk}</ul></div>
     <div><b class="muted">نصيحة للمندوب</b><p style="margin:4px 0 10px">${esc(a.coaching_tip||'')}</p><b class="muted">مهام متابعة</b><ul>${tasks}</ul></div></div>
-    ${tr&&tr.length?`<details><summary class="muted" style="cursor:pointer">نص المكالمة</summary><div class="tr">${tr.map(l=>`<div><span>${l.start}s</span> ${esc(l.text)}</div>`).join('')}</div></details>`:''}`;
+    ${tr&&tr.length?`<details><summary class="muted" style="cursor:pointer">نص المكالمة</summary><div class="tr">${tr.map(l=>`<div><span>${l.start!=null?l.start+"s":"•"}</span> ${esc(l.text)}</div>`).join('')}</div></details>`:''}`;
 }
 async function callJob(id,kind){
   const p=document.getElementById('pnl-'+id); if(!p) return;

@@ -188,15 +188,26 @@ chmod 755 /usr/local/bin/nq-update
 # تغيير مفتاح Claude: sudo nq-setkey
 cat > /usr/local/bin/nq-setkey <<'KEY'
 #!/bin/bash
+# sudo nq-setkey          -> مفتاح Claude (Anthropic) للتحليل
+# sudo nq-setkey openai   -> مفتاح OpenAI لتحويل الصوت لنص
 set -e
-read -rsp "الصق مفتاح Anthropic API الجديد: " K; echo
-K=$(printf '%s' "$K" | tr -d '[:space:]')
-[[ "$K" == sk-ant-* ]] || { echo "✖ المفتاح لازم يبدأ بـ sk-ant-"; exit 1; }
 F=/etc/nq-calls/env
-if grep -q '^ANTHROPIC_API_KEY=' "$F"; then sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$K|" "$F"; else echo "ANTHROPIC_API_KEY=$K" >> "$F"; fi
+if [[ "${1:-}" == openai ]]; then
+  NAME=OPENAI_API_KEY; PFX=sk-; LBL="OpenAI"
+else
+  NAME=ANTHROPIC_API_KEY; PFX=sk-ant-; LBL="Anthropic"
+fi
+read -rsp "الصق مفتاح $LBL الجديد: " K; echo
+K=$(printf '%s' "$K" | tr -d '[:space:]')
+[[ "$K" == $PFX* ]] || { echo "✖ المفتاح لازم يبدأ بـ $PFX"; exit 1; }
+if grep -q "^$NAME=" "$F"; then sed -i "s|^$NAME=.*|$NAME=$K|" "$F"; else echo "$NAME=$K" >> "$F"; fi
 systemctl restart nq-calls
-CODE=$(curl -s -o /dev/null -w '%{http_code}' https://api.anthropic.com/v1/models -H "x-api-key: $K" -H "anthropic-version: 2023-06-01")
-[[ "$CODE" == 200 ]] && echo "✔ المفتاح شغال واتحفظ" || echo "✖ Anthropic رفض المفتاح (كود $CODE) — اتأكد إنك نسخته كامل وإن الحساب عليه رصيد"
+if [[ $NAME == OPENAI_API_KEY ]]; then
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' https://api.openai.com/v1/models -H "Authorization: Bearer $K")
+else
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' https://api.anthropic.com/v1/models -H "x-api-key: $K" -H "anthropic-version: 2023-06-01")
+fi
+[[ "$CODE" == 200 ]] && echo "✔ مفتاح $LBL شغال واتحفظ" || echo "✖ $LBL رفض المفتاح (كود $CODE) — اتأكد إنك نسخته كامل وإن الحساب عليه رصيد"
 KEY
 chmod 755 /usr/local/bin/nq-setkey
 

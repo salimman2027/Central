@@ -331,7 +331,7 @@ async def analyze(request: Request, date_from: dt.date | None = Query(None, alia
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise HTTPException(400, "مفتاح Claude API مش متضاف على السيرفر")
     import importlib.util
-    if not importlib.util.find_spec("faster_whisper"):
+    if not os.environ.get("OPENAI_API_KEY") and not importlib.util.find_spec("faster_whisper"):
         raise HTTPException(400, "تحليل التسجيلات (المرحلة 2) لسه مش متركّب على السيرفر")
     ids, body = [], None
     try:

@@ -82,7 +82,35 @@ def _segments(wav: str, vad: bool):
     return lines, info
 
 
+OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
+OPENAI_STT = os.environ.get("NQ_OPENAI_STT_MODEL", "gpt-4o-transcribe")
+
+
+def transcribe_openai(wav: str) -> dict:
+    """تحويل لنص على OpenAI — أدق بكتير في العربي وصوت التليفون"""
+    import re
+    import requests
+    with open(wav, "rb") as fh:
+        r = requests.post("https://api.openai.com/v1/audio/transcriptions",
+                          headers={"Authorization": f"Bearer {OPENAI_KEY}"},
+                          data={"model": OPENAI_STT, "language": "ar", "response_format": "json",
+                                "prompt": PROMPT_HINT + " اكتب الكلام زي ما اتقال بالظبط بالعامية."},
+                          files={"file": (Path(wav).name, fh, "audio/wav")}, timeout=300)
+    if r.status_code == 401:
+        raise RuntimeError("مفتاح OpenAI غلط — على السيرفر اكتب: sudo nq-setkey openai")
+    if r.status_code == 429:
+        raise RuntimeError("OpenAI: الرصيد خلص أو طلبات كتير — اشحن من platform.openai.com")
+    if r.status_code >= 400:
+        raise RuntimeError(f"OpenAI {r.status_code}: {r.text[:200]}")
+    text = (r.json().get("text") or "").strip()
+    parts = [p.strip() for p in re.split(r"(?<=[.!؟?،])\s+|\n+", text) if p.strip()]
+    lines = [{"start": None, "end": None, "text": p} for p in parts]
+    return {"duration": 0, "lines": lines, "model": "openai:" + OPENAI_STT}
+
+
 def transcribe(wav: str) -> dict:
+    if OPENAI_KEY:
+        return transcribe_openai(wav)
     global _MODEL
     if _MODEL is None:  # النموذج بيتحمّل مرة واحدة بس لكل التسجيلات
         from faster_whisper import WhisperModel
@@ -98,7 +126,7 @@ def transcribe(wav: str) -> dict:
 
 def analyze(transcript_lines: list, meta: dict) -> dict:
     import anthropic
-    text = "\n".join(f"[{l['start']:>6}s] {l['text']}" for l in transcript_lines)
+    text = "\n".join((f"[{l['start']:>6}s] " if l.get("start") is not None else "- ") + l["text"] for l in transcript_lines)
     msg = anthropic.Anthropic().messages.create(
         model=CLAUDE_MODEL,
         max_tokens=2000,
@@ -133,7 +161,7 @@ def to_html(results: list) -> str:
             for c in a.get("checklist", []))
         tasks = "".join(f"<li>{e(t.get('task',''))}{' — ' + e(t['due']) if t.get('due') else ''}</li>"
                         for t in a.get("follow_up_tasks", [])) or "<li>—</li>"
-        tr = "".join(f"<div><span>{l['start']}s</span> {e(l['text'])}</div>" for l in r["transcript"]["lines"])
+        tr = "".join(f"<div><span>{'' if l.get('start') is None else str(l['start']) + 's'}</span> {e(l['text'])}</div>" for l in r["transcript"]["lines"])
         cards.append(f"""
 <section class="card">
   <header><b>{e(m.get('direction',''))} · تحويلة {e(m.get('extension','—'))} · {e(m.get('number','—'))}</b>
@@ -240,7 +268,7 @@ def main():
             if trf.exists() and not (args.transcript_only and args.redo):  # اتحوّل لنص قبل كده بنفس النموذج — نوفّر الوقت
                 try:
                     t = json.loads(trf.read_text(encoding="utf-8"))
-                    if t.get("model") != WHISPER_MODEL:
+                    if t.get("model") != ("openai:" + OPENAI_STT if OPENAI_KEY else WHISPER_MODEL):
                         t = None
                 except Exception:  # noqa: BLE001
                     t = None
