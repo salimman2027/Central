@@ -96,7 +96,9 @@ if [[ -n "${NQ_DASH_PASSWORD:-}" ]]; then
 fi
 [[ -f "$CONF/htpasswd" ]] || { echo "!! no dashboard password set (NQ_DASH_PASSWORD)"; exit 1; }
 # FreePBX بيشغّل Apache بيوزر asterisk مش www-data
-WEB_GROUP=$( . /etc/apache2/envvars 2>/dev/null; echo "${APACHE_RUN_GROUP:-www-data}" )
+WEB_GROUP=$(sed -n 's/^export APACHE_RUN_GROUP=//p' /etc/apache2/envvars 2>/dev/null | tail -1 | tr -d "\"'" || true)
+WEB_GROUP=${WEB_GROUP:-www-data}
+echo "   apache group: $WEB_GROUP"
 chown root:"$WEB_GROUP" "$CONF/htpasswd"; chmod 640 "$CONF/htpasswd"
 
 CERT=/etc/asterisk/keys/integration/certificate.pem
