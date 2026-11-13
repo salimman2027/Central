@@ -47,18 +47,19 @@
   .topbar .who { flex:1; font-size:15px; }
   .topbar .who small { display:block; color:var(--muted); font-size:12px; }
   .iconbtn { width:42px; height:42px; border-radius:50%; background:#eef2f5; font-size:20px; display:flex; align-items:center; justify-content:center; color:var(--fg); }
-  .display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:10px 20px; min-height:90px; }
-  .display .num { font-size:38px; letter-spacing:1px; direction:ltr; min-height:48px; font-weight:300; word-break:break-all; text-align:center; }
+  .display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:6px 20px; min-height:70px; }
+  .display .num { font-size:clamp(26px, 5vh, 38px); letter-spacing:1px; direction:ltr; min-height:48px; font-weight:300; word-break:break-all; text-align:center; }
   .keypad, .dialrow, .incall-pad, .incbtns { direction:ltr; }
-  .keypad { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px 22px; padding:8px 36px 10px; max-width:420px; width:100%; margin:0 auto; }
-  .key { aspect-ratio:1/1; max-height:78px; border-radius:50%; background:#f1f4f7; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:30px; color:var(--fg); user-select:none; }
+  .keypad { display:grid; grid-template-columns:repeat(3, var(--k)); justify-content:space-evenly; gap:1.4vh 0; padding:4px 20px 6px; max-width:420px; width:100%; margin:0 auto; --k:min(72px, 9.2vh, 22vw); }
+  .key { width:var(--k); height:var(--k); border-radius:50%; background:#f1f4f7; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:calc(var(--k) * .42); color:var(--fg); user-select:none; }
   .key small { font-size:10px; color:var(--muted); letter-spacing:2px; height:12px; }
   .key:active { background:#dfe5ea; }
-  .dialrow { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; padding:6px 36px 28px; max-width:420px; width:100%; margin:0 auto; align-items:center; }
-  .round { width:72px; height:72px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:30px; margin:auto; }
+  .dialrow { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; padding:1vh 36px 1.6vh; max-width:420px; width:100%; margin:0 auto; align-items:center; }
+  .round { width:min(72px, 9vh); height:min(72px, 9vh); border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:30px; margin:auto; }
   .round.green { background:var(--ok); } .round.red { background:var(--bad); }
   .round svg { width:32px; height:32px; fill:#fff; }
-  .del { font-size:26px; color:var(--muted); background:none; margin:auto; }
+  .del { font-size:26px; color:var(--muted); background:none; margin:auto; width:56px; height:56px; }
+  .side { font-size:24px; background:none; margin:auto; width:56px; height:56px; color:var(--pri); }
 
   /* ---------- incoming / in-call ---------- */
   .callscr { background:linear-gradient(170deg, var(--call-bg2), var(--call-bg)); color:#fff; align-items:center; padding:60px 24px 48px; }
@@ -167,11 +168,11 @@
   <div class="display"><div id="dialNum" class="num"></div><div id="dialErr" class="err"></div></div>
   <div class="keypad" id="keypad"></div>
   <div class="dialrow">
-    <span></span>
+    <button class="side" onclick="pickContact()" aria-label="جهات الاتصال">👥</button>
     <button class="round green" onclick="NQPhone.call(dialNum.textContent)" aria-label="اتصال">
       <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
     </button>
-    <button class="del" onclick="dialDel()" aria-label="مسح">⌫</button>
+    <button class="del" id="btnDel" aria-label="مسح">⌫</button>
   </div>
 </section>
 
@@ -190,6 +191,10 @@
       <div><b>تسجيل المكالمات الواردة كمان</b><small>اسأل بعد المكالمات الواردة مش الصادرة بس</small></div>
       <label class="tg"><input type="checkbox" id="crmIn" onchange="NQPrefs.set('crmIn', this.checked)"><span></span></label>
     </div>
+  </div>
+  <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <div><b>🎯 تارجت المكالمات اليومي</b><div style="color:var(--muted);font-size:12px">عدد المكالمات المطلوبة في اليوم — بيظهر في "إنجازي"</div></div>
+    <input id="sGoal" type="number" inputmode="numeric" class="ltr" style="width:90px;text-align:center" placeholder="60" onchange="NQPrefs.set('dailyGoal', +this.value||0); toast('اتحفظ ✓')">
   </div>
   <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px">
     <b>الاتصال من</b>
@@ -263,9 +268,9 @@
     <label class="lbl">اسم العميل</label>
     <input id="tName" placeholder="مثلًا: شركة الأفق — م. سامي">
     <label class="lbl">رقم التليفون</label>
-    <input id="tPhone" class="ltr" inputmode="tel" placeholder="05XXXXXXXX">
+    <div style="display:flex;gap:8px"><input id="tPhone" class="ltr" inputmode="tel" placeholder="05XXXXXXXX"><button class="iconbtn" style="flex-shrink:0;width:48px;height:48px" onclick="window._pickForTarget=true;pickContact()" aria-label="من جهات الاتصال">👥</button></div>
     <div style="height:12px"></div>
-    <button class="btn" onclick="NQTargets.add()">إضافة</button>
+    <button class="btn" id="tAddBtn" onclick="NQTargets.add()">إضافة</button>
   </div>
   <div class="card" id="tList"></div>
 </section>
@@ -279,12 +284,6 @@
   <div class="card" id="sTarget"></div>
   <div class="kgrid" id="sKpis"></div>
   <div class="card"><b>نتايج المكالمات</b><div id="sOut" style="margin-top:6px"></div></div>
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <div><b>هدف المكالمات اليومي</b><div style="color:var(--muted);font-size:12px">عدد المكالمات المطلوبة في اليوم</div></div>
-      <input id="sGoal" type="number" inputmode="numeric" class="ltr" style="width:90px;text-align:center" onchange="NQPrefs.set('dailyGoal', +this.value||0); NQStats.render()">
-    </div>
-  </div>
   <button class="btn" onclick="NQStats.download()">📥 تنزيل التقرير (Excel)</button>
 </section>
 
@@ -381,12 +380,31 @@ function dialKey(d) {
   n.textContent = n.textContent + d;
   $("dialErr").textContent = "";
 }
-function dialDel() { const n = $("dialNum"); n.textContent = n.textContent.slice(0, -1); }
+function dialDel() { const n = $("dialNum"); n.textContent = n.textContent.slice(0, -1); $("dialErr").textContent = ""; }
+(function () { // ضغطة = يمسح رقم، ضغطة طويلة = يمسح الكل
+  const b = document.getElementById("btnDel"); let t = null, long = false;
+  b.onpointerdown = () => { long = false; t = setTimeout(() => { long = true; $("dialNum").textContent = ""; }, 550); };
+  b.onpointerup = b.onpointerleave = () => clearTimeout(t);
+  b.onclick = () => { if (!long) dialDel(); long = false; };
+})();
+/* جهات الاتصال: التطبيق بيفتح قايمة الأسماء وبيرجّع الرقم */
+function pickContact() {
+  if (window.Android && Android.pickContact) Android.pickContact();
+  else toast("جهات الاتصال شغّالة من التطبيق بس");
+}
+window.onContactPicked = function (name, number) {
+  number = String(number || "").replace(/[^\d+]/g, "").replace(/^\+966/, "0").replace(/^00966/, "0");
+  if (window._pickForTarget) { window._pickForTarget = false; $("tPhone").value = number; if (!$("tName").value) $("tName").value = name || ""; return; }
+  $("dialNum").textContent = number; $("dialErr").innerHTML = "";
+  if (name) { const sp = document.createElement("span"); sp.style.color = "var(--pri)"; sp.textContent = "👤 " + name; $("dialErr").appendChild(sp); }
+  window._pickedName = name || "";
+};
 function toggleCallPad() { $("callPad").classList.toggle("on"); $("cPad").classList.toggle("on"); }
 function showSettings() {
   $("crmMode").checked = NQPrefs.get("crm", false);
   $("crmIn").checked = NQPrefs.get("crmIn", true);
   $("callVia").value = NQPrefs.get("callVia", "ask");
+  $("sGoal").value = NQPrefs.get("dailyGoal", 0) || "";
   const q = NQNotes.queue().length;
   $("queueInfo").textContent = q ? `${q} ملخص مستني يتبعت للسيرفر` : "";
   show("scrSettings");
@@ -532,7 +550,8 @@ const NQNotes = {
     const t = new Date(info.started);
     $("noteMeta").textContent = `${info.via === "sim" ? "📱 من شريحتي · " : ""}${info.direction === "out" ? "↗ صادرة" : "↙ واردة"} · ${info.number} · ${t.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })} · ${Math.floor(info.duration / 60)}:${String(info.duration % 60).padStart(2, "0")}`;
     const tg = NQTargets.findByNumber(info.number);
-    $("noteCustomer").value = tg ? tg.customer : ""; $("noteSummary").value = ""; $("noteFollow").value = "";
+    $("noteCustomer").value = tg ? tg.customer : (window._pickedName || "");
+    window._pickedName = ""; $("noteSummary").value = ""; $("noteFollow").value = "";
     const box = $("noteOutcome"); box.innerHTML = "";
     OUTCOMES.forEach(o => { const c = document.createElement("button"); c.className = "chip"; c.textContent = o; c.onclick = () => { this.outcome = o; box.querySelectorAll(".chip").forEach(x => x.classList.toggle("sel", x === c)); }; box.appendChild(c); });
     show("scrNote");
@@ -619,10 +638,22 @@ const NQTargets = {
   all() { return store.get("nq_targets", []); },
   save(t) { store.set("nq_targets", t); },
   open() { if (!$("tDate").value) $("tDate").value = isoDay(new Date()); this.render(); show("scrTargets"); },
+  editing: null,
+  edit(id) {
+    const x = this.all().find(y => y.id === id); if (!x) return;
+    this.editing = id; $("tName").value = x.customer; $("tPhone").value = x.number || "";
+    $("tAddBtn").textContent = "حفظ التعديل"; $("tName").focus(); $("scrTargets").scrollTop = 0;
+  },
   add() {
     const customer = $("tName").value.trim(), number = $("tPhone").value.trim();
     if (!customer) { toast("اكتب اسم العميل"); return; }
     const t = this.all();
+    if (this.editing) {
+      const x = t.find(y => y.id === this.editing);
+      if (x) { x.customer = customer; x.number = number; x.date = $("tDate").value || x.date; }
+      this.editing = null; $("tAddBtn").textContent = "إضافة";
+      this.save(t); $("tName").value = ""; $("tPhone").value = ""; this.render(); toast("اتعدّل ✓"); return;
+    }
     t.push({ id: Date.now() + "" + Math.random().toString(36).slice(2, 6), date: $("tDate").value || isoDay(new Date()), customer, number, done: false });
     this.save(t); $("tName").value = ""; $("tPhone").value = ""; this.render(); toast("اتضاف ✓");
   },
@@ -650,9 +681,9 @@ const NQTargets = {
     if (!list.length) { box.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px">مفيش عملاء في تارجت اليوم ده. ضيف من فوق.</div>'; return; }
     list.forEach(x => {
       const row = document.createElement("div"); row.className = "tgt" + (x.done ? " done" : "");
-      const info = document.createElement("div"); info.className = "info";
+      const info = document.createElement("div"); info.className = "info"; info.onclick = () => this.edit(x.id); info.title = "اضغط للتعديل";
       const b = document.createElement("b"); b.textContent = x.customer;
-      const sm = document.createElement("small"); sm.textContent = x.number || "";
+      const sm = document.createElement("small"); sm.textContent = (x.number || "") + "  ✎";
       info.append(b, sm);
       const pill = document.createElement("span"); pill.className = "pill" + (x.done ? "" : " wait"); pill.textContent = x.done ? "تم ✓" : "لسه"; pill.onclick = () => this.toggle(x.id);
       row.append(info, pill);
@@ -666,7 +697,7 @@ const NQTargets = {
 /* ---------- my stats + report ---------- */
 const NQStats = {
   period: "day",
-  open() { $("sGoal").value = NQPrefs.get("dailyGoal", 0) || ""; this.render(); show("scrStats"); },
+  open() { this.render(); show("scrStats"); },
   range() {
     const now = new Date(); let from;
     if (this.period === "day") from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -690,7 +721,8 @@ const NQStats = {
     const bar = (v, max) => { const p = max ? Math.min(100, Math.round(v / max * 100)) : 0; return `<div class="prog${p < 50 ? " low" : p < 80 ? " mid" : ""}"><b style="width:${p}%"></b></div>`; };
     $("sTarget").innerHTML =
       `<div style="display:flex;justify-content:space-between"><b>🎯 تارجت العملاء النهارده</b><b>${td} / ${tl.length}</b></div>${bar(td, tl.length)}` +
-      (goal ? `<div style="display:flex;justify-content:space-between;margin-top:14px"><b>📞 هدف المكالمات النهارده</b><b>${todayCalls} / ${goal}</b></div>${bar(todayCalls, goal)}` : "");
+      (goal ? `<div style="display:flex;justify-content:space-between;margin-top:14px"><b>📞 هدف المكالمات النهارده</b><b>${todayCalls} / ${goal}</b></div>${bar(todayCalls, goal)}`
+            : `<div style="color:var(--muted);font-size:13px;margin-top:12px">حدّد تارجت المكالمات اليومي من ⚙ الإعدادات</div>`);
     const k = (l, v) => `<div class="card"><div class="l">${l}</div><div class="v">${v}</div></div>`;
     $("sKpis").innerHTML = k(`مكالمات ${this.label()}`, rows.length) + k("اتردّ عليها", ans.length) +
       k("وقت الكلام", fmtDur(talk)) + k("متوسط المكالمة", ans.length ? fmtDur(Math.round(talk / ans.length)) : "0:00") +

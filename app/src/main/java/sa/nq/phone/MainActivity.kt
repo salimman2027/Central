@@ -25,6 +25,21 @@ class MainActivity : Activity() {
     private lateinit var web: WebView
     private var pendingSimNumber: String? = null
 
+    @Deprecated("startActivityForResult is enough for a contact pick")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != 3 || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        var name = ""; var number = ""
+        contentResolver.query(uri, arrayOf(
+            android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER), null, null, null)?.use { c ->
+            if (c.moveToFirst()) { name = c.getString(0) ?: ""; number = c.getString(1) ?: "" }
+        }
+        val js = "window.onContactPicked && onContactPicked(" + org.json.JSONObject.quote(name) + "," + org.json.JSONObject.quote(number) + ")"
+        web.evaluateJavascript(js, null)
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 2) {
@@ -133,6 +148,15 @@ class MainActivity : Activity() {
             PhoneService.stopRing()
             val am = getSystemService(AUDIO_SERVICE) as AudioManager
             am.mode = if (active) AudioManager.MODE_IN_COMMUNICATION else AudioManager.MODE_NORMAL
+        }
+
+        /** يفتح جهات الاتصال ويرجّع الاسم والرقم */
+        @JavascriptInterface fun pickContact() {
+            runOnUiThread {
+                @Suppress("DEPRECATION")
+                startActivityForResult(Intent(Intent.ACTION_PICK,
+                    android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI), 3)
+            }
         }
 
         /** اتصال من شريحة الموبايل نفسه */
