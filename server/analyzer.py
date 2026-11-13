@@ -66,9 +66,12 @@ def transcribe(wav: str) -> dict:
     if _MODEL is None:  # النموذج بيتحمّل مرة واحدة بس لكل التسجيلات
         from faster_whisper import WhisperModel
         _MODEL = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8", cpu_threads=os.cpu_count() or 2)
-    segs, info = _MODEL.transcribe(wav, language="ar", vad_filter=True, beam_size=1,
-                                   vad_parameters={"threshold": 0.3, "min_silence_duration_ms": 700})
-    lines = [{"start": round(s.start, 1), "end": round(s.end, 1), "text": s.text.strip()} for s in segs if s.text.strip()]
+    try:
+        segs, info = _MODEL.transcribe(wav, language="ar", vad_filter=True, beam_size=1,
+                                       vad_parameters={"min_silence_duration_ms": 700})
+        lines = [{"start": round(s.start, 1), "end": round(s.end, 1), "text": s.text.strip()} for s in segs if s.text.strip()]
+    except TypeError:  # نسخ faster-whisper بتختلف في إعدادات فلتر السكوت
+        lines = []
     if not lines:  # صوت التليفون (8kHz) ساعات فلتر السكوت بيشيله كله — نجرّب من غيره
         segs, info = _MODEL.transcribe(wav, language="ar", vad_filter=False, beam_size=1)
         lines = [{"start": round(s.start, 1), "end": round(s.end, 1), "text": s.text.strip()} for s in segs if s.text.strip()]
