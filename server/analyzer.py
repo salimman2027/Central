@@ -146,7 +146,7 @@ def meta_from_name(path: str) -> dict:
     if len(p) >= 5:
         m.update(direction={"out": "صادرة", "in": "واردة", "external": "واردة"}.get(p[0], p[0]),
                  number=p[1], extension=p[2],
-                 time=f"{p[3][:4]}-{p[3][4:6]}-{p[3][6:]} {p[4][:2]}:{p[4][2:4]} UTC")
+                 time=f"{p[3][:4]}-{p[3][4:6]}-{p[3][6:]} {p[4][:2]}:{p[4][2:4]}")
     return m
 
 

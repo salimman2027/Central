@@ -28,6 +28,7 @@ DATA_DIR = Path(os.environ.get("NQ_DATA", "/var/lib/nq-calls"))
 ANALYSIS_DIR = DATA_DIR / "analysis"
 NOTES_DIR = DATA_DIR / "notes"
 SUP_FILE = DATA_DIR / "supervisor-notes.json"
+SERVER_TZ = dt.datetime.now().astimezone().tzinfo   # توقيت السيرفر اللي Asterisk بيكتب بيه الـ CDR
 SIM_DIR = DATA_DIR / "mobile"            # تسجيلات مكالمات الشريحة اللي التطبيق بيرفعها
 SIM_INDEX = SIM_DIR / "index.jsonl"
 SIM_LOCK = threading.Lock()
@@ -279,8 +280,11 @@ def notes(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
 # ---------------- calls ----------------
 @app.get("/api/calls")
 def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(alias="to")):
-    start = dt.datetime.combine(date_from, dt.time.min, TZ).astimezone(dt.timezone.utc).replace(tzinfo=None)
-    end = dt.datetime.combine(date_to + dt.timedelta(days=1), dt.time.min, TZ).astimezone(dt.timezone.utc).replace(tzinfo=None)
+    # الـ CDR بيتسجّل بتوقيت السيرفر المحلي (مش UTC)
+    start_a = dt.datetime.combine(date_from, dt.time.min, TZ)
+    end_a = dt.datetime.combine(date_to + dt.timedelta(days=1), dt.time.min, TZ)
+    start = start_a.astimezone(SERVER_TZ).replace(tzinfo=None)
+    end = end_a.astimezone(SERVER_TZ).replace(tzinfo=None)
     rows = query(
         """SELECT uniqueid, linkedid, calldate, src, cnum, dst, channel, dstchannel,
                   disposition, duration, billsec, recordingfile
@@ -304,7 +308,7 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
             continue
         status = {"ANSWERED": "تم الرد", "BUSY": "مرفوضة"}.get(main["disposition"], "فائتة" if inbound else "لم يرد")
         rec = next((r["recordingfile"] for r in g if r["recordingfile"]), "")
-        t = main["calldate"].replace(tzinfo=dt.timezone.utc)
+        t = main["calldate"].replace(tzinfo=SERVER_TZ).astimezone(dt.timezone.utc)
         out.append(dict(
             id=main["uniqueid"], time=t.isoformat(), ext=ext, dir="in" if inbound else "out",
             status=status, talkSec=int(main["billsec"] or 0),
@@ -322,7 +326,7 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
     # مكالمات الشريحة اللي اترفعت من التطبيق
     for r in load_sim_calls().values():
         t = dt.datetime.fromtimestamp(r["start"] / 1000, dt.timezone.utc)
-        if not (start <= t.replace(tzinfo=None) < end):
+        if not (start_a <= t < end_a):
             continue
         st = Path(r["file"]).stem
         out.append(dict(
