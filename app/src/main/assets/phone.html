@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NQ Softphone</title>
+<style>
+  :root { --bg:#fff; --fg:#1d2433; --muted:#6b7280; --line:#e5e7eb; --ok:#16a34a; --bad:#dc2626; --pri:#2563eb; }
+  body { margin:0; font-family: system-ui, "Segoe UI", Tahoma, sans-serif; background:#f3f4f6; color:var(--fg); }
+  #nq-phone { width: auto; max-width: 420px; margin: 16px; background:var(--bg); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:0 4px 16px rgba(0,0,0,.06); }
+  .row { display:flex; gap:8px; margin-bottom:10px; }
+  input { flex:1; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:15px; direction:ltr; }
+  button { padding:14px 12px; border:0; border-radius:8px; cursor:pointer; font-size:14px; color:#fff; background:var(--pri); }
+  button.ok { background:var(--ok); } button.bad { background:var(--bad); } button.gray { background:#9ca3af; }
+  button:disabled { opacity:.4; cursor:default; }
+  #status { font-size:13px; color:var(--muted); margin-bottom:12px; }
+  #status b.on { color:var(--ok); } #status b.off { color:var(--bad); }
+  #callinfo { min-height:22px; font-weight:600; margin:6px 0 10px; direction:ltr; text-align:center; }
+  #login, #dialer { display:none; }
+  .full { width:100%; }
+</style>
+</head>
+<body>
+
+<div id="nq-phone">
+  <div id="status">الحالة: <b class="off">غير متصل</b></div>
+
+  <!-- تسجيل الدخول -->
+  <div id="login">
+    <div class="row"><input id="ext" placeholder="رقم التحويلة (مثلًا 101)"></div>
+    <div class="row"><input id="pwd" type="password" placeholder="باسورد التحويلة"></div>
+    <button class="full" onclick="NQPhone.login(ext.value.trim(), pwd.value)">دخول</button>
+  </div>
+
+  <!-- لوحة الاتصال -->
+  <div id="dialer">
+    <div id="callinfo"></div>
+    <div class="row"><input id="num" placeholder="05XXXXXXXX"></div>
+    <div class="row">
+      <button id="btnCall" class="ok" onclick="NQPhone.call(num.value)">اتصال</button>
+      <button id="btnAnswer" class="ok" onclick="NQPhone.answer()" disabled>رد</button>
+      <button id="btnHang" class="bad" onclick="NQPhone.hangup()" disabled>إنهاء</button>
+      <button id="btnMute" class="gray" onclick="NQPhone.toggleMute()" disabled>كتم</button>
+      <button id="btnSpk" class="gray" onclick="NQPhone.toggleSpeaker()">سماعة</button>
+    </div>
+    <button class="gray full" onclick="NQPhone.logout()">خروج</button>
+  </div>
+</div>
+
+<audio id="remoteAudio" autoplay></audio>
+<audio id="ringtone"></audio>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jssip/3.10.0/jssip.min.js"></script>
+<script>
+/* =====================================================================
+   NQ Softphone — تليفون WebRTC بسيط للتركيب جوه الـ CRM
+   - بيتصل بسنترال FreePBX عن طريق WSS على بورت 8089
+   - التسجيل بيحصل على السيرفر (Force Recording على التحويلات)
+   - الـ CRM يقدر يستخدم:
+       NQPhone.call("05XXXXXXXX")              اتصال بضغطة
+       NQPhone.onIncoming = (num) => {...}      فتح ملف العميل عند الرنين
+       NQPhone.onCallEnded = (info) => {...}    تسجيل المكالمة في الـ CRM
+   ===================================================================== */
+const CONFIG = {
+  wss:    "wss://3.89.245.93.sslip.io:8089/ws",
+  domain: "3.89.245.93.sslip.io",
+  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+};
+
+const $ = id => document.getElementById(id);
+
+const NQPhone = {
+  ua: null, session: null, muted: false, callStart: null, direction: null, peer: null,
+
+  // أحداث يربطها الـ CRM
+  onIncoming:  (number) => {},
+  onAnswered:  (info) => {},
+  onCallEnded: (info) => {},
+
+  speaker: false,
+  toggleSpeaker() {
+    this.speaker = !this.speaker;
+    $("btnSpk").textContent = this.speaker ? "سماعة: شغّالة" : "سماعة";
+    if (window.Android) Android.setSpeaker(this.speaker);
+  },
+
+  login(ext, password) {
+    if (!ext || !password) return alert("اكتب رقم التحويلة والباسورد");
+    try { localStorage.setItem("nq_login", JSON.stringify({ ext, password })); } catch (e) {}
+    const socket = new JsSIP.WebSocketInterface(CONFIG.wss);
+    this.ua = new JsSIP.UA({
+      sockets: [socket],
+      uri: `sip:${ext}@${CONFIG.domain}`,
+      password,
+      display_name: ext,
+      register: true,
+      session_timers: false
+    });
+    this.ua.on("registered",        () => { this._status(true, ext); try { sessionStorage.setItem("nq_ext", ext); } catch(e){} });
+    this.ua.on("unregistered",      () => this._status(false));
+    this.ua.on("registrationFailed",e  => { this._status(false); alert("فشل الدخول: " + e.cause); });
+    this.ua.on("disconnected",      () => this._status(false));
+    this.ua.on("newRTCSession",     e  => this._onSession(e));
+    this.ua.start();
+  },
+
+  logout() {
+    try { localStorage.removeItem("nq_login"); } catch (e) {}
+    if (this.ua) this.ua.stop(); this.ua = null; this._status(false);
+  },
+
+  call(number) {
+    number = String(number || "").replace(/[^\d+*#]/g, "");
+    if (!this.ua || !this.ua.isRegistered()) return alert("التليفون مش متصل");
+    if (this.session) return alert("في مكالمة شغالة");
+    if (!number) return;
+    if (window.Android) Android.onCallStateChanged(true);
+    this.ua.call(`sip:${number}@${CONFIG.domain}`, {
+      mediaConstraints: { audio: true, video: false },
+      pcConfig: { iceServers: CONFIG.iceServers }
+    });
+  },
+
+  answer() {
+    if (!this.session) return;
+    this._ring(false);
+    this.session.answer({
+      mediaConstraints: { audio: true, video: false },
+      pcConfig: { iceServers: CONFIG.iceServers }
+    });
+  },
+
+  hangup() { if (this.session) this.session.terminate(); },
+
+  toggleMute() {
+    if (!this.session) return;
+    this.muted ? this.session.unmute({ audio: true }) : this.session.mute({ audio: true });
+    this.muted = !this.muted;
+    $("btnMute").textContent = this.muted ? "إلغاء الكتم" : "كتم";
+  },
+
+  /* ---------- داخلي ---------- */
+  _onSession(e) {
+    const s = e.session;
+    if (this.session) { s.terminate({ status_code: 486 }); return; } // مشغول
+    this.session = s;
+    this.direction = e.originator === "remote" ? "in" : "out";
+    this.peer = s.remote_identity.uri.user;
+    this.callStart = null;
+
+    if (this.direction === "in") {
+      this._info("📞 مكالمة واردة من " + this.peer);
+      this._ring(true);
+      this._buttons({ call:false, answer:true, hang:true, mute:false });
+      if (window.Android) Android.onIncoming(this.peer);
+      this.onIncoming(this.peer);
+    } else {
+      this._info("جاري الاتصال بـ " + this.peer + "...");
+      this._buttons({ call:false, answer:false, hang:true, mute:false });
+    }
+
+    s.on("peerconnection", ev => this._attachAudio(ev.peerconnection));
+    if (s.connection) this._attachAudio(s.connection);
+
+    s.on("accepted", () => {
+      this.callStart = Date.now();
+      this._ring(false);
+      this._info("متصل: " + this.peer);
+      this._buttons({ call:false, answer:false, hang:true, mute:true });
+      if (window.Android) Android.onCallStateChanged(true);
+      this.onAnswered({ number: this.peer, direction: this.direction });
+    });
+    const end = (ev) => {
+      const info = {
+        number: this.peer, direction: this.direction,
+        answered: !!this.callStart,
+        duration: this.callStart ? Math.round((Date.now() - this.callStart) / 1000) : 0,
+        cause: ev && ev.cause
+      };
+      this._ring(false);
+      this.session = null; this.muted = false;
+      $("btnMute").textContent = "كتم";
+      this._info(info.answered ? `انتهت المكالمة (${info.duration} ث)` : "المكالمة لم تكتمل: " + info.cause);
+      this._buttons({ call:true, answer:false, hang:false, mute:false });
+      if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); }
+      this.speaker = false; $("btnSpk").textContent = "سماعة";
+      this.onCallEnded(info);
+    };
+    s.on("ended", end);
+    s.on("failed", end);
+  },
+
+  _attachAudio(pc) {
+    pc.addEventListener("track", ev => { $("remoteAudio").srcObject = ev.streams[0]; });
+  },
+  _ring(on) { const r = $("ringtone"); try { on ? r.play() : (r.pause(), r.currentTime = 0); } catch(e){} },
+  _info(t) { $("callinfo").textContent = t; },
+  _buttons(b) {
+    $("btnCall").disabled = !b.call; $("btnAnswer").disabled = !b.answer;
+    $("btnHang").disabled = !b.hang; $("btnMute").disabled = !b.mute;
+  },
+  _status(on, ext) {
+    $("status").innerHTML = on ? `الحالة: <b class="on">متصل</b> — تحويلة ${ext}` : `الحالة: <b class="off">غير متصل</b>`;
+    $("login").style.display  = on ? "none" : "block";
+    $("dialer").style.display = on ? "block" : "none";
+  }
+};
+window.NQPhone = NQPhone;
+NQPhone._status(false);
+// دخول تلقائي بآخر تحويلة اتسجّلت على الجهاز
+try { const s = JSON.parse(localStorage.getItem("nq_login") || "null"); if (s) NQPhone.login(s.ext, s.password); } catch (e) {}
+$("num").addEventListener("keydown", e => { if (e.key === "Enter") NQPhone.call(e.target.value); });
+
+/* ===== مثال ربط بالـ CRM (عدّله حسب نظامكم) =====
+NQPhone.onIncoming = (num) => {
+  // افتح ملف العميل بالرقم
+  // window.open("/crm/customers/search?phone=" + num, "_blank");
+};
+NQPhone.onCallEnded = (info) => {
+  // سجّل المكالمة في الـ CRM
+  // fetch("/api/calls", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(info) });
+};
+*/
+</script>
+</body>
+</html>
