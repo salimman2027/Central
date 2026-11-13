@@ -33,6 +33,12 @@ cp -r "$SRC"/app.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$A
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 chown -R "$RUN_USER:$RUN_USER" "$DATA"
 
+# نسخة اللابتوب من التليفون (نفس صفحة التطبيق) على https://HOST/phone/
+if [[ -d "$SRC/../app/src/main/assets" ]]; then
+  rm -rf "$APP/phone"; cp -r "$SRC/../app/src/main/assets" "$APP/phone"
+  cp "$APP/phone/phone.html" "$APP/phone/index.html"
+fi
+
 echo "== python env"
 [[ -x "$APP/venv/bin/python" ]] || python3 -m venv "$APP/venv"
 NEWHASH=$(sha256sum "$APP/requirements.txt" | cut -d' ' -f1)
@@ -118,6 +124,14 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/notes http://127.0.0.1:8090/app/notes
   ProxyPass        /calls-app/insight http://127.0.0.1:8090/app/insight
   ProxyPassReverse /calls-app/insight http://127.0.0.1:8090/app/insight
+
+  # التليفون من اللابتوب
+  RedirectMatch ^/phone\$ /phone/
+  Alias /phone/ $APP/phone/
+  <Directory $APP/phone>
+    Require all granted
+    Header set Cache-Control "no-cache"
+  </Directory>
 
   # لوحة المكالمات
   RedirectMatch ^/calls\$ /calls/
