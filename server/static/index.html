@@ -255,6 +255,23 @@ html[data-theme=light] .tree,html[data-theme=light] .tr{background:#f5f8fb;color
 html[data-theme=light] .modal{background:rgba(20,30,50,.35)}
 html[data-theme=light] .ai-err{color:#b0163b;background:#fdecef}
 html[data-theme=light] .pager button.a,html[data-theme=light] .play:hover{color:#fff}
+
+.acts{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.a-play{--p:0;width:34px;height:34px;border-radius:50%;border:0;cursor:pointer;color:var(--teal);font-size:12px;font-weight:800;
+  background:radial-gradient(closest-side,var(--glass2) 78%,transparent 80% 100%),conic-gradient(var(--teal) calc(var(--p)*1%),rgba(148,190,255,.18) 0);box-shadow:0 0 0 1px rgba(25,230,193,.25)}
+.a-play.on{box-shadow:0 0 18px rgba(25,230,193,.6)}
+.a-time{font-size:11px;color:var(--grey);direction:ltr}
+.a-btn{width:32px;height:32px;border-radius:10px;border:1px solid var(--border);background:var(--glass);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:15px;text-decoration:none;position:relative;transition:.2s}
+.a-btn:hover{border-color:var(--teal);box-shadow:0 0 14px rgba(25,230,193,.35)}
+.a-btn.has:after{content:"";position:absolute;top:-3px;left:-3px;width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+tr.pnl-row td{background:transparent!important;white-space:normal;padding:0 8px 12px}
+.pnl{position:relative;border:1px solid rgba(25,230,193,.35);border-radius:16px;padding:14px 16px;background:var(--glass2);margin-top:8px;animation:pnlIn .25s ease;text-align:right}
+@keyframes pnlIn{from{opacity:0;transform:translateY(-6px)}}
+.pnl-x{position:absolute;left:10px;top:8px;border:0;background:none;color:var(--grey);cursor:pointer;font-size:16px}
+.pnl-ta{width:100%;margin-top:8px;border:1px solid var(--border);border-radius:12px;padding:10px;font-family:inherit;font-size:14px;background:rgba(4,8,18,.5);color:var(--text)}
+html[data-theme=light] .pnl-ta{background:#fff}
+.pnl-btns{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.btn.rec{background:var(--red)!important;color:#fff!important;border-color:transparent!important;animation:breathe 1.6s infinite}
 /* التقرير ورق أبيض للطباعة */
 .report{color:#1C2B2A;border-radius:14px;--teal:#0F7C7A;--teal-d:#0A5654;--teal-l:#E7F3F2;--border:#D5E2E1;--text:#1C2B2A}
 .report th{background:#0F7C7A;color:#fff}.report td{border-color:#D5E2E1}.report tr:hover td{background:none}
@@ -419,7 +436,7 @@ async function loadCalls(from,to){
   const rows=await r.json();
   CALLS=rows.filter(c=>REPS.some(x=>x.id===c.ext)).map(c=>({
     id:c.id, t:new Date(c.time), rep:c.ext, dir:c.dir, st:c.status, dur:c.talkSec, ring:c.ringSec,
-    num:c.number, cust:(c.note&&c.note.customer)||c.customer||'—', rec:!!c.hasRecording, ai:!!c.analyzed, note:c.note||null
+    num:c.number, cust:(c.note&&c.note.customer)||c.customer||'—', rec:!!c.hasRecording, ai:!!c.analyzed, tx:!!c.transcribed, sup:c.supNote||'', note:c.note||null
   })).sort((a,b)=>b.t-a.t);
   loadedRange=key;
 }
@@ -542,11 +559,11 @@ function renderLog(){
   const pages=Math.max(1,Math.ceil(logList.length/PS));logPage=Math.min(logPage,pages);
   const rows=logList.slice((logPage-1)*PS,logPage*PS).map((c,i)=>{
     const r=repOf(c.rep);
-    return `<tr><td class="c">${(logPage-1)*PS+i+1}</td><td>${dmy(c.t)} ${c.t.toLocaleTimeString('en-GB')}</td><td>${r.name}</td><td>${teamOf(r.team).name}</td>
+    return `<tr id="row-${esc(c.id)}"><td class="c">${(logPage-1)*PS+i+1}</td><td>${dmy(c.t)} ${c.t.toLocaleTimeString('en-GB')}</td><td>${r.name}</td><td>${teamOf(r.team).name}</td>
     <td style="direction:ltr;text-align:right">${c.num}</td><td>${c.cust}</td>
     <td><span class="badge ${c.dir==='out'?'b-out':'b-in'}">${c.dir==='out'?'↗ صادرة':'↙ واردة'}</span></td>
     <td><span class="badge ${stBadge(c.st)}">${c.st}</span></td><td class="c">${ms(c.ring)}</td><td class="c">${c.dur?ms(c.dur):'—'}</td>
-    <td class="c">${c.rec?`<button class="play" onclick="openRec(${CALLS.indexOf(c)})">▶</button>`:'—'}</td>
+    <td class="c">${c.rec?callActs(c.id,{ai:c.ai,tx:c.tx,sup:c.sup}):'—'}</td>
     <td style="white-space:normal;min-width:220px;max-width:340px">${c.note?`${c.note.outcome?`<span class="badge b-out">${esc(c.note.outcome)}</span> `:''}${esc((c.note.summary||'').slice(0,140))}${c.note.followUp?`<div class="muted">متابعة: ${esc(c.note.followUp)}</div>`:''}`:'<span class="muted">—</span>'}</td></tr>`}).join('');
   $('logTbl').innerHTML=`<tr><th class="c">#</th><th>التاريخ والوقت</th><th>المندوب</th><th>الفريق</th><th>الرقم</th><th>العميل</th><th>النوع</th><th>الحالة</th><th class="c">الرنين</th><th class="c">المدة</th><th class="c">تسجيل</th><th>ملخص المندوب</th></tr>`+(rows||'<tr><td colspan="12" class="c">لا توجد مكالمات</td></tr>');
   let p='';for(let i=1;i<=Math.min(pages,7);i++)p+=`<button class="${i===logPage?'a':''}" onclick="logPage=${i};renderLog()">${i}</button>`;
@@ -675,7 +692,7 @@ function renderAI(){
       ${a?`<div class="ai-score">${esc(a.agent_score??'—')}<small>تقييم الموظف</small></div>`:''}
       <div style="flex:1"><b>${esc(r.name)}</b> <span class="muted">${c.dir==='out'?'↗ صادرة':'↙ واردة'} · <span style="direction:ltr;display:inline-block">${esc(c.number)}</span> · ${dmy(t)} ${tm(t)} · ${ms(c.talkSec)}</span>
       ${a?`<br><span class="badge b-out">${esc(a.outcome||'')}</span> <span class="badge ${a.customer_sentiment==='متضايق'?'b-miss':a.customer_sentiment==='راضي'?'b-ans':'b-no'}">${esc(a.customer_sentiment||'')}</span>`:''}</div>
-      <button class="play" title="سماع التسجيل" onclick="openRecById('${esc(c.id)}','${esc(r.name)} ← ${esc(c.number)}')">▶</button></div>`;
+      ${callActs(c.id,{ai:!!a,tx:c.transcribed,sup:c.supNote,noAi:true})}</div>`;
     if(!a){
       const P=AI_PROG, k=c.rec, err=P&&P.errors&&P.errors[k];
       let st;
@@ -683,12 +700,12 @@ function renderAI(){
       else if(err) st=`<div class="ai-err">✖ ${esc(err)}</div>`;
       else if(AI_WAIT.has(c.id)&&AI_RUNNING) st='<div class="muted">⏳ في الطابور…</div>';
       else st='<div class="muted">لسه متحلّلتش — علّم عليها ودوس "حلّل المحدد"</div>';
-      return `<div class="ai-card pending ${P&&P.current===k&&AI_RUNNING?'live':''}">${head}${st}</div>`;
+      return `<div class="ai-card pending ${P&&P.current===k&&AI_RUNNING?'live':''}" id="row-${esc(c.id)}">${head}${st}</div>`;
     }
     const chk=(a.checklist||[]).map(k=>`<li class="${k.done?'ok':'no'}">${k.done?'✔':'✖'} ${esc(k.item)}${k.evidence?` <span class="muted">— ${esc(k.evidence)}</span>`:''}</li>`).join('');
     const tasks=(a.follow_up_tasks||[]).map(k=>`<li>${esc(k.task)}${k.due?' — '+esc(k.due):''}</li>`).join('')||'<li>—</li>';
     const tr=(x.transcript||[]).map(l=>`<div><span>${l.start}s</span> ${esc(l.text)}</div>`).join('');
-    return `<div class="ai-card">${head}
+    return `<div class="ai-card" id="row-${esc(c.id)}">${head}
       <p style="margin:0 0 10px">${esc(a.summary||'')}</p>
       <div class="ai-cols"><div><b class="muted">نقط التقييم</b><ul class="ai-chk">${chk}</ul></div>
       <div><b class="muted">نصيحة للمندوب</b><p style="margin:4px 0 10px">${esc(a.coaching_tip||'')}</p><b class="muted">مهام متابعة</b><ul style="margin:4px 0">${tasks}</ul>
@@ -713,6 +730,115 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 loadConfig().then(()=>{fillSelects();refresh();initAI();}).catch(e=>{$('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل الإعدادات</div><div class="s">${e.message}</div></div>`});
 // تحديث تلقائي كل دقيقة
 setInterval(()=>{loadedRange='';refresh()},60000);
+/* ===================== أزرار المكالمة: سماع / تحميل / نص / تحليل / ملاحظة المدير ===================== */
+const IP=new Audio(); let IP_ID=null;
+IP.addEventListener('timeupdate',()=>{const b=document.querySelector(`.acts[data-id="${CSS.escape(IP_ID||'')}"] .a-play`);if(b&&IP.duration)b.style.setProperty('--p',(IP.currentTime/IP.duration*100).toFixed(1));
+  const t=document.querySelector(`.acts[data-id="${CSS.escape(IP_ID||'')}"] .a-time`);if(t)t.textContent=ms(Math.floor(IP.currentTime))+(IP.duration?' / '+ms(Math.floor(IP.duration)):'');});
+IP.addEventListener('ended',()=>setPlayIcon(IP_ID,false));IP.addEventListener('pause',()=>setPlayIcon(IP_ID,false));IP.addEventListener('play',()=>setPlayIcon(IP_ID,true));
+function setPlayIcon(id,on){document.querySelectorAll('.acts .a-play').forEach(b=>{const mine=b.closest('.acts').dataset.id===id;b.textContent=mine&&on?'❚❚':'▶';b.classList.toggle('on',mine&&on);});}
+function recUrl(id){return `${API_BASE}/recording/${encodeURIComponent(id)}`}
+function callActs(id,o={}){
+  const q=esc(id);
+  return `<div class="acts" data-id="${q}">
+    <button class="a-play" title="سماع" onclick="playInline('${q}')">▶</button><span class="a-time"></span>
+    <a class="a-btn" title="تحميل التسجيل" href="${recUrl(id)}?download=1">⬇</a>
+    <button class="a-btn ${o.tx?'has':''}" title="تحويل لنص" onclick="callPanel('${q}','text')">📝</button>
+    ${o.noAi?'':`<button class="a-btn ${o.ai?'has':''}" title="تحليل المكالمة" onclick="callPanel('${q}','ai')">🤖</button>`}
+    <button class="a-btn ${o.sup?'has':''}" title="ملاحظة المدير" onclick="callPanel('${q}','note')">💬</button></div>`;
+}
+function playInline(id){
+  if(IP_ID===id&&!IP.paused){IP.pause();return}
+  if(IP_ID!==id){IP.src=recUrl(id);IP_ID=id;}
+  IP.play().catch(e=>alert('تعذّر تشغيل التسجيل: '+e.message));
+}
+function panelHost(id){
+  const row=document.getElementById('row-'+id); if(!row) return null;
+  let p=document.getElementById('pnl-'+id);
+  if(!p){
+    if(row.tagName==='TR'){const tr=document.createElement('tr');tr.className='pnl-row';tr.innerHTML=`<td colspan="12"><div class="pnl" id="pnl-${esc(id)}"></div></td>`;row.after(tr);}
+    else row.insertAdjacentHTML('beforeend',`<div class="pnl" id="pnl-${esc(id)}"></div>`);
+    p=document.getElementById('pnl-'+id);
+  }
+  return p;
+}
+function closePanel(id){const p=document.getElementById('pnl-'+id);if(!p)return;const tr=p.closest('tr.pnl-row');(tr||p).remove();}
+async function callPanel(id,kind){
+  const p=panelHost(id); if(!p) return;
+  if(p.dataset.kind===kind){closePanel(id);return}
+  p.dataset.kind=kind; p.innerHTML='<div class="muted">جاري التحميل…</div>';
+  let d={transcript:[],analysis:null,supNote:''};
+  try{ d=await (await fetch(`${API_BASE}/call/${encodeURIComponent(id)}`,{cache:'no-store'})).json(); }catch(e){}
+  const x=`<button class="pnl-x" onclick="closePanel('${esc(id)}')">✕</button>`;
+  if(kind==='note'){
+    p.innerHTML=`${x}<b>💬 ملاحظة المدير</b>
+      <textarea class="pnl-ta" id="sn-${esc(id)}" rows="3" placeholder="اكتب أو دوس 🎙 واتكلم…">${esc(d.supNote||'')}</textarea>
+      <div class="pnl-btns"><button class="btn o" id="snm-${esc(id)}" onclick="supDictate('${esc(id)}')">🎙 سجّل بصوتك</button>
+      <button class="btn" onclick="supSave('${esc(id)}')">💾 حفظ</button><span class="muted" id="sns-${esc(id)}"></span></div>`;
+    return;
+  }
+  if(kind==='text'){
+    if(d.transcript&&d.transcript.length){p.innerHTML=`${x}<b>📝 نص المكالمة</b><div class="tr" style="margin-top:8px">${d.transcript.map(l=>`<div><span>${l.start}s</span> ${esc(l.text)}</div>`).join('')}</div>
+      <div class="pnl-btns"><button class="btn o" onclick="callJob('${esc(id)}','ai')">🤖 حلّل المكالمة</button></div>`;return}
+    p.innerHTML=`${x}<b>📝 نص المكالمة</b><div class="pnl-btns"><span class="muted">لسه متحوّلتش لنص.</span><button class="btn" onclick="callJob('${esc(id)}','transcript')">⚡ حوّل لنص دلوقتي</button></div>`;
+    return;
+  }
+  if(d.analysis){p.innerHTML=x+aiBlock(d.analysis,d.transcript);return}
+  p.innerHTML=`${x}<b>🤖 تحليل المكالمة</b><div class="pnl-btns"><span class="muted">المكالمة دي لسه متحلّلتش.</span><button class="btn" onclick="callJob('${esc(id)}','ai')">⚡ حلّلها دلوقتي</button></div>`;
+}
+function aiBlock(a,tr){
+  const chk=(a.checklist||[]).map(k=>`<li class="${k.done?'ok':'no'}">${k.done?'✔':'✖'} ${esc(k.item)}</li>`).join('');
+  const tasks=(a.follow_up_tasks||[]).map(k=>`<li>${esc(k.task)}${k.due?' — '+esc(k.due):''}</li>`).join('')||'<li>—</li>';
+  return `<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="ai-score">${esc(a.agent_score??'—')}<small>تقييم الموظف</small></div>
+    <div><span class="badge b-out">${esc(a.outcome||'')}</span> <span class="badge ${a.customer_sentiment==='متضايق'?'b-miss':a.customer_sentiment==='راضي'?'b-ans':'b-no'}">${esc(a.customer_sentiment||'')}</span></div></div>
+    <p>${esc(a.summary||'')}</p><div class="ai-cols"><div><b class="muted">نقط التقييم</b><ul class="ai-chk">${chk}</ul></div>
+    <div><b class="muted">نصيحة للمندوب</b><p style="margin:4px 0 10px">${esc(a.coaching_tip||'')}</p><b class="muted">مهام متابعة</b><ul>${tasks}</ul></div></div>
+    ${tr&&tr.length?`<details><summary class="muted" style="cursor:pointer">نص المكالمة</summary><div class="tr">${tr.map(l=>`<div><span>${l.start}s</span> ${esc(l.text)}</div>`).join('')}</div></details>`:''}`;
+}
+async function callJob(id,kind){
+  const p=document.getElementById('pnl-'+id); if(!p) return;
+  let box=p.querySelector('.pnl-btns'); if(!box){p.insertAdjacentHTML('beforeend','<div class="pnl-btns"></div>');box=p.querySelector('.pnl-btns');}
+  const st=()=>p.querySelector('.pnl-btns');
+  st().innerHTML='<div class="ai-live" style="flex:1">⏳ بيبدأ…<i class="scan"></i></div>';
+  try{
+    const r=await fetch(`${API_BASE}/analyze`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[id],mode:kind==='transcript'?'transcript':'ai'})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok){st().innerHTML=`<div class="ai-err" style="flex:1">✖ ${esc(j.detail||('خطأ '+r.status))}</div>`;return}
+  }catch(e){st().innerHTML=`<div class="ai-err" style="flex:1">✖ ${esc(e.message)}</div>`;return}
+  const t0=Date.now(), view=kind==='transcript'?'text':'ai';
+  const tick=async()=>{
+    let j={};try{j=await (await fetch(API_BASE+'/analyze/status',{cache:'no-store'})).json()}catch(e){}
+    const s=Math.round((Date.now()-t0)/1000), P=j.progress||{};
+    if(j.running){ if(st()) st().innerHTML=`<div class="ai-live" style="flex:1">${P.stage==='analyze'?'🧠 الذكاء الاصطناعي بيحلّل…':'🎧 بيسمع المكالمة ويحوّلها لنص…'} <span class="muted">${s}s</span><i class="scan"></i></div>`; setTimeout(tick,2500); return }
+    const e=Object.values(P.errors||{})[0];
+    delete p.dataset.kind; await callPanel(id,view);
+    if(e){ const b=p.querySelector('.pnl-btns'); if(b) b.insertAdjacentHTML('afterbegin',`<div class="ai-err" style="flex:1 0 100%">✖ ${esc(e)}</div>`); return }
+    const btn=document.querySelector(`.acts[data-id="${CSS.escape(id)}"] .a-btn[title="${kind==='transcript'?'تحويل لنص':'تحليل المكالمة'}"]`); if(btn) btn.classList.add('has');
+  };
+  setTimeout(tick,1500);
+}
+async function supSave(id){
+  const t=document.getElementById('sn-'+id).value, s=document.getElementById('sns-'+id);
+  s.textContent='بيحفظ…';
+  try{const r=await fetch(`${API_BASE}/supnote`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,text:t})});
+    if(!r.ok) throw new Error('خطأ '+r.status); s.textContent='✔ اتحفظت';
+    const c=CALLS.find(c=>c.id===id); if(c) c.sup=t;
+    const b=document.querySelector(`.acts[data-id="${CSS.escape(id)}"] .a-btn[title="ملاحظة المدير"]`); if(b) b.classList.toggle('has',!!t.trim());
+  }catch(e){s.textContent='✖ '+e.message}
+}
+let SUP_REC=null;
+function supDictate(id){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition, btn=document.getElementById('snm-'+id), ta=document.getElementById('sn-'+id);
+  if(!SR){alert('التسجيل بالصوت محتاج Google Chrome أو Edge');return}
+  if(SUP_REC){SUP_REC.stop();return}
+  const r=new SR(); SUP_REC=r; r.lang='ar-EG'; r.continuous=true; r.interimResults=true;
+  let base=ta.value.trim(); btn.textContent='⏹ بيسمعك… دوس للإيقاف'; btn.classList.add('rec');
+  r.onresult=e=>{let fin='',part='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript.trim();if(e.results[i].isFinal)fin+=' '+t;else part+=' '+t;}
+    if(fin){base=(base+' '+fin).trim()} ta.value=(base+' '+part).trim();};
+  r.onerror=e=>{if(e.error==='not-allowed')alert('اسمح للمتصفح باستخدام المايك')};
+  r.onend=()=>{if(SUP_REC===r&&!r._stop){try{r.start();return}catch(e){}} SUP_REC=null;btn.textContent='🎙 سجّل بصوتك';btn.classList.remove('rec');ta.value=base;};
+  const stop=r.stop.bind(r); r.stop=()=>{r._stop=true;stop()};
+  r.start();
+}
 </script>
 </body>
 </html>

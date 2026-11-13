@@ -26,6 +26,11 @@ CONF_DIR = Path(os.environ.get("NQ_CONF", "/etc/nq-calls"))
 DATA_DIR = Path(os.environ.get("NQ_DATA", "/var/lib/nq-calls"))
 ANALYSIS_DIR = DATA_DIR / "analysis"
 NOTES_DIR = DATA_DIR / "notes"
+SUP_FILE = DATA_DIR / "supervisor-notes.json"
+try:
+    SUP_NOTES = json.loads(SUP_FILE.read_text(encoding="utf-8"))
+except Exception:  # noqa: BLE001
+    SUP_NOTES = {}
 MONITOR = Path(os.environ.get("NQ_MONITOR", "/var/spool/asterisk/monitor"))
 TZ = ZoneInfo(os.environ.get("NQ_TZ", "Asia/Riyadh"))
 TRUNK = "PJSIP/" + os.environ.get("NQ_TRUNK", "dinastar1")
@@ -267,6 +272,9 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
             hasRecording=bool(rec) and main["disposition"] == "ANSWERED",
             analyzed=bool(rec) and (ANALYSIS_DIR / (stem(rec) + ".json")).exists(),
             rec=stem(rec) if rec else "",
+            transcribed=bool(rec) and ((ANALYSIS_DIR / (stem(rec) + ".tr.json")).exists()
+                                       or (ANALYSIS_DIR / (stem(rec) + ".json")).exists()),
+            supNote=(SUP_NOTES.get(main["uniqueid"]) or {}).get("text", ""),
         ))
     out.sort(key=lambda c: c["time"], reverse=True)
     return out
@@ -325,7 +333,7 @@ async def analyze(request: Request, date_from: dt.date | None = Query(None, alia
     import importlib.util
     if not importlib.util.find_spec("faster_whisper"):
         raise HTTPException(400, "تحليل التسجيلات (المرحلة 2) لسه مش متركّب على السيرفر")
-    ids = []
+    ids, body = [], None
     try:
         body = await request.json()
         ids = [str(i) for i in (body or {}).get("ids", [])][:500]
@@ -340,7 +348,11 @@ async def analyze(request: Request, date_from: dt.date | None = Query(None, alia
                 pass
         if not files:
             raise HTTPException(404, "المكالمات المختارة مفيهاش تسجيلات على السيرفر")
-        args, rng = ["--redo", "--min-sec", "0", *files], [f"{len(files)} مكالمة", ""]
+        mode = (body or {}).get("mode") if isinstance(body, dict) else None
+        if mode == "transcript":
+            args, rng = ["--transcript-only", "--redo", "--min-sec", "0", *files], [f"تحويل {len(files)} مكالمة لنص", ""]
+        else:
+            args, rng = ["--redo", "--min-sec", "0", *files], [f"{len(files)} مكالمة", ""]
     elif date_from and date_to:
         args, rng = ["--from", str(date_from), "--to", str(date_to), "--min-sec", "10"], [str(date_from), str(date_to)]
     else:
@@ -380,6 +392,49 @@ def analysis(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(
         out.append(dict(call=c, analysis=r.get("analysis", {}),
                         transcript=r.get("transcript", {}).get("lines", [])))
     return out
+
+
+@app.get("/api/call/{call_id}")
+def call_detail(call_id: str):
+    """النص والتحليل وملاحظة المدير لمكالمة واحدة"""
+    out = {"transcript": [], "analysis": None, "supNote": (SUP_NOTES.get(call_id) or {}).get("text", "")}
+    try:
+        st = stem(_recording_row(call_id)["recordingfile"])
+    except HTTPException:
+        return out
+    for f in (ANALYSIS_DIR / (st + ".json"), ANALYSIS_DIR / (st + ".tr.json")):
+        if f.exists():
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                continue
+            if "analysis" in d:
+                out["analysis"] = d["analysis"]
+                out["transcript"] = d.get("transcript", {}).get("lines", [])
+                break
+            out["transcript"] = d.get("lines", [])
+    return out
+
+
+SUP_LOCK = threading.Lock()
+
+
+@app.post("/api/supnote")
+async def save_supnote(request: Request):
+    """ملاحظة المدير على مكالمة"""
+    body = await request.json()
+    cid, text = str(body.get("id", ""))[:64], str(body.get("text", ""))[:4000]
+    if not cid:
+        raise HTTPException(400, "id مطلوب")
+    with SUP_LOCK:
+        if text.strip():
+            SUP_NOTES[cid] = {"text": text.strip(), "at": dt.datetime.now(TZ).isoformat()}
+        else:
+            SUP_NOTES.pop(cid, None)
+        tmp = SUP_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(SUP_NOTES, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(SUP_FILE)
+    return {"ok": True}
 
 
 # ---------------- page ----------------

@@ -171,6 +171,7 @@ def main():
     ap.add_argument("--last-week", action="store_true", help="آخر 7 أيام (للتشغيل الأسبوعي)")
     ap.add_argument("--min-sec", type=int, default=30, help="تجاهل التسجيلات الأقصر من كده بالثواني")
     ap.add_argument("--redo", action="store_true", help="حلّل تاني حتى لو اتحلّلت قبل كده")
+    ap.add_argument("--transcript-only", action="store_true", help="حوّل لنص بس من غير تحليل")
     args = ap.parse_args()
 
     files = list(args.files)
@@ -194,7 +195,7 @@ def main():
     print(f"هيتحلّل {len(files)} تسجيل (من {before}) — الباقي اتحلّل قبل كده أو أقصر من {args.min_sec} ثانية")
     if not files:
         return
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    if not args.transcript_only and not os.environ.get("ANTHROPIC_API_KEY"):
         sys.exit("حط ANTHROPIC_API_KEY الأول: export ANTHROPIC_API_KEY=sk-ant-...")
 
     # تقدّم التحليل: اللوحة بتقراه كل كام ثانية وتعرض كل مكالمة فين
@@ -213,7 +214,22 @@ def main():
         prog.update(current=name, stage="transcribe"); save_prog()
         print(f"▶ {Path(f).name}: تحويل لنص...", flush=True)
         try:
-            t = transcribe(f)
+            trf = OUT_DIR / (name + ".tr.json")
+            t = None
+            if trf.exists():  # اتحوّل لنص قبل كده — نوفّر الوقت
+                try:
+                    t = json.loads(trf.read_text(encoding="utf-8"))
+                except Exception:  # noqa: BLE001
+                    t = None
+            if t is None or not t.get("lines"):
+                t = transcribe(f)
+                trf.write_text(json.dumps(t, ensure_ascii=False), encoding="utf-8")
+            if args.transcript_only:
+                prog["errors"].pop(name, None)
+                if not t["lines"]:
+                    prog["errors"][name] = "مفيش كلام واضح في التسجيل"
+                print(f"   ✔ نص: {len(t['lines'])} سطر", flush=True)
+                continue
             if not t["lines"]:
                 print("   مفيش كلام في التسجيل، اتخطّى")
                 prog["skipped"].append(name); prog["errors"][name] = "مفيش كلام واضح في التسجيل"
