@@ -1,0 +1,17 @@
+{
+  "teams": [
+    {"id": "amal",  "name": "فريق أمل", "leader": "أمل كمال"},
+    {"id": "sahar", "name": "فريق سحر", "leader": "سحر"},
+    {"id": "ali",   "name": "فريق علي", "leader": "علي سامي"}
+  ],
+  "reps": [
+    {"id": 100, "name": "أمل كمال",   "team": "amal",  "lead": 1},
+    {"id": 101, "name": "مشتاق",      "team": "amal"},
+    {"id": 102, "name": "سحر",        "team": "sahar", "lead": 1},
+    {"id": 103, "name": "هدير",       "team": "sahar"},
+    {"id": 104, "name": "عبد الرحيم", "team": "sahar"},
+    {"id": 105, "name": "علي سامي",   "team": "ali",   "lead": 1},
+    {"id": 106, "name": "محمد حمدي",  "team": "ali"},
+    {"id": 107, "name": "نورهان",     "team": "ali"}
+  ]
+}

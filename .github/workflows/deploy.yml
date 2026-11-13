@@ -1,0 +1,35 @@
+name: Deploy calls dashboard
+
+on:
+  push:
+    paths: ["server/**", ".github/workflows/deploy.yml"]
+  workflow_dispatch:
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secrets
+        env:
+          KEY: ${{ secrets.PBX_SSH_KEY }}
+          PW: ${{ secrets.NQ_DASH_PASSWORD }}
+        run: |
+          [ -n "$KEY" ] || { echo "::error::Add repo secret PBX_SSH_KEY (content of central1.pem)"; exit 1; }
+          [ -n "$PW" ]  || { echo "::error::Add repo secret NQ_DASH_PASSWORD (dashboard password)"; exit 1; }
+      - name: Deploy to PBX
+        env:
+          KEY: ${{ secrets.PBX_SSH_KEY }}
+          PW: ${{ secrets.NQ_DASH_PASSWORD }}
+          AK: ${{ secrets.ANTHROPIC_API_KEY }}
+          HOST: ${{ vars.PBX_HOST || '3.89.245.93' }}
+        run: |
+          install -m 600 /dev/null key && printf '%s\n' "$KEY" > key
+          SSH="ssh -i key -o StrictHostKeyChecking=accept-new admin@$HOST"
+          $SSH 'rm -rf /tmp/nq-calls-src && mkdir -p /tmp/nq-calls-src'
+          scp -i key -o StrictHostKeyChecking=accept-new -r server/. admin@$HOST:/tmp/nq-calls-src/
+          printf 'NQ_DASH_PASSWORD=%q\nANTHROPIC_API_KEY=%q\n' "$PW" "$AK" | $SSH 'umask 077; cat > /tmp/nq-secrets.env'
+          $SSH 'sudo bash /tmp/nq-calls-src/install.sh'
+          rm -f key
