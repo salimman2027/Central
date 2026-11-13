@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NQ Call Monitor - مراقبة مكالمات المناديب</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
@@ -133,6 +134,100 @@ tr.team td{background:#F7FBFB;font-weight:700;color:var(--teal-d)}
 @media(max-width:1000px){.grid,.set-grid{grid-template-columns:1fr}.report{width:auto;padding:14px}.rh{flex-wrap:wrap;gap:10px}}
 @media screen and (max-width:1000px){.report{overflow-x:auto;max-width:100%}.report table{min-width:900px}}
 html,body{max-width:100%;overflow-x:hidden}
+
+/* ================= NQ 2040 theme ================= */
+:root{
+  --teal:#19e6c1;--teal-d:#0b1220;--teal-l:rgba(25,230,193,.10);--border:rgba(148,190,255,.14);--text:#e8f1ff;
+  --grey:#8ea3bd;--bg:#060a14;--white:rgba(255,255,255,.04);--red:#ff4d73;--orange:#ffb547;--green:#3ef0a0;--blue:#5aa8ff;
+  --glass:rgba(16,24,44,.55);--glass2:rgba(22,34,62,.6);--glow:0 0 0 1px rgba(25,230,193,.25),0 8px 40px -10px rgba(25,230,193,.35);
+}
+body{font-family:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;background:
+  radial-gradient(1200px 600px at 85% -10%,rgba(25,230,193,.16),transparent 60%),
+  radial-gradient(900px 500px at -10% 30%,rgba(111,76,255,.18),transparent 60%),
+  radial-gradient(700px 400px at 50% 120%,rgba(90,168,255,.12),transparent 60%),#060a14;background-attachment:fixed;color:var(--text)}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.35;
+  background-image:linear-gradient(rgba(148,190,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(148,190,255,.05) 1px,transparent 1px);background-size:44px 44px;
+  mask-image:radial-gradient(ellipse at 50% 0%,#000 30%,transparent 75%)}
+.top,.tabs,.wrap{position:relative;z-index:1}
+.top{background:rgba(6,10,20,.6);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);padding:14px 22px;position:sticky;top:0;z-index:20}
+.top .logo{font-size:19px;letter-spacing:.3px}
+.top .logo span{background:linear-gradient(135deg,#19e6c1,#5aa8ff 60%,#8b6cff);color:#04101a;border-radius:10px;padding:3px 10px;box-shadow:0 0 24px rgba(25,230,193,.5)}
+.top .muted{color:var(--grey)!important}
+.tabs{background:transparent;border:0;padding:12px 20px 0;gap:8px}
+.tab{border:1px solid var(--border);border-radius:999px;padding:9px 18px;color:var(--grey);background:var(--glass);backdrop-filter:blur(10px);transition:.25s}
+.tab:hover{color:var(--text);border-color:rgba(25,230,193,.4)}
+.tab.active{color:#04101a;background:linear-gradient(135deg,#19e6c1,#5aa8ff);border-color:transparent;box-shadow:0 0 30px -4px rgba(25,230,193,.6)}
+.filters,.ai-bar,.card,.kpi,.tm,.ai-card,.mbox{background:var(--glass);border:1px solid var(--border);backdrop-filter:blur(16px);border-radius:18px;box-shadow:0 10px 40px -20px rgba(0,0,0,.8)}
+.filters{border-radius:18px}
+.f label{color:var(--grey)}
+.f select,.f input,.ai-bar input,.mbox input{background:rgba(4,8,18,.6);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:9px 12px;color-scheme:dark}
+.f select:focus,.f input:focus{outline:0;border-color:var(--teal);box-shadow:0 0 0 3px rgba(25,230,193,.18)}
+.btn{background:linear-gradient(135deg,#19e6c1,#5aa8ff);color:#04101a;border-radius:12px;padding:10px 18px;font-weight:800;box-shadow:0 6px 24px -8px rgba(25,230,193,.7);transition:.2s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 10px 30px -8px rgba(25,230,193,.9)}
+.btn:disabled{opacity:.4;transform:none;cursor:not-allowed}
+.btn.o{background:transparent;color:var(--teal);border:1px solid rgba(25,230,193,.5);box-shadow:none}
+.kpi{border-top:0;position:relative;overflow:hidden}
+.kpi:after{content:"";position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,transparent,var(--teal),transparent)}
+.kpi.red:after{background:linear-gradient(90deg,transparent,var(--red),transparent)}
+.kpi.green:after{background:linear-gradient(90deg,transparent,var(--green),transparent)}
+.kpi.orange:after{background:linear-gradient(90deg,transparent,var(--orange),transparent)}
+.kpi.blue:after{background:linear-gradient(90deg,transparent,var(--blue),transparent)}
+.kpi .v{font-size:32px;letter-spacing:-.5px;background:linear-gradient(180deg,#fff,#9fb3c8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kpi.red .v{background:linear-gradient(180deg,#ff9bb0,var(--red));-webkit-background-clip:text;background-clip:text}
+.kpi.green .v{background:linear-gradient(180deg,#b6ffe0,var(--green));-webkit-background-clip:text;background-clip:text}
+.kpi.orange .v{background:linear-gradient(180deg,#ffe2b0,var(--orange));-webkit-background-clip:text;background-clip:text}
+.kpi.blue .v{background:linear-gradient(180deg,#cfe4ff,var(--blue));-webkit-background-clip:text;background-clip:text}
+.kpi.big{padding:22px}.kpi.big .v{font-size:52px}
+.kpi .ring{position:absolute;left:18px;top:50%;translate:0 -50%;width:74px;height:74px;border-radius:50%;
+  background:conic-gradient(var(--green) calc(var(--p)*1%),rgba(255,255,255,.07) 0);-webkit-mask:radial-gradient(circle,transparent 58%,#000 60%);mask:radial-gradient(circle,transparent 58%,#000 60%);filter:drop-shadow(0 0 10px rgba(62,240,160,.5))}
+.card h3{color:var(--text)}
+th{background:rgba(25,230,193,.08);color:var(--teal);border-bottom:1px solid var(--border);font-weight:700}
+td{border-bottom:1px solid rgba(148,190,255,.07)}
+tr:hover td{background:rgba(25,230,193,.04)}
+tr.tot td{background:rgba(25,230,193,.08);color:var(--teal)}
+tr.team td{background:rgba(255,255,255,.03);color:var(--text)}
+.tm .n{color:var(--teal)}.tm .row b{color:var(--text)}
+.badge{border:1px solid currentColor;background:transparent!important}
+.b-out{color:var(--teal)}.b-in{color:var(--blue)}.b-miss,.b-rej{color:var(--red)}.b-ans{color:var(--green)}.b-no{color:var(--orange)}
+.bar{background:rgba(255,255,255,.07)}.bar b{background:linear-gradient(90deg,#19e6c1,#5aa8ff);box-shadow:0 0 12px rgba(25,230,193,.6)}
+.play{background:rgba(25,230,193,.12);color:var(--teal);box-shadow:0 0 0 1px rgba(25,230,193,.35)}
+.play:hover{background:var(--teal);color:#04101a}
+.note{background:rgba(255,181,71,.07);border:1px solid rgba(255,181,71,.25);color:#ffe7c2;border-radius:16px}
+.note pre{color:#ffcf8a}
+.pager button{background:var(--glass);color:var(--text);border-color:var(--border)}
+.pager button.a{background:var(--teal);color:#04101a}
+.modal{background:rgba(2,6,14,.7);backdrop-filter:blur(6px)}
+.wave span{background:linear-gradient(180deg,#19e6c1,#5aa8ff)}
+.tree,.tr{background:rgba(4,8,18,.6);border-color:var(--border);color:#cfe0f5}
+.ai-head{border-color:var(--border)}
+.ai-score{background:linear-gradient(180deg,#b6ffe0,#19e6c1);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ai-card.pending{border-style:dashed;opacity:.92}
+.ai-card.live{border-color:rgba(25,230,193,.6);box-shadow:var(--glow);animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{50%{box-shadow:0 0 0 1px rgba(25,230,193,.45),0 8px 50px -6px rgba(25,230,193,.55)}}
+.ai-live{position:relative;overflow:hidden;color:var(--teal);font-weight:700;padding:8px 12px;border-radius:12px;background:rgba(25,230,193,.06)}
+.ai-live .scan{position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(25,230,193,.25),transparent);animation:scan 1.6s linear infinite}
+@keyframes scan{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+.ai-err{color:#ff9bb0;background:rgba(255,77,115,.08);border:1px solid rgba(255,77,115,.3);padding:8px 12px;border-radius:12px;font-size:13px}
+.prog-h{display:flex;gap:14px;align-items:center;margin-bottom:8px}.prog-h b{color:var(--teal)}
+.prog{height:10px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.prog b{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#19e6c1,#5aa8ff,#8b6cff);background-size:200% 100%;animation:flow 2s linear infinite;box-shadow:0 0 16px rgba(25,230,193,.7);transition:width .6s}
+@keyframes flow{to{background-position:-200% 0}}
+.tg span{background:rgba(255,255,255,.12)}
+.srow{border-color:var(--border)}
+.muted{color:var(--grey)}
+.ver{background:rgba(25,230,193,.12);border:1px solid rgba(25,230,193,.35);color:var(--teal);border-radius:999px;padding:3px 10px;font-size:12px;white-space:nowrap}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:rgba(148,190,255,.2);border-radius:8px}
+@media(max-width:700px){
+  .top{flex-wrap:wrap;gap:8px 14px;padding:10px 14px;font-size:12.5px}
+  .top>.muted{display:none}.top .sp{display:none}
+  .top .logo{flex:1 0 100%;display:flex;justify-content:space-between}
+  .kpi .ring{display:none}.kpi.big .v{font-size:40px}
+  .wrap{padding:14px 12px}
+}
+/* التقرير ورق أبيض للطباعة */
+.report{color:#1C2B2A;border-radius:14px;--teal:#0F7C7A;--teal-d:#0A5654;--teal-l:#E7F3F2;--border:#D5E2E1;--text:#1C2B2A}
+.report th{background:#0F7C7A;color:#fff}.report td{border-color:#D5E2E1}.report tr:hover td{background:none}
+@media print{body{background:#fff!important}body:before{display:none}}
 </style>
 </head>
 <body>
@@ -143,7 +238,7 @@ html,body{max-width:100%;overflow-x:hidden}
   <div class="sp"></div>
   <div><span class="live-dot"></span> مباشر — آخر تحديث <b id="lastUpd"></b></div>
   <div>👤 المدير: <b>NQS AI</b></div>
-  <div style="background:rgba(255,255,255,.18);border-radius:8px;padding:2px 8px;font-size:12px;white-space:nowrap">إصدار <b>__VER__</b></div>
+  <div class="ver">⚡ إصدار <b>__VER__</b></div>
 </div>
 
 <div class="tabs">
@@ -251,7 +346,7 @@ html,body{max-width:100%;overflow-x:hidden}
   </div>
   <div class="note" id="aNote" style="margin-bottom:14px"></div>
   <div class="kpis" id="aKpis"></div>
-  <div class="card" style="margin-bottom:14px"><h3>👥 متوسط تقييم المناديب<span class="sp"></span><span class="muted">من 100 — للمكالمات اللي اتحلّلت</span></h3><div class="tw"><table id="aRepTbl"></table></div></div>
+  <table id="aRepTbl" hidden></table>
   <div id="aList"></div>
 </div>
 </div>
@@ -387,21 +482,23 @@ function renderAll(){
   const H=[...Array(10)].map((_,i)=>i+8);
   const byH=k=>H.map(h=>list.filter(c=>c.t.getHours()===h&&(!k||k(c))).length);
   draw('cHour','line',{labels:H.map(h=>String(h).padStart(2,'0')+':00'),datasets:[
-    {label:'إجمالي',data:byH(),borderColor:'#0F7C7A',backgroundColor:'rgba(15,124,122,.12)',fill:true,tension:.35},
-    {label:'تم الرد',data:byH(c=>c.st==='تم الرد'),borderColor:'#1E9E5A',tension:.35},
-    {label:'لم يرد',data:byH(c=>c.st!=='تم الرد'),borderColor:'#D64541',tension:.35}]});
+    {label:'إجمالي',data:byH(),borderColor:'#19e6c1',backgroundColor:'rgba(25,230,193,.12)',fill:true,tension:.35},
+    {label:'تم الرد',data:byH(c=>c.st==='تم الرد'),borderColor:'#3ef0a0',tension:.35},
+    {label:'لم يرد',data:byH(c=>c.st!=='تم الرد'),borderColor:'#ff4d73',tension:.35}]});
 
   // daily chart
   const dayMap={};list.forEach(c=>{const k=iso(c.t);dayMap[k]=dayMap[k]||{a:0,n:0};c.st==='تم الرد'?dayMap[k].a++:dayMap[k].n++});
   const dk=Object.keys(dayMap).sort();
-  draw('cDay','bar',{labels:dk.map(k=>k.slice(5)),datasets:[{label:'تم الرد',data:dk.map(k=>dayMap[k].a),backgroundColor:'#0F7C7A'},{label:'لم يرد',data:dk.map(k=>dayMap[k].n),backgroundColor:'#F0A8A6'}]},{scales:{x:{stacked:true},y:{stacked:true}}});
+  draw('cDay','bar',{labels:dk.map(k=>k.slice(5)),datasets:[{label:'تم الرد',data:dk.map(k=>dayMap[k].a),backgroundColor:'#19e6c1',borderRadius:6},{label:'لم يرد',data:dk.map(k=>dayMap[k].n),backgroundColor:'rgba(255,77,115,.55)',borderRadius:6}]},{scales:{x:{stacked:true},y:{stacked:true}}});
 
-  draw('cPie','doughnut',{labels:['تم الرد','لم يرد','مرفوضة','فائتة'],datasets:[{data:[s.ans,s.no,s.rej,s.miss],backgroundColor:['#0F7C7A','#E98B2A','#D64541','#8FA3A2']}]},{cutout:'62%'});
+  draw('cPie','doughnut',{labels:['تم الرد','لم يرد','مرفوضة','فائتة'],datasets:[{data:[s.ans,s.no,s.rej,s.miss],backgroundColor:['#19e6c1','#ffb547','#ff4d73','#5a6b85'],borderColor:'#0b1220',borderWidth:3}]},{cutout:'62%'});
   $('lastUpd').textContent=new Date().toLocaleTimeString('en-GB');
 }
 function draw(id,type,data,extra={}){
   if(charts[id])charts[id].destroy();
-  charts[id]=new Chart($(id),{type,data,options:Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{family:'Segoe UI'}}}}},extra)});
+  if(!window.Chart) return;
+  {Chart.defaults.color='#8ea3bd';Chart.defaults.borderColor='rgba(148,190,255,.08)';Chart.defaults.font.family='IBM Plex Sans Arabic';}
+  charts[id]=new Chart($(id),{type,data,options:Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{usePointStyle:true,font:{family:'IBM Plex Sans Arabic'}}}}},extra)});
 }
 
 /* ============ CALL LOG ============ */
@@ -466,20 +563,26 @@ function initAI(){
   pollAI();
 }
 function setNote(html){$('aNote').innerHTML=html}
-let AI_RUNNING=false;
+let AI_RUNNING=false, AI_PROG=null, AI_LASTDONE=-1;
 async function pollAI(){
   try{
     const j=await (await fetch(API_BASE+'/analyze/status')).json();
-    AI_RUNNING=!!j.running;
+    const wasRunning=AI_RUNNING; AI_RUNNING=!!j.running; AI_PROG=j.progress||null;
     if(!AI_ENABLED) setNote('⚠️ التحليل مش متفعّل: مفتاح Claude API مش متضاف على السيرفر.');
     else if(j.running){
-      setNote(`⏳ التحليل شغّال (${esc(j.range?.[0]||'')}${j.range?.[1]?' → '+esc(j.range[1]):''}) — بدأ ${esc((j.started||'').slice(11,16))}. النتايج بتظهر تحت كل مكالمة أول ما تخلص، وممكن تقفل الصفحة.`);
-      clearTimeout(aiPoll); aiPoll=setTimeout(()=>{loadAI();pollAI();},10000);
+      const P=AI_PROG, tot=P?.total||0, dn=P?.done||0, pct=tot?Math.round(dn*100/tot):0;
+      const secs=Math.max(0,Math.round((Date.now()-new Date(j.started).getTime())/1000));
+      setNote(`<div class="prog-h"><b>⚡ التحليل شغّال</b><span>${tot?`${dn} / ${tot} مكالمة`:'بيجهّز النموذج…'}</span><span class="muted">${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}</span></div>
+        <div class="prog"><b style="width:${tot?Math.max(4,pct):8}%"></b></div>
+        <div class="muted" style="margin-top:6px">${!tot||(!dn&&P?.stage==='transcribe')?'أول مرة بينزّل نموذج تحويل الصوت لنص — بعد كده هيبقى أسرع. ':''}النتايج بتظهر تحت كل مكالمة أول ما تخلص.</div>`);
+      if(P&&P.done!==AI_LASTDONE){ AI_LASTDONE=P.done; loadAI(); } else renderAI();
+      clearTimeout(aiPoll); aiPoll=setTimeout(pollAI,4000);
     } else {
       const log=(j.log||'').trim().split('\n').filter(l=>l&&!/^\s*(File|Traceback|\^|from |import )/.test(l)).slice(-3).join('\n');
-      setNote(j.finished?`✔ آخر تحليل خلص ${esc(j.finished.slice(0,16).replace('T',' '))}.`+(log?`<pre style="white-space:pre-wrap;margin:8px 0 0;font-size:12px;direction:rtl">${esc(log)}</pre>`:'')
+      const P=AI_PROG, errs=P?Object.keys(P.errors||{}).length:0;
+      setNote(j.finished?`✔ آخر تحليل خلص ${esc(j.finished.slice(0,16).replace('T',' '))}${P?` — ${P.done-errs} اتحلّلت${errs?`، ${errs} فيها مشكلة (مكتوبة تحت المكالمة)`:''}`:''}.`+(log&&!P?`<pre style="white-space:pre-wrap;margin:8px 0 0;font-size:12px;direction:rtl">${esc(log)}</pre>`:'')
         :'اختار الفترة ← "عرض المكالمات" ← علّم على المكالمات (أو تحديد الكل) ← "حلّل المحدد". وكل سبت الساعة 6 الصبح بيتحلّل الأسبوع لوحده.');
-      if(j.finished&&aiPoll){aiPoll=null;AI_WAIT.clear();loadAI();}
+      if(wasRunning||(j.finished&&aiPoll)){aiPoll=null;AI_WAIT.clear();AI_LASTDONE=-1;loadAI();}
     }
     aiSelInfo();
   }catch(e){ setNote('تعذّر معرفة حالة التحليل: '+esc(e.message)); }
@@ -525,23 +628,25 @@ function renderAI(){
   const sc=rows.map(x=>+x.analysis.agent_score).filter(v=>!isNaN(v));
   const cnt=k=>rows.filter(x=>x.analysis.outcome===k).length;
   const sent=k=>rows.filter(x=>x.analysis.customer_sentiment===k).length;
+  const errN=all.filter(x=>!x.analysis&&AI_PROG&&AI_PROG.errors&&AI_PROG.errors[x.call.rec]).length;
   $('aKpis').innerHTML=`
-   <div class="kpi"><div class="l">مكالمات متحلّلة</div><div class="v">${rows.length}</div><div class="s">من ${all.length} متسجّلة</div></div>
-   <div class="kpi green"><div class="l">متوسط تقييم المناديب</div><div class="v">${sc.length?Math.round(sc.reduce((a,b)=>a+b,0)/sc.length):'—'}</div><div class="s">من 100</div></div>
-   <div class="kpi blue"><div class="l">بيع / مهتم</div><div class="v">${cnt('بيع')+cnt('مهتم')}</div><div class="s">بيع ${cnt('بيع')} — مهتم ${cnt('مهتم')}</div></div>
-   <div class="kpi orange"><div class="l">يحتاج متابعة</div><div class="v">${cnt('يحتاج متابعة')}</div></div>
-   <div class="kpi red"><div class="l">عملاء متضايقين</div><div class="v">${sent('متضايق')}</div><div class="s">رفض ${cnt('رفض')}</div></div>`;
-  const by={};rows.forEach(x=>{(by[x.call.ext]=by[x.call.ext]||[]).push(x)});
-  $('aRepTbl').innerHTML='<tr><th>المندوب</th><th>الفريق</th><th class="c">مكالمات متحلّلة</th><th class="c">متوسط التقييم</th><th class="c">بيع/مهتم</th><th class="c">يحتاج متابعة</th><th class="c">متضايق</th></tr>'+
-   Object.entries(by).map(([e,l])=>{const r=repOf(+e);const s=l.map(x=>+x.analysis.agent_score).filter(v=>!isNaN(v));const avg=s.length?Math.round(s.reduce((a,b)=>a+b,0)/s.length):0;
-    return `<tr><td>${esc(r.name)}</td><td>${esc(teamOf(r.team)?.name||'')}</td><td class="c">${l.length}</td><td><div style="display:flex;align-items:center;gap:6px"><div class="bar ${avg<50?'low':avg<75?'mid':''}"><b style="width:${avg}%"></b></div><b>${avg}</b></div></td><td class="c">${l.filter(x=>['بيع','مهتم'].includes(x.analysis.outcome)).length}</td><td class="c">${l.filter(x=>x.analysis.outcome==='يحتاج متابعة').length}</td><td class="c">${l.filter(x=>x.analysis.customer_sentiment==='متضايق').length}</td></tr>`}).join('');
+   <div class="kpi green big"><div class="l">✔ متحلّلة</div><div class="v">${rows.length}</div><div class="s">من ${all.length} مكالمة متسجّلة</div><div class="ring" style="--p:${all.length?Math.round(rows.length*100/all.length):0}"></div></div>
+   <div class="kpi orange big"><div class="l">⏳ لسه متحلّلتش</div><div class="v">${all.length-rows.length}</div><div class="s">${errN?`${errN} فيها مشكلة`:'علّم عليها ودوس "حلّل المحدد"'}</div></div>`;
   $('aList').innerHTML=all.length?all.map(x=>{const a=x.analysis,c=x.call,r=repOf(c.ext),t=new Date(c.time);
     const head=`<div class="ai-head"><input type="checkbox" class="pick" ${AI_SEL.has(c.id)?'checked':''} onchange="aiToggle('${esc(c.id)}',this.checked)" title="اختار المكالمة دي للتحليل">
       ${a?`<div class="ai-score">${esc(a.agent_score??'—')}<small>تقييم الموظف</small></div>`:''}
       <div style="flex:1"><b>${esc(r.name)}</b> <span class="muted">${c.dir==='out'?'↗ صادرة':'↙ واردة'} · <span style="direction:ltr;display:inline-block">${esc(c.number)}</span> · ${dmy(t)} ${tm(t)} · ${ms(c.talkSec)}</span>
       ${a?`<br><span class="badge b-out">${esc(a.outcome||'')}</span> <span class="badge ${a.customer_sentiment==='متضايق'?'b-miss':a.customer_sentiment==='راضي'?'b-ans':'b-no'}">${esc(a.customer_sentiment||'')}</span>`:''}</div>
       <button class="play" title="سماع التسجيل" onclick="openRecById('${esc(c.id)}','${esc(r.name)} ← ${esc(c.number)}')">▶</button></div>`;
-    if(!a) return `<div class="ai-card pending">${head}<div class="muted">${AI_WAIT.has(c.id)?'⏳ بيتحلّل دلوقتي…':'لسه متحلّلتش — علّم عليها ودوس "حلّل المحدد"'}</div></div>`;
+    if(!a){
+      const P=AI_PROG, k=c.rec, err=P&&P.errors&&P.errors[k];
+      let st;
+      if(P&&P.current===k&&AI_RUNNING) st=`<div class="ai-live">${P.stage==='analyze'?'🧠 الذكاء الاصطناعي بيحلّل الكلام…':'🎧 بيسمع المكالمة ويحوّلها لنص…'}<i class="scan"></i></div>`;
+      else if(err) st=`<div class="ai-err">✖ ${esc(err)}</div>`;
+      else if(AI_WAIT.has(c.id)&&AI_RUNNING) st='<div class="muted">⏳ في الطابور…</div>';
+      else st='<div class="muted">لسه متحلّلتش — علّم عليها ودوس "حلّل المحدد"</div>';
+      return `<div class="ai-card pending ${P&&P.current===k&&AI_RUNNING?'live':''}">${head}${st}</div>`;
+    }
     const chk=(a.checklist||[]).map(k=>`<li class="${k.done?'ok':'no'}">${k.done?'✔':'✖'} ${esc(k.item)}${k.evidence?` <span class="muted">— ${esc(k.evidence)}</span>`:''}</li>`).join('');
     const tasks=(a.follow_up_tasks||[]).map(k=>`<li>${esc(k.task)}${k.due?' — '+esc(k.due):''}</li>`).join('')||'<li>—</li>';
     const tr=(x.transcript||[]).map(l=>`<div><span>${l.start}s</span> ${esc(l.text)}</div>`).join('');

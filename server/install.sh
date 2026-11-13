@@ -39,6 +39,7 @@ chown -R "$RUN_USER:$RUN_USER" "$DATA"
 # نسخة اللابتوب من التليفون (نفس صفحة التطبيق) على https://HOST/phone/
 if [[ -d "$SRC/../app/src/main/assets" ]]; then
   rm -rf "$APP/phone"; cp -r "$SRC/../app/src/main/assets" "$APP/phone"
+  sed -i "s/__VER__/$(cat "$SRC/../VERSION" 2>/dev/null)/" "$APP/phone/phone.html"
   cp "$APP/phone/phone.html" "$APP/phone/index.html"
 fi
 
@@ -58,6 +59,7 @@ MEM_GB=$(awk '/MemTotal/ {printf "%d", $2/1024/1024}' /proc/meminfo)
 grep -q '^NQ_WHISPER_MODEL=' "$CONF/env" || setkv NQ_WHISPER_MODEL "$([[ $MEM_GB -ge 4 ]] && echo small || echo base)"
 setkv NQ_AI_OUT "$DATA/analysis"
 setkv HF_HOME "$DATA/models"
+ANTHROPIC_API_KEY=$(printf '%s' "${ANTHROPIC_API_KEY:-}" | tr -d '[:space:]')
 [[ -n "${ANTHROPIC_API_KEY:-}" ]] && setkv ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
 chown root:"$RUN_USER" "$CONF/env"; chmod 640 "$CONF/env"
 
@@ -169,6 +171,21 @@ set -e
 cd /tmp && rm -rf Central && git clone -q https://github.com/salimman2027/Central && bash Central/server/install.sh
 UPD
 chmod 755 /usr/local/bin/nq-update
+
+# تغيير مفتاح Claude: sudo nq-setkey
+cat > /usr/local/bin/nq-setkey <<'KEY'
+#!/bin/bash
+set -e
+read -rsp "الصق مفتاح Anthropic API الجديد: " K; echo
+K=$(printf '%s' "$K" | tr -d '[:space:]')
+[[ "$K" == sk-ant-* ]] || { echo "✖ المفتاح لازم يبدأ بـ sk-ant-"; exit 1; }
+F=/etc/nq-calls/env
+if grep -q '^ANTHROPIC_API_KEY=' "$F"; then sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$K|" "$F"; else echo "ANTHROPIC_API_KEY=$K" >> "$F"; fi
+systemctl restart nq-calls
+CODE=$(curl -s -o /dev/null -w '%{http_code}' https://api.anthropic.com/v1/models -H "x-api-key: $K" -H "anthropic-version: 2023-06-01")
+[[ "$CODE" == 200 ]] && echo "✔ المفتاح شغال واتحفظ" || echo "✖ Anthropic رفض المفتاح (كود $CODE) — اتأكد إنك نسخته كامل وإن الحساب عليه رصيد"
+KEY
+chmod 755 /usr/local/bin/nq-setkey
 
 echo "== check"
 for i in 1 2 3 4 5 6 7 8 9 10; do

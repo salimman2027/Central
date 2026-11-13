@@ -58,10 +58,15 @@ PROMPT = """أنت محلل جودة مكالمات لشركة "الجودة ا�
 agent_score من 0 لـ 100 حسب نقط التقييم دي: {checklist}"""
 
 
+_MODEL = None
+
+
 def transcribe(wav: str) -> dict:
-    from faster_whisper import WhisperModel
-    model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
-    segs, info = model.transcribe(wav, language="ar", vad_filter=True, beam_size=5)
+    global _MODEL
+    if _MODEL is None:  # النموذج بيتحمّل مرة واحدة بس لكل التسجيلات
+        from faster_whisper import WhisperModel
+        _MODEL = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8", cpu_threads=os.cpu_count() or 2)
+    segs, info = _MODEL.transcribe(wav, language="ar", vad_filter=True, beam_size=1)
     lines = [{"start": round(s.start, 1), "end": round(s.end, 1), "text": s.text.strip()} for s in segs]
     return {"duration": round(info.duration), "lines": lines}
 
@@ -188,19 +193,47 @@ def main():
     if not os.environ.get("ANTHROPIC_API_KEY"):
         sys.exit("حط ANTHROPIC_API_KEY الأول: export ANTHROPIC_API_KEY=sk-ant-...")
 
+    # تقدّم التحليل: اللوحة بتقراه كل كام ثانية وتعرض كل مكالمة فين
+    prog = {"total": len(files), "done": 0, "current": None, "stage": "", "errors": {}, "skipped": []}
+    pfile = OUT_DIR / "progress.json"
+
+    def save_prog():
+        tmp = pfile.with_suffix(".tmp")
+        tmp.write_text(json.dumps(prog, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(pfile)
+
+    save_prog()
     results = []
     for f in files:
+        name = Path(f).stem
+        prog.update(current=name, stage="transcribe"); save_prog()
         print(f"▶ {Path(f).name}: تحويل لنص...", flush=True)
-        t = transcribe(f)
-        if not t["lines"]:
-            print("   مفيش كلام في التسجيل، اتخطّى"); continue
-        meta = meta_from_name(f)
-        print("   تحليل...", flush=True)
-        a = analyze(t["lines"], meta)
-        r = {"meta": meta, "transcript": t, "analysis": a}
-        (OUT_DIR / (Path(f).stem + ".json")).write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
-        results.append(r)
-        print(f"   ✔ {a.get('outcome')} · {a.get('customer_sentiment')} · تقييم {a.get('agent_score')}/100")
+        try:
+            t = transcribe(f)
+            if not t["lines"]:
+                print("   مفيش كلام في التسجيل، اتخطّى")
+                prog["skipped"].append(name); prog["errors"][name] = "مفيش كلام واضح في التسجيل"
+                continue
+            meta = meta_from_name(f)
+            prog["stage"] = "analyze"; save_prog()
+            print("   تحليل...", flush=True)
+            a = analyze(t["lines"], meta)
+            r = {"meta": meta, "transcript": t, "analysis": a}
+            (OUT_DIR / (name + ".json")).write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
+            results.append(r)
+            print(f"   ✔ {a.get('outcome')} · {a.get('customer_sentiment')} · تقييم {a.get('agent_score')}/100")
+        except Exception as e:  # noqa: BLE001  — مكالمة واحدة غلط متوقفش الباقي
+            msg = str(e)
+            if "authentication_error" in msg or "x-api-key" in msg:
+                msg = "مفتاح Claude API غلط — على السيرفر اكتب: sudo nq-setkey"
+            elif "credit balance" in msg:
+                msg = "رصيد حساب Anthropic خلص — اشحن من console.anthropic.com"
+            else:
+                msg = f"{type(e).__name__}: {msg}"[:300]
+            prog["errors"][name] = msg
+            print(f"   ✖ {msg}", flush=True)
+        finally:
+            prog["done"] += 1; prog["current"] = None; prog["stage"] = ""; save_prog()
     out = OUT_DIR / f"report-{time.strftime('%Y-%m-%d')}.html"
     out.write_text(to_html(results), encoding="utf-8")
     print(f"\nالتقرير: {out}")

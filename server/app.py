@@ -206,7 +206,12 @@ async def app_insight(request: Request):
         raw = msg.content[0].text
         out = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
     except Exception as e:  # noqa: BLE001
-        return JSONResponse({"detail": f"فشل التحليل: {e}"}, 502, headers=hdr)
+        m = str(e)
+        if "authentication_error" in m or "x-api-key" in m:
+            m = "مفتاح Claude API على السيرفر غلط — المدير يكتب على السيرفر: sudo nq-setkey"
+        elif "credit balance" in m:
+            m = "رصيد حساب Anthropic خلص"
+        return JSONResponse({"detail": f"فشل التحليل: {m}"}, 502, headers=hdr)
     return JSONResponse(out, headers=hdr)
 
 
@@ -253,6 +258,7 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
             note=match_note(notes_all, ext, main["src"] if inbound else strip_prefix(main["dst"] or "", ext), t),
             hasRecording=bool(rec) and main["disposition"] == "ANSWERED",
             analyzed=bool(rec) and (ANALYSIS_DIR / (stem(rec) + ".json")).exists(),
+            rec=stem(rec) if rec else "",
         ))
     out.sort(key=lambda c: c["time"], reverse=True)
     return out
@@ -335,13 +341,19 @@ async def analyze(request: Request, date_from: dt.date | None = Query(None, alia
         if JOB["running"]:
             raise HTTPException(409, "في تحليل شغّال بالفعل")
         JOB.update(running=True, started=dt.datetime.now(TZ).isoformat(), finished=None, log="", range=rng)
+        (ANALYSIS_DIR / "progress.json").unlink(missing_ok=True)
     threading.Thread(target=_run_job, args=(args,), daemon=True).start()
     return JOB
 
 
 @app.get("/api/analyze/status")
 def analyze_status():
-    return JOB
+    prog = None
+    try:
+        prog = json.loads((ANALYSIS_DIR / "progress.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        pass
+    return {**JOB, "progress": prog}
 
 
 @app.get("/api/analysis")

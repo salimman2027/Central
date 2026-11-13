@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>NQ Phone</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg:#f4f6f8; --card:#fff; --fg:#14202e; --muted:#6b7684; --line:#e3e8ee;
@@ -154,6 +155,57 @@
   .aicard .temp.hot { background:#fde8e8; color:var(--bad); } .aicard .temp.warm { background:#fff4e2; color:#c47a12; } .aicard .temp.cold { background:#e8f0fb; color:#2f6fb5; }
   .aicard ul { margin:4px 0; padding-inline-start:18px; }
   .toast { position:fixed; bottom:84px; left:50%; transform:translateX(-50%); background:#14202e; color:#fff; padding:10px 18px; border-radius:20px; font-size:14px; display:none; z-index:9; }
+
+  /* ================= NQ 2040 ================= */
+  :root {
+    --bg:#060a14; --card:rgba(18,28,50,.62); --fg:#e8f1ff; --muted:#8ea3bd; --line:rgba(148,190,255,.14);
+    --ok:#22e39a; --bad:#ff4d73; --pri:#19e6c1; --call-bg:#03060d; --call-bg2:#0d1f3a;
+    --grad:linear-gradient(135deg,#19e6c1,#5aa8ff 60%,#8b6cff);
+  }
+  body { font-family:"IBM Plex Sans Arabic", system-ui, "Segoe UI", Tahoma, sans-serif;
+    background:radial-gradient(700px 420px at 100% -5%,rgba(25,230,193,.16),transparent 60%),
+               radial-gradient(600px 380px at -10% 40%,rgba(111,76,255,.16),transparent 60%),#060a14; }
+  .screen, #scrDial, .page, #scrNote, #scrSettings { background:transparent !important; }
+  input, select, textarea { background:rgba(4,8,18,.6); color:var(--fg); border-color:var(--line); color-scheme:dark; }
+  input:focus, select:focus, textarea:focus { outline:0; border-color:var(--pri); box-shadow:0 0 0 3px rgba(25,230,193,.18); }
+  .btn { background:var(--grad); color:#04101a; font-weight:800; box-shadow:0 8px 26px -10px rgba(25,230,193,.8); }
+  .btn.light { background:rgba(255,255,255,.06); color:var(--fg); box-shadow:none; border:1px solid var(--line); }
+  .btn.gray { background:rgba(255,255,255,.1); color:var(--fg); box-shadow:none; }
+  .topbar { border-bottom:1px solid var(--line); background:rgba(6,10,20,.5); backdrop-filter:blur(14px); }
+  .dot { box-shadow:0 0 12px var(--ok); } .dot.off { box-shadow:0 0 12px var(--bad); }
+  .iconbtn { background:rgba(255,255,255,.06); color:var(--fg); border:1px solid var(--line); }
+  .ver { font-size:11px; padding:4px 9px; border-radius:99px; color:var(--pri); border:1px solid rgba(25,230,193,.35); background:rgba(25,230,193,.08); white-space:nowrap; direction:ltr; }
+  .display .num { font-weight:300; background:linear-gradient(180deg,#fff,#9fb3c8); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .key { background:rgba(255,255,255,.045); color:var(--fg); border:1px solid rgba(148,190,255,.12); backdrop-filter:blur(8px); transition:.15s; }
+  .key:active { background:rgba(25,230,193,.18); border-color:rgba(25,230,193,.6); box-shadow:0 0 24px rgba(25,230,193,.45); }
+  .round.green { background:linear-gradient(135deg,#22e39a,#19e6c1); box-shadow:0 10px 34px -8px rgba(34,227,154,.85); }
+  .round.green svg { fill:#04101a; }
+  .round.red { background:linear-gradient(135deg,#ff4d73,#ff7a59); box-shadow:0 10px 34px -8px rgba(255,77,115,.85); }
+  .side, .del { color:var(--pri); }
+  .callscr { background:radial-gradient(500px 360px at 50% 20%,rgba(25,230,193,.18),transparent 70%),linear-gradient(170deg,var(--call-bg2),var(--call-bg)); }
+  .avatar { background:rgba(25,230,193,.08); border:1px solid rgba(25,230,193,.4); box-shadow:0 0 50px -6px rgba(25,230,193,.6); }
+  .ctrl b { background:rgba(255,255,255,.07); border:1px solid rgba(148,190,255,.18); }
+  .ctrl.on b { background:var(--pri); color:#04101a; }
+  .tabbar { background:rgba(6,10,20,.75); backdrop-filter:blur(18px); border-top:1px solid var(--line); }
+  .tabbar button.sel { color:var(--pri); text-shadow:0 0 14px rgba(25,230,193,.7); }
+  .card, details, .opt, .sheet, .chip { background:var(--card); border-color:var(--line); color:var(--fg); backdrop-filter:blur(14px); }
+  .card { border-radius:18px; box-shadow:0 10px 30px -18px rgba(0,0,0,.9); }
+  .sheet { background:rgba(10,16,30,.96); border-top:1px solid var(--line); }
+  .sheet-bg { background:rgba(2,6,14,.6); backdrop-filter:blur(4px); }
+  .chip.sel { background:var(--grad); color:#04101a; border-color:transparent; }
+  .prog { background:rgba(255,255,255,.07); }
+  .prog b { background:var(--grad); box-shadow:0 0 14px rgba(25,230,193,.6); }
+  .kgrid .v { background:linear-gradient(180deg,#fff,#19e6c1); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .seg { background:rgba(255,255,255,.05); border:1px solid var(--line); }
+  .seg button { color:var(--muted); } .seg button.sel { background:var(--grad); color:#04101a; }
+  .viachip, .micbtn { background:rgba(25,230,193,.1); color:var(--pri); border:1px solid rgba(25,230,193,.35); }
+  .micbtn.rec { background:var(--bad); color:#fff; border-color:transparent; box-shadow:0 0 24px rgba(255,77,115,.6); animation:pulse 1.6s infinite; }
+  .mini.call { background:var(--grad); color:#04101a; } .mini.x, .logrow .ic { background:rgba(255,255,255,.06); color:var(--muted); }
+  .pill { background:rgba(34,227,154,.1); color:var(--ok); } .pill.wait { background:rgba(255,181,71,.1); color:#ffb547; }
+  .tg span { background:rgba(255,255,255,.14); }
+  #toast { background:rgba(10,16,30,.95) !important; color:var(--fg) !important; border:1px solid rgba(25,230,193,.35); }
+  @media (min-width: 620px) { body.web { background:radial-gradient(900px 500px at 80% -10%,rgba(25,230,193,.18),transparent 60%),radial-gradient(800px 500px at 0% 60%,rgba(111,76,255,.18),transparent 60%),#04070f; }
+    body.web .screen { background:rgba(8,13,26,.92) !important; border:1px solid var(--line); box-shadow:0 30px 80px -20px rgba(0,0,0,.9),0 0 0 1px rgba(25,230,193,.08); } }
 </style>
 </head>
 <body>
@@ -164,6 +216,7 @@
     <span id="regDot" class="dot"></span>
     <div class="who"><b id="whoExt">—</b><small id="whoSt">متصل بالسنترال</small></div>
     <button class="viachip app-only" id="viaChip" onclick="NQVia.cycle()"></button>
+    <span class="ver" id="appVer"></span>
     <button class="iconbtn" onclick="showSettings()" aria-label="الإعدادات">⚙</button>
   </div>
   <div class="display"><div id="dialNum" class="num"></div><div id="dialErr" class="err"></div></div>
@@ -183,7 +236,7 @@
     <button class="iconbtn" onclick="show('scrDial')" aria-label="رجوع">→</button>
     <h2 style="margin:0;font-size:20px">الإعدادات</h2>
   </div>
-  <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 14px">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 14px">
     <div class="switch">
       <div><b>وضع موظف CRM</b><small>بعد كل مكالمة يسألك: مين العميل؟ وإيه ملخص المكالمة؟</small></div>
       <label class="tg"><input type="checkbox" id="crmMode" onchange="NQPrefs.set('crm', this.checked)"><span></span></label>
@@ -193,11 +246,11 @@
       <label class="tg"><input type="checkbox" id="crmIn" onchange="NQPrefs.set('crmIn', this.checked)"><span></span></label>
     </div>
   </div>
-  <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
     <div><b>🎯 تارجت المكالمات اليومي</b><div style="color:var(--muted);font-size:12px">عدد المكالمات المطلوبة في اليوم — بيظهر في "إنجازي"</div></div>
     <input id="sGoal" type="number" inputmode="numeric" class="ltr" style="width:90px;text-align:center" placeholder="60" onchange="NQPrefs.set('dailyGoal', +this.value||0); toast('اتحفظ ✓')">
   </div>
-  <div class="app-only" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px">
+  <div class="app-only" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px">
     <b>الاتصال من</b>
     <select id="callVia" style="margin-top:8px" onchange="NQPrefs.set('callVia', this.value); NQVia.chip()">
       <option value="ask">اسألني كل مرة</option>
@@ -205,7 +258,7 @@
       <option value="sim">شريحتي دايمًا</option>
     </select>
   </div>
-  <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px">
     <b>☎️ حساب السنترال</b>
     <div style="color:var(--muted);font-size:12px">اختياري — من غيره التطبيق بيتصل من شريحتك بس</div>
     <label class="lbl">رقم التحويلة</label>
@@ -380,6 +433,8 @@ const store = {
 /* ---------- server settings ---------- */
 const DEFAULT_SERVER = { host: "3.89.245.93.sslip.io", port: "8089", path: "/ws" };
 const IS_APP = !!window.Android;
+const APP_VER = (() => { try { return IS_APP && Android.appVersion ? "v" + Android.appVersion() : "web __VER__"; } catch (e) { return ""; } })();
+document.addEventListener("DOMContentLoaded", () => { const v = document.getElementById("appVer"); if (v) v.textContent = APP_VER; });
 if (!IS_APP) document.body.classList.add("web");
 const CONFIG = { wss: [], domain: "", api: "", iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 const NQSettings = {

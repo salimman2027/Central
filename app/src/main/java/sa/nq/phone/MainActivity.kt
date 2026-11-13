@@ -395,6 +395,10 @@ class MainActivity : Activity() {
             runOnUiThread { makePdf(name, html) }
         }
 
+        @JavascriptInterface fun appVersion(): String = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+        } catch (e: Exception) { "" }
+
         @JavascriptInterface fun setSpeaker(on: Boolean) {
             @Suppress("DEPRECATION")
             (getSystemService(AUDIO_SERVICE) as AudioManager).isSpeakerphoneOn = on
