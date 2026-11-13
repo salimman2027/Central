@@ -31,6 +31,9 @@ echo "== app files"
 mkdir -p "$APP" "$CONF" "$DATA/analysis"
 cp -r "$SRC"/app.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
+VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
+sed -i "s/__VER__/$VER/" "$APP/static/index.html"
+echo "   version: $VER"
 chown -R "$RUN_USER:$RUN_USER" "$DATA"
 
 # نسخة اللابتوب من التليفون (نفس صفحة التطبيق) على https://HOST/phone/
