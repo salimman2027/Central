@@ -24,6 +24,7 @@
 
 <div id="nq-phone">
   <div id="status">الحالة: <b class="off">غير متصل</b></div>
+  <div id="err" style="color:var(--bad);font-size:13px;margin:-6px 0 10px"></div>
 
   <!-- تسجيل الدخول -->
   <div id="login">
@@ -50,7 +51,7 @@
 <audio id="remoteAudio" autoplay></audio>
 <audio id="ringtone"></audio>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jssip/3.10.0/jssip.min.js"></script>
+<script src="jssip.min.js"></script>
 <script>
 /* =====================================================================
    NQ Softphone — تليفون WebRTC بسيط للتركيب جوه الـ CRM
@@ -62,7 +63,7 @@
        NQPhone.onCallEnded = (info) => {...}    تسجيل المكالمة في الـ CRM
    ===================================================================== */
 const CONFIG = {
-  wss:    "wss://3.89.245.93.sslip.io:8089/ws",
+  wss:    ["wss://3.89.245.93.sslip.io:8089/ws", "wss://3.89.245.93.sslip.io/ws"],
   domain: "3.89.245.93.sslip.io",
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
 };
@@ -85,11 +86,17 @@ const NQPhone = {
   },
 
   login(ext, password) {
-    if (!ext || !password) return alert("اكتب رقم التحويلة والباسورد");
+    if (!ext || !password) return this._err("اكتب رقم التحويلة والباسورد");
+    if (typeof JsSIP === "undefined") return this._err("مكتبة الاتصال مش محمّلة");
+    this._err("");
+    $("status").innerHTML = 'الحالة: <b style="color:#d97706">جاري الاتصال بالسنترال…</b>';
+    if (this.ua) { try { this.ua.stop(); } catch (e) {} }
     try { localStorage.setItem("nq_login", JSON.stringify({ ext, password })); } catch (e) {}
-    const socket = new JsSIP.WebSocketInterface(CONFIG.wss);
+    const sockets = CONFIG.wss.map((u, i) => ({ socket: new JsSIP.WebSocketInterface(u), weight: 10 - i }));
     this.ua = new JsSIP.UA({
-      sockets: [socket],
+      sockets,
+      connection_recovery_min_interval: 2,
+      connection_recovery_max_interval: 30,
       uri: `sip:${ext}@${CONFIG.domain}`,
       password,
       display_name: ext,
@@ -98,8 +105,13 @@ const NQPhone = {
     });
     this.ua.on("registered",        () => { this._status(true, ext); try { sessionStorage.setItem("nq_ext", ext); } catch(e){} });
     this.ua.on("unregistered",      () => this._status(false));
-    this.ua.on("registrationFailed",e  => { this._status(false); alert("فشل الدخول: " + e.cause); });
-    this.ua.on("disconnected",      () => this._status(false));
+    this.ua.on("registrationFailed",e  => {
+      this._status(false);
+      this._err(e.cause === "Authentication Error" || e.cause === "Rejected"
+        ? "رقم التحويلة أو الباسورد غلط" : "فشل الدخول: " + e.cause);
+    });
+    this.ua.on("disconnected",      () => { this._status(false); this._err("مش قادر يوصل للسنترال — بيحاول تاني…"); });
+    this.ua.on("connected",         () => this._err(""));
     this.ua.on("newRTCSession",     e  => this._onSession(e));
     this.ua.start();
   },
@@ -111,8 +123,8 @@ const NQPhone = {
 
   call(number) {
     number = String(number || "").replace(/[^\d+*#]/g, "");
-    if (!this.ua || !this.ua.isRegistered()) return alert("التليفون مش متصل");
-    if (this.session) return alert("في مكالمة شغالة");
+    if (!this.ua || !this.ua.isRegistered()) return this._err("التليفون مش متصل");
+    if (this.session) return this._err("في مكالمة شغالة");
     if (!number) return;
     if (window.Android) Android.onCallStateChanged(true);
     this.ua.call(`sip:${number}@${CONFIG.domain}`, {
@@ -195,6 +207,7 @@ const NQPhone = {
   },
   _ring(on) { const r = $("ringtone"); try { on ? r.play() : (r.pause(), r.currentTime = 0); } catch(e){} },
   _info(t) { $("callinfo").textContent = t; },
+  _err(t) { $("err").textContent = t || ""; },
   _buttons(b) {
     $("btnCall").disabled = !b.call; $("btnAnswer").disabled = !b.answer;
     $("btnHang").disabled = !b.hang; $("btnMute").disabled = !b.mute;
