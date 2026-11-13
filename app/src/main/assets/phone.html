@@ -75,7 +75,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .incbtns { display:flex; justify-content:space-around; width:100%; max-width:360px; }
   .incbtns .lab { text-align:center; font-size:14px; opacity:.85; margin-top:10px; }
   .ctrls { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; width:100%; max-width:340px; margin-bottom:40px; }
-  .ctrl { display:flex; flex-direction:column; align-items:center; gap:8px; font-size:13px; opacity:.9; }
+  .ctrl { display:flex; flex-direction:column; align-items:center; gap:8px; font-size:13px; opacity:.9; background:none; border:0; color:inherit; font-family:inherit; cursor:pointer; }
   .ctrl b { width:64px; height:64px; border-radius:50%; background:rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:400; }
   .ctrl.on b { background:#fff; color:var(--call-bg); }
   .incall-pad { display:none; grid-template-columns:repeat(3,1fr); gap:10px 22px; width:100%; max-width:320px; margin-bottom:24px; }
@@ -649,6 +649,10 @@ const NQPhone = {
       show("scrCall");
     }
 
+    // اللابتوب فيه كروت شبكة كتير (VPN، Hyper-V…) وتجميع ICE ممكن يعلّق دقيقة —
+    // نبعت المكالمة بعد أول ثانية من آخر candidate بدل ما نستنى للآخر
+    let iceT = null;
+    s.on("icecandidate", ev => { clearTimeout(iceT); iceT = setTimeout(() => { try { ev.ready(); } catch (x) {} }, 1000); });
     s.on("peerconnection", ev => this._audio(ev.peerconnection));
     if (s.connection) this._audio(s.connection);
     s.on("progress", () => { if (this.direction === "out") $("cState").textContent = "بيرن…"; });
