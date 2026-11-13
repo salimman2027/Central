@@ -13,6 +13,16 @@ RUN_USER=asterisk
 # أسرار جاية من GitHub (بتتمسح بعد القراية)
 if [[ -f /tmp/nq-secrets.env ]]; then set -a; . /tmp/nq-secrets.env; set +a; rm -f /tmp/nq-secrets.env; fi
 
+# تركيب يدوي من غير GitHub secrets: يسأل عن الباسورد والمفتاح لو مش موجودين
+if [[ -t 0 ]]; then
+  if [[ -z "${NQ_DASH_PASSWORD:-}" && ! -f /etc/nq-calls/htpasswd ]]; then
+    read -rsp "اختار باسورد للوحة المكالمات (user: admin): " NQ_DASH_PASSWORD; echo
+  fi
+  if [[ -z "${ANTHROPIC_API_KEY:-}" ]] && ! grep -q '^ANTHROPIC_API_KEY=.\+' /etc/nq-calls/env 2>/dev/null; then
+    read -rsp "الصق مفتاح Anthropic API (أو Enter للتخطي): " ANTHROPIC_API_KEY; echo
+  fi
+fi
+
 echo "== packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y -qq python3-venv python3-pip ffmpeg apache2-utils >/dev/null
