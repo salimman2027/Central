@@ -205,6 +205,9 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .mini.call { background:var(--grad); color:#04101a; } .mini.x, .logrow .ic { background:rgba(255,255,255,.06); color:var(--muted); }
   .pill { background:rgba(34,227,154,.1); color:var(--ok); } .pill.wait { background:rgba(255,181,71,.1); color:#ffb547; }
   .tg span { background:rgba(255,255,255,.14); }
+  .tg span { border:1px solid var(--line); } .tg span:before { box-shadow:0 2px 6px rgba(0,0,0,.35); }
+  html[data-theme=light] .tg span { background:#c3ceda; }
+  .tg input:checked + span { background:var(--grad); box-shadow:0 0 14px rgba(25,230,193,.5); }
   #toast { background:rgba(10,16,30,.95) !important; color:var(--fg) !important; border:1px solid rgba(25,230,193,.35); }
   @media (min-width: 620px) { body.web { background:radial-gradient(900px 500px at 80% -10%,rgba(25,230,193,.18),transparent 60%),radial-gradient(800px 500px at 0% 60%,rgba(111,76,255,.18),transparent 60%),#04070f; }
     body.web .screen { background:rgba(8,13,26,.92) !important; border:1px solid var(--line); box-shadow:0 30px 80px -20px rgba(0,0,0,.9),0 0 0 1px rgba(25,230,193,.08); } }
