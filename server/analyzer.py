@@ -18,7 +18,7 @@ from pathlib import Path
 
 MONITOR = "/var/spool/asterisk/monitor"
 OUT_DIR = Path(os.environ.get("NQ_AI_OUT", Path.home() / "call-ai"))
-WHISPER_MODEL = os.environ.get("NQ_WHISPER_MODEL", "small")   # tiny / base / small / medium
+WHISPER_MODEL = os.environ.get("NQ_WHISPER_MODEL", "large-v3-turbo")   # small / medium / large-v3-turbo
 CLAUDE_MODEL = os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5")
 
 # نقط تقييم الموظف — عدّلها حسب سكريبت البيع عندكم
@@ -61,21 +61,39 @@ agent_score من 0 لـ 100 حسب نقط التقييم دي: {checklist}"""
 _MODEL = None
 
 
+PROMPT_HINT = "مكالمة تليفون بين موظف مبيعات في شركة الجودة الوطنية لتقنية المعلومات وعميل، باللهجة السعودية أو المصرية."
+
+
+def _segments(wav: str, vad: bool):
+    kw = dict(language="ar", beam_size=5, best_of=5, condition_on_previous_text=False,
+              initial_prompt=PROMPT_HINT, no_speech_threshold=0.6, compression_ratio_threshold=2.2)
+    if vad:
+        kw.update(vad_filter=True, vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 300})
+    segs, info = _MODEL.transcribe(wav, **kw)
+    lines = []
+    for s in segs:
+        t = s.text.strip()
+        # بنشيل الكلام المتألّف (لما النموذج مش متأكد أو المقطع سكوت)
+        if not t or s.no_speech_prob > 0.6 or s.avg_logprob < -1.1:
+            continue
+        if lines and t == lines[-1]["text"]:
+            continue
+        lines.append({"start": round(s.start, 1), "end": round(s.end, 1), "text": t})
+    return lines, info
+
+
 def transcribe(wav: str) -> dict:
     global _MODEL
     if _MODEL is None:  # النموذج بيتحمّل مرة واحدة بس لكل التسجيلات
         from faster_whisper import WhisperModel
         _MODEL = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8", cpu_threads=os.cpu_count() or 2)
     try:
-        segs, info = _MODEL.transcribe(wav, language="ar", vad_filter=True, beam_size=1,
-                                       vad_parameters={"min_silence_duration_ms": 700})
-        lines = [{"start": round(s.start, 1), "end": round(s.end, 1), "text": s.text.strip()} for s in segs if s.text.strip()]
+        lines, info = _segments(wav, vad=True)
     except TypeError:  # نسخ faster-whisper بتختلف في إعدادات فلتر السكوت
-        lines = []
-    if not lines:  # صوت التليفون (8kHz) ساعات فلتر السكوت بيشيله كله — نجرّب من غيره
-        segs, info = _MODEL.transcribe(wav, language="ar", vad_filter=False, beam_size=1)
-        lines = [{"start": round(s.start, 1), "end": round(s.end, 1), "text": s.text.strip()} for s in segs if s.text.strip()]
-    return {"duration": round(info.duration), "lines": lines}
+        lines, info = [], None
+    if not lines:  # صوت التليفون ساعات فلتر السكوت بيشيله كله — نجرّب من غيره
+        lines, info = _segments(wav, vad=False)
+    return {"duration": round(info.duration) if info else 0, "lines": lines, "model": WHISPER_MODEL}
 
 
 def analyze(transcript_lines: list, meta: dict) -> dict:
@@ -219,9 +237,11 @@ def main():
         try:
             trf = OUT_DIR / (name + ".tr.json")
             t = None
-            if trf.exists():  # اتحوّل لنص قبل كده — نوفّر الوقت
+            if trf.exists() and not (args.transcript_only and args.redo):  # اتحوّل لنص قبل كده بنفس النموذج — نوفّر الوقت
                 try:
                     t = json.loads(trf.read_text(encoding="utf-8"))
+                    if t.get("model") != WHISPER_MODEL:
+                        t = None
                 except Exception:  # noqa: BLE001
                     t = None
             if t is None or not t.get("lines"):

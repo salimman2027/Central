@@ -56,7 +56,13 @@ echo "== settings"
 touch "$CONF/env"; chmod 600 "$CONF/env"
 setkv() { grep -q "^$1=" "$CONF/env" && sed -i "s|^$1=.*|$1=$2|" "$CONF/env" || echo "$1=$2" >> "$CONF/env"; }
 MEM_GB=$(awk '/MemTotal/ {printf "%d", $2/1024/1024}' /proc/meminfo)
-grep -q '^NQ_WHISPER_MODEL=' "$CONF/env" || setkv NQ_WHISPER_MODEL "$([[ $MEM_GB -ge 4 ]] && echo small || echo base)"
+MEM_MB=$(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo)
+CUR_MODEL=$(sed -n 's/^NQ_WHISPER_MODEL=//p' "$CONF/env")
+# النموذج الأدق اللي الرام يستحمله (المختار يدويًا غير base/small بيفضل زي ما هو)
+if [[ -z "$CUR_MODEL" || "$CUR_MODEL" == base || "$CUR_MODEL" == small ]]; then
+  setkv NQ_WHISPER_MODEL "$([[ $MEM_MB -ge 2800 ]] && echo large-v3-turbo || echo small)"
+fi
+echo "   RAM: ${MEM_MB}MB — speech model: $(sed -n 's/^NQ_WHISPER_MODEL=//p' "$CONF/env")"
 setkv NQ_AI_OUT "$DATA/analysis"
 setkv HF_HOME "$DATA/models"
 ANTHROPIC_API_KEY=$(printf '%s' "${ANTHROPIC_API_KEY:-}" | tr -d '[:space:]')
@@ -93,6 +99,13 @@ systemctl restart nq-calls
 if [[ "${NQ_PHASE2:-}" == 1 ]]; then
   echo "== phase 2: call-recording analysis"
   apt-get install -y -qq ffmpeg >/dev/null
+  # مساحة swap احتياطي عشان نموذج الصوت ميزاحمش السنترال على الرام
+  if ! swapon --show | grep -q . && [[ $MEM_MB -lt 6000 ]]; then
+    if fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile; then
+      grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      echo "   swap: 2G added"
+    fi
+  fi
   "$APP/venv/bin/pip" install -q -r "$SRC/requirements-phase2.txt"
   cat > /etc/cron.d/nq-calls <<EOF
 0 3 * * 6 $RUN_USER set -a; . $CONF/env; nice -n 19 $APP/venv/bin/python $APP/analyzer.py --last-week >> $DATA/weekly.log 2>&1
