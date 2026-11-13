@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,7 +23,14 @@ jobs:
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           gradle :app:assembleDebug --no-daemon --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk NQPhone.apk
       - uses: actions/upload-artifact@v4
         with:
           name: NQPhone-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: NQPhone.apk
+      - name: Publish download link
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest NQPhone.apk --title "NQ Phone (latest)" --notes "Build ${{ github.sha }}" --latest
