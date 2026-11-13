@@ -131,33 +131,6 @@
 </head>
 <body>
 
-<!-- ================= login ================= -->
-<section id="scrLogin" class="screen">
-  <div class="brand"><div class="logo">NQ</div><h1>NQ Phone</h1><p>سنترال الجودة الوطنية</p></div>
-  <label class="lbl">رقم التحويلة</label>
-  <input id="ext" class="ltr" inputmode="numeric" placeholder="مثلًا 106">
-  <label class="lbl">باسورد التحويلة</label>
-  <input id="pwd" class="ltr" type="password" placeholder="••••••••">
-  <div style="height:16px"></div>
-  <button class="btn" onclick="NQPhone.login(ext.value.trim(), pwd.value)">دخول</button>
-  <div id="err" class="err"></div>
-
-  <details id="srvBox">
-    <summary>⚙ إعدادات السيرفر</summary>
-    <label class="lbl">عنوان السيرفر</label>
-    <input id="srvHost" class="ltr" placeholder="3.89.245.93.sslip.io">
-    <label class="lbl">البورت</label>
-    <input id="srvPort" class="ltr" inputmode="numeric" placeholder="8089">
-    <label class="lbl">المسار</label>
-    <input id="srvPath" class="ltr" placeholder="/ws">
-    <div class="row2">
-      <button class="btn light" onclick="NQSettings.reset()">الافتراضي</button>
-      <button class="btn" onclick="NQSettings.save()">حفظ</button>
-    </div>
-    <div id="srvMsg" style="font-size:13px;color:var(--muted);margin-top:8px"></div>
-  </details>
-</section>
-
 <!-- ================= dialer ================= -->
 <section id="scrDial" class="screen withtabs">
   <div class="topbar">
@@ -177,7 +150,7 @@
 </section>
 
 <!-- ================= settings sheet ================= -->
-<section id="scrSettings" class="screen" style="background:var(--bg);padding:20px;overflow:auto">
+<section id="scrSettings" class="screen" style="background:var(--bg);padding:20px 20px 40px;overflow:auto">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <button class="iconbtn" onclick="show('scrDial')" aria-label="رجوع">→</button>
     <h2 style="margin:0;font-size:20px">الإعدادات</h2>
@@ -204,9 +177,34 @@
       <option value="sim">شريحتي دايمًا</option>
     </select>
   </div>
+  <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px">
+    <b>☎️ حساب السنترال</b>
+    <div style="color:var(--muted);font-size:12px">اختياري — من غيره التطبيق بيتصل من شريحتك بس</div>
+    <label class="lbl">رقم التحويلة</label>
+    <input id="ext" class="ltr" inputmode="numeric" placeholder="مثلًا 106">
+    <label class="lbl">باسورد التحويلة</label>
+    <input id="pwd" class="ltr" type="password" placeholder="••••••••">
+    <div class="row2">
+      <button class="btn light" onclick="NQPhone.logout()">فصل</button>
+      <button class="btn" onclick="NQPhone.login(ext.value.trim(), pwd.value)">حفظ واتصال</button>
+    </div>
+    <div id="err" class="err"></div>
+    <details id="srvBox" style="margin-top:8px;border:0;padding:0">
+      <summary>⚙ إعدادات السيرفر</summary>
+      <label class="lbl">عنوان السيرفر</label>
+      <input id="srvHost" class="ltr" placeholder="3.89.245.93.sslip.io">
+      <label class="lbl">البورت</label>
+      <input id="srvPort" class="ltr" inputmode="numeric" placeholder="8089">
+      <label class="lbl">المسار</label>
+      <input id="srvPath" class="ltr" placeholder="/ws">
+      <div class="row2">
+        <button class="btn light" onclick="NQSettings.reset()">الافتراضي</button>
+        <button class="btn" onclick="NQSettings.save()">حفظ</button>
+      </div>
+      <div id="srvMsg" style="font-size:13px;color:var(--muted);margin-top:8px"></div>
+    </details>
+  </div>
   <div id="queueInfo" style="color:var(--muted);font-size:13px;margin:12px 4px"></div>
-  <div style="height:10px"></div>
-  <button class="btn gray" onclick="NQPhone.logout()">خروج من التحويلة</button>
 </section>
 
 <!-- ================= incoming ================= -->
@@ -291,7 +289,7 @@
   <div class="sheet">
     <h3>تتصل منين؟</h3>
     <div class="n" id="viaNum"></div>
-    <button class="opt" onclick="NQVia.pick('pbx')"><b>☎️</b><div>من السنترال<small>بيتسجّل ويظهر في اللوحة ويطلع من شريحة الشركة</small></div></button>
+    <button class="opt" id="viaPbx" onclick="NQVia.pick('pbx')"><b>☎️</b><div>من السنترال<small>بيتسجّل ويظهر في اللوحة ويطلع من شريحة الشركة</small></div></button>
     <button class="opt" onclick="NQVia.pick('sim')"><b>📱</b><div>من شريحتي<small>من خط الموبايل الشخصي — مش بيتسجّل على السنترال</small></div></button>
     <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-top:6px"><input type="checkbox" id="viaRemember" style="width:auto"> افتكر اختياري ومتسألنيش تاني</label>
   </div>
@@ -427,12 +425,12 @@ const NQPhone = {
       register: true, session_timers: false,
       connection_recovery_min_interval: 2, connection_recovery_max_interval: 30
     });
-    this.ua.on("registered", () => { this._err(""); this._reg(true); if (!this.session) show("scrDial"); NQNotes.flush(); });
+    this.ua.on("registered", () => { this._err("متصل ✓"); this._reg(true); NQNotes.flush(); });
     this.ua.on("unregistered", () => this._reg(false));
     this.ua.on("registrationFailed", e => {
       this._reg(false);
       const bad = e.cause === "Authentication Error" || e.cause === "Rejected";
-      if (bad) { store.del("nq_login"); show("scrLogin"); }
+      if (bad) { store.del("nq_login"); if (this.ua) { try { this.ua.stop(); } catch (x) {} } this.ua = null; this.ext = null; this._reg(false); }
       this._err(bad ? "رقم التحويلة أو الباسورد غلط" : "فشل الدخول: " + e.cause);
     });
     this.ua.on("disconnected", () => { this._reg(false); this._err("مش قادر يوصل للسنترال — بيحاول تاني…"); });
@@ -443,16 +441,20 @@ const NQPhone = {
   logout() {
     store.del("nq_login");
     if (this.ua) { try { this.ua.stop(); } catch (e) {} } this.ua = null;
-    this._err(""); show("scrLogin");
+    this.ext = null; $("pwd").value = "";
+    this._err("اتفصل من السنترال — الاتصال هيبقى من شريحتك"); this._reg(false);
   },
 
   call(number, forceVia) {
     number = String(number || "").replace(/[^\d+*#]/g, "");
     if (!number) return;
-    const via = forceVia || NQPrefs.get("callVia", "ask");
+    const pbxReady = !!(this.ua && this.ua.isRegistered());
+    let via = forceVia || NQPrefs.get("callVia", "ask");
+    if (!this.ext) via = "sim";                       // مفيش حساب سنترال: شريحتي على طول
+    else if (via === "pbx" && !pbxReady) via = "ask"; // السنترال مش متصل دلوقتي
     if (via === "ask") return NQVia.open(number);
     if (via === "sim") return NQVia.simCall(number);
-    if (!this.ua || !this.ua.isRegistered()) { $("dialErr").textContent = "التليفون مش متصل بالسنترال"; return; }
+    if (!pbxReady) { $("dialErr").textContent = "السنترال مش متصل — اتصل من شريحتك"; return NQVia.open(number); }
     if (this.session) return;
     if (window.Android) Android.onCallStateChanged(true);
     this.ua.call(`sip:${number}@${CONFIG.domain}`, { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: CONFIG.iceServers } });
@@ -525,7 +527,7 @@ const NQPhone = {
       NQHistory.add(info);
       $("dialNum").textContent = "";
       if (!info.answered && info.direction === "out") $("dialErr").textContent = "المكالمة مكملتش: " + (info.cause || "");
-      if (!NQNotes.maybeAsk(info)) show(this.ua && this.ua.isRegistered() ? "scrDial" : "scrLogin");
+      if (!NQNotes.maybeAsk(info)) show("scrDial");
     };
     s.on("ended", end); s.on("failed", end);
   },
@@ -533,8 +535,9 @@ const NQPhone = {
   _err(t) { $("err").textContent = t || ""; },
   _reg(on) {
     $("regDot").classList.toggle("off", !on);
-    $("whoExt").textContent = "تحويلة " + (this.ext || "—");
-    $("whoSt").textContent = on ? "متصل بالسنترال" : "غير متصل — بيحاول تاني…";
+    if (!this.ext) { $("whoExt").textContent = "NQ Phone"; $("whoSt").textContent = "📱 الاتصال من شريحتك — اربط السنترال من ⚙"; $("regDot").classList.add("off"); return; }
+    $("whoExt").textContent = "تحويلة " + this.ext;
+    $("whoSt").textContent = on ? "متصل بالسنترال" : "غير متصل بالسنترال — بيحاول تاني…";
   }
 };
 
@@ -572,7 +575,7 @@ const NQNotes = {
   },
   skip() { this.current = null; show("scrDial"); },
   async flush() {
-    let q = this.queue(); if (!q.length || !NQPhone.ext) return;
+    let q = this.queue(); if (!q.length || !NQPhone.ext || !NQPhone.pass) return;
     const left = [];
     for (const n of q) {
       try {
@@ -591,7 +594,13 @@ setInterval(() => NQNotes.flush(), 5 * 60 * 1000);
 /* ---------- call from: PBX or my SIM ---------- */
 const NQVia = {
   num: "",
-  open(n) { this.num = n; $("viaNum").textContent = n; $("viaRemember").checked = false; $("viaSheet").classList.add("on"); },
+  open(n) {
+    this.num = n; $("viaNum").textContent = n; $("viaRemember").checked = false;
+    const ok = !!(NQPhone.ua && NQPhone.ua.isRegistered());
+    const b = $("viaPbx"); b.disabled = !ok; b.style.opacity = ok ? 1 : .45;
+    b.querySelector("small").textContent = ok ? "بيتسجّل ويظهر في اللوحة ويطلع من شريحة الشركة" : "السنترال مش متصل دلوقتي";
+    $("viaSheet").classList.add("on");
+  },
   close() { $("viaSheet").classList.remove("on"); },
   pick(v) {
     if ($("viaRemember").checked) { NQPrefs.set("callVia", v); toast(v === "pbx" ? "هيتصل من السنترال دايمًا — غيّرها من الإعدادات" : "هيتصل من شريحتك دايمًا — غيّرها من الإعدادات"); }
@@ -763,8 +772,9 @@ buildPad($("callPad"), d => NQPhone.dtmf(d));
 NQSettings.apply(NQSettings.load());
 (function boot() {
   const s = store.get("nq_login", null);
-  if (s && s.ext && s.password) { $("ext").value = s.ext; NQPhone.ext = s.ext; NQPhone._reg(false); show("scrDial"); NQPhone.login(s.ext, s.password); }
-  else show("scrLogin");
+  show("scrDial");
+  if (s && s.ext && s.password) { $("ext").value = s.ext; $("pwd").value = s.password; NQPhone.ext = s.ext; NQPhone._reg(false); NQPhone.login(s.ext, s.password); }
+  else NQPhone._reg(false);
 })();
 window.NQPhone = NQPhone;
 </script>

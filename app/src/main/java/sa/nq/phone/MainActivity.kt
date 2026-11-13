@@ -45,9 +45,24 @@ class MainActivity : Activity() {
         if (requestCode == 2) {
             val n = pendingSimNumber ?: return
             pendingSimNumber = null
-            val uri = Uri.parse("tel:" + Uri.encode(n))
             val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-            startActivity(Intent(if (granted) Intent.ACTION_CALL else Intent.ACTION_DIAL, uri))
+            if (granted) placeSimCall(n)
+            else startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(n))))
+        }
+    }
+
+    /** اتصال مباشر من شريحة الموبايل عن طريق نظام الاتصال نفسه (من غير ما يسأل أنهي تطبيق) */
+    @SuppressLint("MissingPermission")
+    private fun placeSimCall(number: String) {
+        val uri = Uri.fromParts("tel", number, null)
+        try {
+            val tm = getSystemService(android.telecom.TelecomManager::class.java)
+            tm.placeCall(uri, Bundle())
+        } catch (e: Exception) {
+            val i = Intent(Intent.ACTION_CALL, uri)
+            val dialer = getSystemService(android.telecom.TelecomManager::class.java)?.defaultDialerPackage
+            if (dialer != null) i.setPackage(dialer)
+            startActivity(i)
         }
     }
 
@@ -162,9 +177,8 @@ class MainActivity : Activity() {
         /** اتصال من شريحة الموبايل نفسه */
         @JavascriptInterface fun callWithSim(number: String) {
             runOnUiThread {
-                val uri = Uri.parse("tel:" + Uri.encode(number))
                 if (checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
-                    startActivity(Intent(Intent.ACTION_CALL, uri))
+                    placeSimCall(number)
                 } else {
                     pendingSimNumber = number
                     requestPermissions(arrayOf(Manifest.permission.CALL_PHONE), 2)
