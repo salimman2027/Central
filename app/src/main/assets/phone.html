@@ -570,7 +570,7 @@ const NQPhone = {
       if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); }
       NQHistory.add(info);
       $("dialNum").textContent = "";
-      if (!info.answered && info.direction === "out") $("dialErr").textContent = "المكالمة مكملتش: " + (info.cause || "");
+      if (!info.answered && info.direction === "out") $("dialErr").textContent = /Media Access/i.test(info.cause || "") ? "المايك مش مسموح للتطبيق — اسمح بيه من الإعدادات وجرّب تاني" : "المكالمة مكملتش: " + (info.cause || "");
       if (!NQNotes.maybeAsk(info)) show("scrDial");
     };
     s.on("ended", end); s.on("failed", end);

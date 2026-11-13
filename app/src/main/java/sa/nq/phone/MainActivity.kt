@@ -48,6 +48,17 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 5) {
+            val r = pendingMic ?: return
+            pendingMic = null
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                r.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+            } else {
+                r.deny()
+                micSettingsHint()
+            }
+            return
+        }
         if (requestCode == 2) {
             val n = pendingSimNumber ?: return
             pendingSimNumber = null
@@ -55,6 +66,29 @@ class MainActivity : Activity() {
             if (granted) placeSimCall(n)
             else startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(n))))
         }
+    }
+
+    private var pendingMic: PermissionRequest? = null
+
+    /** الويب فيو عاوز المايك: لو أندرويد سحب الإذن (زي "المرة دي بس") نطلبه تاني بدل ما المكالمة تفشل */
+    private fun grantMic(request: PermissionRequest) {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)); return
+        }
+        pendingMic?.deny()
+        pendingMic = request
+        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 5)
+    }
+
+    private fun micSettingsHint() {
+        if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) return
+        android.app.AlertDialog.Builder(this)
+            .setTitle("إذن المايك مقفول")
+            .setMessage("مكالمات السنترال محتاجة المايك. افتح الإعدادات ← الأذونات ← الميكروفون واختار \"السماح دائمًا أثناء استخدام التطبيق\".")
+            .setPositiveButton("فتح الإعدادات") { _, _ ->
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+            }
+            .setNegativeButton("إلغاء", null).show()
     }
 
     /** اتصال مباشر من شريحة الموبايل عن طريق نظام الاتصال نفسه (من غير ما يسأل أنهي تطبيق) */
@@ -89,7 +123,7 @@ class MainActivity : Activity() {
         web.webViewClient = WebViewClient()
         web.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
-                request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                runOnUiThread { grantMic(request) }
             }
         }
         web.addJavascriptInterface(Bridge(), "Android")
