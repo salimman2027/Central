@@ -10,6 +10,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.text.InputType
 import android.text.format.Formatter
@@ -19,6 +21,7 @@ import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
@@ -56,9 +59,20 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    private val importLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNotEmpty()) importPdfs(uris)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        PdfOps.init(this)
         setContentView(buildUi())
+        refresh()
+    }
+
+    override fun onResume() {
+        super.onResume()
         refresh()
     }
 
@@ -97,6 +111,19 @@ class MainActivity : ComponentActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT, dp(64)
         ).apply { setMargins(dp(16), dp(16), dp(16), dp(8)) })
 
+        val tools = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(8))
+        }
+        tools.addView(toolBtn("📥 استيراد PDF") { importLauncher.launch(arrayOf("application/pdf")) })
+        tools.addView(toolBtn("🔗 دمج ملفات") { mergeDialog() })
+        tools.addView(toolBtn("✂️ فصل ملف") { pickThen("اختر الملف للفصل") { splitDialog(it) } })
+        tools.addView(toolBtn("✏️ تعديل ملف") { pickThen("اختر الملف للتعديل") { openEditor(it) } })
+        root.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(tools)
+        })
+
         val hint = TextView(this).apply {
             text = "اضغط على الملف لفتحه، واضغط مطوّلاً لخيارات أكثر"
             textSize = 13f
@@ -121,6 +148,22 @@ class MainActivity : ComponentActivity() {
         root.addView(emptyView, lp)
         root.addView(listView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         return root
+    }
+
+    private fun toolBtn(label: String, onClick: () -> Unit) = TextView(this).apply {
+        text = label
+        textSize = 14f
+        setTypeface(typeface, Typeface.BOLD)
+        setTextColor(green)
+        setPadding(dp(14), dp(10), dp(14), dp(10))
+        background = GradientDrawable().apply {
+            cornerRadius = dp(20).toFloat()
+            setColor(Color.parseColor("#E6F1EE"))
+        }
+        setOnClickListener { onClick() }
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(dp(4), 0, dp(4), 0) }
     }
 
     private inner class FilesAdapter : BaseAdapter() {
@@ -274,19 +317,24 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showOptions(f: File) {
-        val items = arrayOf("فتح", "مشاركة", "حفظ نسخة في التنزيلات", "إعادة تسمية", "حذف")
+        val items = arrayOf(
+            "فتح", "تعديل الصفحات (ترتيب، تدوير، حذف، إضافة)", "فصل / استخراج صفحات",
+            "مشاركة", "حفظ نسخة في التنزيلات", "إعادة تسمية", "حذف"
+        )
         AlertDialog.Builder(this)
             .setTitle(f.nameWithoutExtension)
             .setItems(items) { _, which ->
                 when (which) {
                     0 -> openFile(f)
-                    1 -> shareFile(f)
-                    2 -> toast(
+                    1 -> openEditor(f)
+                    2 -> splitDialog(f)
+                    3 -> shareFile(f)
+                    4 -> toast(
                         if (copyToDownloads(f)) "تم الحفظ في التنزيلات/DocScanner"
                         else "غير مدعوم على هذا الإصدار، استخدم المشاركة"
                     )
-                    3 -> rename(f)
-                    4 -> confirmDelete(f)
+                    5 -> rename(f)
+                    6 -> confirmDelete(f)
                 }
             }
             .show()
@@ -325,6 +373,141 @@ class MainActivity : ComponentActivity() {
             .setPositiveButton("حذف") { _, _ -> f.delete(); refresh() }
             .setNegativeButton("إلغاء", null)
             .show()
+    }
+
+    // ---------- PDF tools ----------
+
+    private fun openEditor(f: File) {
+        startActivity(Intent(this, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_PATH, f.path))
+    }
+
+    private fun displayName(uri: Uri): String {
+        contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { c -> if (c.moveToFirst()) c.getString(0)?.let { return it.removeSuffix(".pdf").removeSuffix(".PDF") } }
+        return "ملف"
+    }
+
+    private fun importPdfs(uris: List<Uri>) {
+        busy("جارٍ الاستيراد…", {
+            var ok = 0
+            for (u in uris) {
+                val out = PdfOps.uniqueFile(scansDir, displayName(u))
+                contentResolver.openInputStream(u)!!.use { input -> out.outputStream().use { input.copyTo(it) } }
+                try { PdfOps.pageCount(out); ok++ } catch (e: Exception) { out.delete() }
+            }
+            ok to uris.size
+        }) { (ok, total) ->
+            refresh()
+            toast(if (ok == total) "تم استيراد $ok ملف" else "تم استيراد $ok من $total (بعض الملفات تالفة أو محمية بكلمة سر)")
+        }
+    }
+
+    private fun pickThen(title: String, action: (File) -> Unit) {
+        if (files.isEmpty()) { toast("لا توجد ملفات — امسح مستنداً أو استورد PDF أولاً"); return }
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setItems(files.map { it.nameWithoutExtension }.toTypedArray()) { _, i -> action(files[i]) }
+            .setNegativeButton("إلغاء", null)
+            .show()
+    }
+
+    private fun mergeDialog() {
+        if (files.size < 2) { toast("تحتاج ملفين على الأقل — امسح أو استورد ملفات PDF"); return }
+        val snapshot = files.toList()
+        val order = mutableListOf<Int>()
+        AlertDialog.Builder(this)
+            .setTitle("اختر الملفات بالترتيب المطلوب")
+            .setMultiChoiceItems(snapshot.map { it.nameWithoutExtension }.toTypedArray(), null) { _, i, checked ->
+                if (checked) order.add(i) else order.remove(i)
+            }
+            .setPositiveButton("دمج") { _, _ ->
+                if (order.size < 2) { toast("اختر ملفين على الأقل"); return@setPositiveButton }
+                val chosen = order.map { snapshot[it] }
+                askName("اسم الملف المدموج", "مدموج_" + chosen.first().nameWithoutExtension) { name ->
+                    val out = PdfOps.uniqueFile(scansDir, name)
+                    busy("جارٍ الدمج…", { PdfOps.merge(chosen, out); PdfOps.pageCount(out) }) { n ->
+                        refresh()
+                        toast("تم الدمج: ${out.nameWithoutExtension} ($n صفحة)")
+                    }
+                }
+            }
+            .setNegativeButton("إلغاء", null)
+            .show()
+    }
+
+    private fun splitDialog(f: File) {
+        val choices = arrayOf(
+            "كل صفحة في ملف منفصل",
+            "استخراج صفحات معيّنة (مثل 1-3، 5)",
+            "تقسيم كل عدد من الصفحات"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("فصل: ${f.nameWithoutExtension}")
+            .setItems(choices) { _, which ->
+                val base = f.nameWithoutExtension
+                when (which) {
+                    0 -> busy("جارٍ الفصل…", { PdfOps.splitEach(f, scansDir, base) }) { list ->
+                        refresh(); toast("تم إنشاء ${list.size} ملف")
+                    }
+                    1 -> askText("أرقام الصفحات", "مثال: 1-3, 5, 7", "", InputType.TYPE_CLASS_TEXT) { text ->
+                        busy("جارٍ الاستخراج…", {
+                            val idx = PdfOps.parseRanges(text, PdfOps.pageCount(f))
+                            val out = PdfOps.uniqueFile(scansDir, "${base}_صفحات_${text.replace(" ", "")}")
+                            PdfOps.build(idx.map { PageRef(f, it) }, out)
+                            out to idx.size
+                        }) { (out, n) -> refresh(); toast("تم إنشاء ${out.nameWithoutExtension} ($n صفحة)") }
+                    }
+                    2 -> askText("عدد الصفحات في كل ملف", "مثال: 2", "2", InputType.TYPE_CLASS_NUMBER) { text ->
+                        val size = text.toIntOrNull()
+                        if (size == null || size < 1) { toast("اكتب رقماً صحيحاً"); return@askText }
+                        busy("جارٍ التقسيم…", { PdfOps.splitEvery(f, size, scansDir, base) }) { list ->
+                            refresh(); toast("تم إنشاء ${list.size} ملف")
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("إلغاء", null)
+            .show()
+    }
+
+    private fun askName(title: String, initial: String, onOk: (String) -> Unit) =
+        askText(title, null, initial, InputType.TYPE_CLASS_TEXT) { onOk(it.ifBlank { initial }) }
+
+    private fun askText(title: String, hint: String?, initial: String, type: Int, onOk: (String) -> Unit) {
+        val input = EditText(this).apply {
+            setText(initial)
+            this.hint = hint
+            inputType = type
+            setSelectAllOnFocus(true)
+        }
+        val box = LinearLayout(this).apply {
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(input, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setView(box)
+            .setPositiveButton("موافق") { _, _ -> onOk(input.text.toString().trim()) }
+            .setNegativeButton("إلغاء", null)
+            .show()
+    }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun <T> busy(msg: String, work: () -> T, done: (T) -> Unit) {
+        val dialog = AlertDialog.Builder(this).setMessage(msg).setCancelable(false).show()
+        Thread {
+            val res = runCatching(work)
+            mainHandler.post {
+                dialog.dismiss()
+                res.onSuccess(done).onFailure { e ->
+                    AlertDialog.Builder(this).setTitle("حدث خطأ")
+                        .setMessage(e.message ?: e.toString())
+                        .setPositiveButton("حسناً", null).show()
+                }
+            }
+        }.start()
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
