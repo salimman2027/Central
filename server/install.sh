@@ -98,6 +98,10 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPass        /ws      wss://127.0.0.1:8089/ws
   ProxyPassReverse /ws      wss://127.0.0.1:8089/ws
 
+  # التطبيق بيبعت ملخص المكالمة هنا (بيتحقق برقم التحويلة وباسوردها)
+  ProxyPass        /calls-app/notes http://127.0.0.1:8090/app/notes
+  ProxyPassReverse /calls-app/notes http://127.0.0.1:8090/app/notes
+
   # لوحة المكالمات
   RedirectMatch ^/calls\$ /calls/
   <Location /calls/>

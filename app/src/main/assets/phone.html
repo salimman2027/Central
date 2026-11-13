@@ -2,285 +2,739 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NQ Softphone</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>NQ Phone</title>
 <style>
-  :root { --bg:#fff; --fg:#1d2433; --muted:#6b7280; --line:#e5e7eb; --ok:#16a34a; --bad:#dc2626; --pri:#2563eb; }
-  body { margin:0; font-family: system-ui, "Segoe UI", Tahoma, sans-serif; background:#f3f4f6; color:var(--fg); }
-  #nq-phone { width: auto; max-width: 420px; margin: 16px; background:var(--bg); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:0 4px 16px rgba(0,0,0,.06); }
-  .row { display:flex; gap:8px; margin-bottom:10px; }
-  input { flex:1; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:15px; direction:ltr; }
-  button { padding:14px 12px; border:0; border-radius:8px; cursor:pointer; font-size:14px; color:#fff; background:var(--pri); }
-  button.ok { background:var(--ok); } button.bad { background:var(--bad); } button.gray { background:#9ca3af; }
-  button:disabled { opacity:.4; cursor:default; }
-  #status { font-size:13px; color:var(--muted); margin-bottom:12px; }
-  #status b.on { color:var(--ok); } #status b.off { color:var(--bad); }
-  #callinfo { min-height:22px; font-weight:600; margin:6px 0 10px; direction:ltr; text-align:center; }
-  #login, #dialer { display:none; }
-  .lbl { display:block; font-size:12px; color:var(--muted); margin:0 2px 4px; }
-  .full { width:100%; }
+  :root {
+    --bg:#f4f6f8; --card:#fff; --fg:#14202e; --muted:#6b7684; --line:#e3e8ee;
+    --ok:#1fb15a; --bad:#e5383b; --pri:#0f7c7a; --call-bg:#0d1b2a; --call-bg2:#1b3a4b;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; margin:0; }
+  body { font-family: system-ui, "Segoe UI", Tahoma, sans-serif; background:var(--bg); color:var(--fg); overflow:hidden; }
+  .screen { position:fixed; inset:0; display:none; flex-direction:column; }
+  .screen.on { display:flex; }
+  input, select, textarea { width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:12px; font-size:16px; font-family:inherit; background:#fff; color:var(--fg); }
+  input.ltr { direction:ltr; text-align:left; }
+  button { font-family:inherit; cursor:pointer; border:0; }
+  .btn { padding:14px; border-radius:12px; font-size:16px; color:#fff; background:var(--pri); width:100%; }
+  .btn.gray { background:#9aa5b1; } .btn.light { background:#eef2f5; color:var(--fg); }
+  .lbl { display:block; font-size:13px; color:var(--muted); margin:12px 4px 6px; }
+  .err { color:var(--bad); font-size:14px; min-height:20px; margin-top:8px; text-align:center; }
+
+  /* ---------- login ---------- */
+  #scrLogin { padding:28px 20px; overflow:auto; }
+  .brand { text-align:center; margin:20px 0 26px; }
+  .brand .logo { width:72px; height:72px; border-radius:20px; background:var(--pri); color:#fff; font-weight:800; font-size:26px; display:inline-flex; align-items:center; justify-content:center; }
+  .brand h1 { margin:12px 0 2px; font-size:22px; }
+  .brand p { margin:0; color:var(--muted); font-size:14px; }
+  details { margin-top:18px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  summary { color:var(--muted); font-size:15px; cursor:pointer; }
+  .switch { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; }
+  .switch small { display:block; color:var(--muted); font-size:12px; }
+  .tg { position:relative; width:50px; height:28px; flex-shrink:0; }
+  .tg input { display:none; }
+  .tg span { position:absolute; inset:0; background:#c9d2da; border-radius:20px; transition:.2s; }
+  .tg span:before { content:""; position:absolute; width:22px; height:22px; top:3px; right:3px; background:#fff; border-radius:50%; transition:.2s; }
+  .tg input:checked + span { background:var(--pri); }
+  .tg input:checked + span:before { right:25px; }
+
+  /* ---------- dialer ---------- */
+  #scrDial { background:#fff; }
+  .topbar { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--ok); }
+  .dot.off { background:var(--bad); }
+  .topbar .who { flex:1; font-size:15px; }
+  .topbar .who small { display:block; color:var(--muted); font-size:12px; }
+  .iconbtn { width:42px; height:42px; border-radius:50%; background:#eef2f5; font-size:20px; display:flex; align-items:center; justify-content:center; color:var(--fg); }
+  .display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:10px 20px; min-height:90px; }
+  .display .num { font-size:38px; letter-spacing:1px; direction:ltr; min-height:48px; font-weight:300; word-break:break-all; text-align:center; }
+  .keypad, .dialrow, .incall-pad, .incbtns { direction:ltr; }
+  .keypad { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px 22px; padding:8px 36px 10px; max-width:420px; width:100%; margin:0 auto; }
+  .key { aspect-ratio:1/1; max-height:78px; border-radius:50%; background:#f1f4f7; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:30px; color:var(--fg); user-select:none; }
+  .key small { font-size:10px; color:var(--muted); letter-spacing:2px; height:12px; }
+  .key:active { background:#dfe5ea; }
+  .dialrow { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; padding:6px 36px 28px; max-width:420px; width:100%; margin:0 auto; align-items:center; }
+  .round { width:72px; height:72px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:30px; margin:auto; }
+  .round.green { background:var(--ok); } .round.red { background:var(--bad); }
+  .round svg { width:32px; height:32px; fill:#fff; }
+  .del { font-size:26px; color:var(--muted); background:none; margin:auto; }
+
+  /* ---------- incoming / in-call ---------- */
+  .callscr { background:linear-gradient(170deg, var(--call-bg2), var(--call-bg)); color:#fff; align-items:center; padding:60px 24px 48px; }
+  .avatar { width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; font-size:48px; margin-bottom:18px; }
+  .callscr .num { font-size:32px; direction:ltr; font-weight:300; text-align:center; word-break:break-all; }
+  .callscr .sub { margin-top:8px; opacity:.75; font-size:16px; }
+  .callscr .spacer { flex:1; }
+  .pulse { animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(31,177,90,.6)} 70%{box-shadow:0 0 0 22px rgba(31,177,90,0)} 100%{box-shadow:0 0 0 0 rgba(31,177,90,0)} }
+  .incbtns { display:flex; justify-content:space-around; width:100%; max-width:360px; }
+  .incbtns .lab { text-align:center; font-size:14px; opacity:.85; margin-top:10px; }
+  .ctrls { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; width:100%; max-width:340px; margin-bottom:40px; }
+  .ctrl { display:flex; flex-direction:column; align-items:center; gap:8px; font-size:13px; opacity:.9; }
+  .ctrl b { width:64px; height:64px; border-radius:50%; background:rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:400; }
+  .ctrl.on b { background:#fff; color:var(--call-bg); }
+  .incall-pad { display:none; grid-template-columns:repeat(3,1fr); gap:10px 22px; width:100%; max-width:320px; margin-bottom:24px; }
+  .incall-pad.on { display:grid; }
+  .incall-pad .key { background:rgba(255,255,255,.12); color:#fff; max-height:64px; font-size:24px; }
+  .incall-pad .key small { color:rgba(255,255,255,.6); }
+
+  /* ---------- CRM note ---------- */
+  #scrNote { background:var(--bg); padding:24px 20px; overflow:auto; }
+  #scrNote h2 { margin:6px 0 4px; font-size:20px; }
+  #scrNote .meta { color:var(--muted); font-size:14px; direction:rtl; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { padding:9px 14px; border-radius:20px; border:1px solid var(--line); background:#fff; font-size:14px; color:var(--fg); }
+  .chip.sel { background:var(--pri); color:#fff; border-color:var(--pri); }
+  textarea { min-height:120px; resize:vertical; }
+  .row2 { display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-top:18px; }
+  /* ---------- tabs + targets + stats ---------- */
+  .tabbar { position:fixed; left:0; right:0; bottom:0; display:none; background:#fff; border-top:1px solid var(--line); z-index:5; }
+  .tabbar.on { display:flex; }
+  .tabbar button { flex:1; background:none; padding:10px 0 12px; font-size:12px; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .tabbar button b { font-size:20px; font-weight:400; }
+  .tabbar button.sel { color:var(--pri); font-weight:600; }
+  .withtabs { padding-bottom:66px !important; }
+  .page { background:var(--bg); overflow:auto; padding:16px 16px 80px; }
+  .page h2 { margin:4px 0 12px; font-size:20px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .prog { height:10px; background:#e8edf1; border-radius:6px; overflow:hidden; margin-top:8px; }
+  .prog b { display:block; height:100%; background:var(--ok); border-radius:6px; }
+  .prog.mid b { background:#e9a23b; } .prog.low b { background:var(--bad); }
+  .tgt { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .tgt:last-child { border-bottom:0; }
+  .tgt .info { flex:1; min-width:0; }
+  .tgt .info b { display:block; }
+  .tgt .info small { color:var(--muted); direction:ltr; display:inline-block; }
+  .tgt.done .info b { color:var(--muted); text-decoration:line-through; }
+  .mini { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .mini.call { background:var(--ok); color:#fff; } .mini.x { background:#eef2f5; color:var(--muted); font-size:14px; }
+  .pill { font-size:12px; padding:3px 9px; border-radius:12px; background:#e8f6ee; color:var(--ok); white-space:nowrap; }
+  .pill.wait { background:#fff4e2; color:#c47a12; }
+  .kgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  .kgrid .card { margin:0; }
+  .kgrid .v { font-size:26px; font-weight:700; margin-top:4px; }
+  .kgrid .l { color:var(--muted); font-size:13px; }
+  .seg { display:flex; background:#e8edf1; border-radius:12px; padding:4px; margin-bottom:12px; }
+  .seg button { flex:1; padding:9px; border-radius:9px; background:none; font-size:14px; color:var(--fg); }
+  .seg button.sel { background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.08); font-weight:600; }
+  .orow { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; }
+  .sheet-bg { position:fixed; inset:0; background:rgba(10,20,30,.45); display:none; align-items:flex-end; z-index:8; }
+  .sheet-bg.on { display:flex; }
+  .sheet { background:#fff; width:100%; border-radius:18px 18px 0 0; padding:20px 18px 26px; }
+  .sheet h3 { margin:0 0 4px; font-size:18px; } .sheet .n { direction:ltr; color:var(--muted); margin-bottom:14px; text-align:right; }
+  .opt { display:flex; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; margin-bottom:10px; text-align:right; font-size:16px; color:var(--fg); }
+  .opt b { font-size:24px; } .opt small { display:block; color:var(--muted); font-size:12px; }
+  .toast { position:fixed; bottom:84px; left:50%; transform:translateX(-50%); background:#14202e; color:#fff; padding:10px 18px; border-radius:20px; font-size:14px; display:none; z-index:9; }
 </style>
 </head>
 <body>
 
-<div id="nq-phone">
-  <div id="status">الحالة: <b class="off">غير متصل</b></div>
-  <div id="err" style="color:var(--bad);font-size:13px;margin:-6px 0 10px"></div>
+<!-- ================= login ================= -->
+<section id="scrLogin" class="screen">
+  <div class="brand"><div class="logo">NQ</div><h1>NQ Phone</h1><p>سنترال الجودة الوطنية</p></div>
+  <label class="lbl">رقم التحويلة</label>
+  <input id="ext" class="ltr" inputmode="numeric" placeholder="مثلًا 106">
+  <label class="lbl">باسورد التحويلة</label>
+  <input id="pwd" class="ltr" type="password" placeholder="••••••••">
+  <div style="height:16px"></div>
+  <button class="btn" onclick="NQPhone.login(ext.value.trim(), pwd.value)">دخول</button>
+  <div id="err" class="err"></div>
 
-  <!-- تسجيل الدخول -->
-  <div id="login">
-    <div class="row"><input id="ext" placeholder="رقم التحويلة (مثلًا 101)"></div>
-    <div class="row"><input id="pwd" type="password" placeholder="باسورد التحويلة"></div>
-    <button class="full" onclick="NQPhone.login(ext.value.trim(), pwd.value)">دخول</button>
-    <details id="srvBox" style="margin-top:14px">
-      <summary style="cursor:pointer;color:var(--muted);font-size:14px">⚙ إعدادات السيرفر</summary>
-      <div style="margin-top:10px">
-        <label class="lbl">عنوان السيرفر</label>
-        <div class="row"><input id="srvHost" placeholder="3.89.245.93.sslip.io"></div>
-        <label class="lbl">البورت</label>
-        <div class="row"><input id="srvPort" inputmode="numeric" placeholder="8089"></div>
-        <label class="lbl">المسار</label>
-        <div class="row"><input id="srvPath" placeholder="/ws"></div>
-        <div class="row">
-          <button class="gray" style="flex:1" onclick="NQSettings.reset()">الافتراضي</button>
-          <button style="flex:1" onclick="NQSettings.save()">حفظ</button>
-        </div>
-        <div id="srvMsg" style="font-size:13px;color:var(--muted)"></div>
-      </div>
-    </details>
-  </div>
-
-  <!-- لوحة الاتصال -->
-  <div id="dialer">
-    <div id="callinfo"></div>
-    <div class="row"><input id="num" placeholder="05XXXXXXXX"></div>
-    <div class="row">
-      <button id="btnCall" class="ok" onclick="NQPhone.call(num.value)">اتصال</button>
-      <button id="btnAnswer" class="ok" onclick="NQPhone.answer()" disabled>رد</button>
-      <button id="btnHang" class="bad" onclick="NQPhone.hangup()" disabled>إنهاء</button>
-      <button id="btnMute" class="gray" onclick="NQPhone.toggleMute()" disabled>كتم</button>
-      <button id="btnSpk" class="gray" onclick="NQPhone.toggleSpeaker()">سماعة</button>
+  <details id="srvBox">
+    <summary>⚙ إعدادات السيرفر</summary>
+    <label class="lbl">عنوان السيرفر</label>
+    <input id="srvHost" class="ltr" placeholder="3.89.245.93.sslip.io">
+    <label class="lbl">البورت</label>
+    <input id="srvPort" class="ltr" inputmode="numeric" placeholder="8089">
+    <label class="lbl">المسار</label>
+    <input id="srvPath" class="ltr" placeholder="/ws">
+    <div class="row2">
+      <button class="btn light" onclick="NQSettings.reset()">الافتراضي</button>
+      <button class="btn" onclick="NQSettings.save()">حفظ</button>
     </div>
-    <button class="gray full" onclick="NQPhone.logout()">خروج</button>
+    <div id="srvMsg" style="font-size:13px;color:var(--muted);margin-top:8px"></div>
+  </details>
+</section>
+
+<!-- ================= dialer ================= -->
+<section id="scrDial" class="screen withtabs">
+  <div class="topbar">
+    <span id="regDot" class="dot"></span>
+    <div class="who"><b id="whoExt">—</b><small id="whoSt">متصل بالسنترال</small></div>
+    <button class="iconbtn" onclick="showSettings()" aria-label="الإعدادات">⚙</button>
+  </div>
+  <div class="display"><div id="dialNum" class="num"></div><div id="dialErr" class="err"></div></div>
+  <div class="keypad" id="keypad"></div>
+  <div class="dialrow">
+    <span></span>
+    <button class="round green" onclick="NQPhone.call(dialNum.textContent)" aria-label="اتصال">
+      <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+    </button>
+    <button class="del" onclick="dialDel()" aria-label="مسح">⌫</button>
+  </div>
+</section>
+
+<!-- ================= settings sheet ================= -->
+<section id="scrSettings" class="screen" style="background:var(--bg);padding:20px;overflow:auto">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <button class="iconbtn" onclick="show('scrDial')" aria-label="رجوع">→</button>
+    <h2 style="margin:0;font-size:20px">الإعدادات</h2>
+  </div>
+  <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 14px">
+    <div class="switch">
+      <div><b>وضع موظف CRM</b><small>بعد كل مكالمة يسألك: مين العميل؟ وإيه ملخص المكالمة؟</small></div>
+      <label class="tg"><input type="checkbox" id="crmMode" onchange="NQPrefs.set('crm', this.checked)"><span></span></label>
+    </div>
+    <div class="switch">
+      <div><b>تسجيل المكالمات الواردة كمان</b><small>اسأل بعد المكالمات الواردة مش الصادرة بس</small></div>
+      <label class="tg"><input type="checkbox" id="crmIn" onchange="NQPrefs.set('crmIn', this.checked)"><span></span></label>
+    </div>
+  </div>
+  <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px">
+    <b>الاتصال من</b>
+    <select id="callVia" style="margin-top:8px" onchange="NQPrefs.set('callVia', this.value)">
+      <option value="ask">اسألني كل مرة</option>
+      <option value="pbx">السنترال دايمًا</option>
+      <option value="sim">شريحتي دايمًا</option>
+    </select>
+  </div>
+  <div id="queueInfo" style="color:var(--muted);font-size:13px;margin:12px 4px"></div>
+  <div style="height:10px"></div>
+  <button class="btn gray" onclick="NQPhone.logout()">خروج من التحويلة</button>
+</section>
+
+<!-- ================= incoming ================= -->
+<section id="scrIncoming" class="screen callscr">
+  <div class="avatar">👤</div>
+  <div id="inNum" class="num"></div>
+  <div class="sub">مكالمة واردة…</div>
+  <div class="spacer"></div>
+  <div class="incbtns">
+    <div><button class="round red" onclick="NQPhone.hangup()" aria-label="رفض"><svg viewBox="0 0 24 24" style="transform:rotate(135deg)"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg></button><div class="lab">رفض</div></div>
+    <div><button class="round green pulse" onclick="NQPhone.answer()" aria-label="رد"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg></button><div class="lab">رد</div></div>
+  </div>
+</section>
+
+<!-- ================= in call ================= -->
+<section id="scrCall" class="screen callscr">
+  <div class="avatar">👤</div>
+  <div id="cNum" class="num"></div>
+  <div id="cState" class="sub">جاري الاتصال…</div>
+  <div class="spacer"></div>
+  <div class="incall-pad" id="callPad"></div>
+  <div class="ctrls">
+    <button class="ctrl" id="cMute" onclick="NQPhone.toggleMute()"><b>🎙</b>كتم</button>
+    <button class="ctrl" id="cPad" onclick="toggleCallPad()"><b>⌗</b>الأرقام</button>
+    <button class="ctrl" id="cSpk" onclick="NQPhone.toggleSpeaker()"><b>🔊</b>سماعة</button>
+  </div>
+  <button class="round red" onclick="NQPhone.hangup()" aria-label="إنهاء"><svg viewBox="0 0 24 24" style="transform:rotate(135deg)"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg></button>
+</section>
+
+<!-- ================= CRM note ================= -->
+<section id="scrNote" class="screen">
+  <h2>ملخص المكالمة</h2>
+  <div class="meta" id="noteMeta"></div>
+  <label class="lbl">اسم العميل / الشركة</label>
+  <input id="noteCustomer" placeholder="مثلًا: مؤسسة الرواد — أ. خالد">
+  <label class="lbl">نتيجة المكالمة</label>
+  <div class="chips" id="noteOutcome"></div>
+  <label class="lbl">ملخص المكالمة</label>
+  <textarea id="noteSummary" placeholder="اتكلمنا في إيه؟ العميل محتاج إيه؟ الخطوة الجاية إيه؟"></textarea>
+  <label class="lbl">ميعاد المتابعة (اختياري)</label>
+  <input id="noteFollow" type="date" class="ltr">
+  <div class="row2">
+    <button class="btn light" onclick="NQNotes.skip()">تخطّي</button>
+    <button class="btn" onclick="NQNotes.save()">حفظ</button>
+  </div>
+</section>
+
+<!-- ================= targets ================= -->
+<section id="scrTargets" class="screen page">
+  <h2>🎯 تارجت الاتصال</h2>
+  <div class="card">
+    <label class="lbl" style="margin-top:0">اليوم</label>
+    <input id="tDate" type="date" class="ltr" onchange="NQTargets.render()">
+    <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:14px"><span>المنجز</span><b id="tProgTxt">0 من 0</b></div>
+    <div class="prog" id="tProg"><b style="width:0"></b></div>
+  </div>
+  <div class="card">
+    <b>إضافة عميل للتارجت</b>
+    <label class="lbl">اسم العميل</label>
+    <input id="tName" placeholder="مثلًا: شركة الأفق — م. سامي">
+    <label class="lbl">رقم التليفون</label>
+    <input id="tPhone" class="ltr" inputmode="tel" placeholder="05XXXXXXXX">
+    <div style="height:12px"></div>
+    <button class="btn" onclick="NQTargets.add()">إضافة</button>
+  </div>
+  <div class="card" id="tList"></div>
+</section>
+
+<!-- ================= my stats + report ================= -->
+<section id="scrStats" class="screen page">
+  <h2>📊 إنجازي</h2>
+  <div class="seg" id="sSeg">
+    <button data-p="day" class="sel">اليوم</button><button data-p="month">الشهر</button><button data-p="quarter">الربع</button>
+  </div>
+  <div class="card" id="sTarget"></div>
+  <div class="kgrid" id="sKpis"></div>
+  <div class="card"><b>نتايج المكالمات</b><div id="sOut" style="margin-top:6px"></div></div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div><b>هدف المكالمات اليومي</b><div style="color:var(--muted);font-size:12px">عدد المكالمات المطلوبة في اليوم</div></div>
+      <input id="sGoal" type="number" inputmode="numeric" class="ltr" style="width:90px;text-align:center" onchange="NQPrefs.set('dailyGoal', +this.value||0); NQStats.render()">
+    </div>
+  </div>
+  <button class="btn" onclick="NQStats.download()">📥 تنزيل التقرير (Excel)</button>
+</section>
+
+<div class="sheet-bg" id="viaSheet" onclick="if(event.target===this)NQVia.close()">
+  <div class="sheet">
+    <h3>تتصل منين؟</h3>
+    <div class="n" id="viaNum"></div>
+    <button class="opt" onclick="NQVia.pick('pbx')"><b>☎️</b><div>من السنترال<small>بيتسجّل ويظهر في اللوحة ويطلع من شريحة الشركة</small></div></button>
+    <button class="opt" onclick="NQVia.pick('sim')"><b>📱</b><div>من شريحتي<small>من خط الموبايل الشخصي — مش بيتسجّل على السنترال</small></div></button>
+    <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-top:6px"><input type="checkbox" id="viaRemember" style="width:auto"> افتكر اختياري ومتسألنيش تاني</label>
   </div>
 </div>
 
+<nav class="tabbar" id="tabbar">
+  <button data-s="scrDial" onclick="show('scrDial')"><b>📞</b>اتصال</button>
+  <button data-s="scrTargets" onclick="NQTargets.open()"><b>🎯</b>التارجت</button>
+  <button data-s="scrStats" onclick="NQStats.open()"><b>📊</b>إنجازي</button>
+</nav>
+
+<div id="toast" class="toast"></div>
 <audio id="remoteAudio" autoplay></audio>
-<audio id="ringtone"></audio>
 
 <script src="jssip.min.js"></script>
 <script>
-/* =====================================================================
-   NQ Softphone — تليفون WebRTC بسيط للتركيب جوه الـ CRM
-   - بيتصل بسنترال FreePBX عن طريق WSS على بورت 8089
-   - التسجيل بيحصل على السيرفر (Force Recording على التحويلات)
-   - الـ CRM يقدر يستخدم:
-       NQPhone.call("05XXXXXXXX")              اتصال بضغطة
-       NQPhone.onIncoming = (num) => {...}      فتح ملف العميل عند الرنين
-       NQPhone.onCallEnded = (info) => {...}    تسجيل المكالمة في الـ CRM
-   ===================================================================== */
-/* إعدادات السيرفر: الافتراضي هنا، والمستخدم يقدر يغيّرها من "⚙ إعدادات السيرفر" */
-const DEFAULT_SERVER = { host: "3.89.245.93.sslip.io", port: "8089", path: "/ws" };
-const CONFIG = { wss: [], domain: "", iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+/* ===================================================================
+   NQ Phone — تليفون السنترال
+   - الصوت والمكالمات: JsSIP عن طريق WSS
+   - التطبيق (Android) بيرن ويصحّي الشاشة: window.Android
+   - وضع CRM: بعد المكالمة يسأل عن العميل والملخص ويبعته للسيرفر
+   =================================================================== */
+const $ = id => document.getElementById(id);
+const TAB_SCREENS = ["scrDial", "scrTargets", "scrStats"];
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
+  const tabs = TAB_SCREENS.includes(id);
+  $("tabbar").classList.toggle("on", tabs);
+  document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("sel", b.dataset.s === id));
+}
+function toast(t) { const e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = "none", 2500); }
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
 
+/* ---------- server settings ---------- */
+const DEFAULT_SERVER = { host: "3.89.245.93.sslip.io", port: "8089", path: "/ws" };
+const CONFIG = { wss: [], domain: "", api: "", iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 const NQSettings = {
-  load() {
-    let s = {};
-    try { s = JSON.parse(localStorage.getItem("nq_server") || "{}"); } catch (e) {}
-    return { ...DEFAULT_SERVER, ...s };
-  },
+  load() { return { ...DEFAULT_SERVER, ...store.get("nq_server", {}) }; },
   apply(s) {
     const path = s.path.startsWith("/") ? s.path : "/" + s.path;
     CONFIG.domain = s.host;
     CONFIG.wss = [`wss://${s.host}${s.port && s.port !== "443" ? ":" + s.port : ""}${path}`];
-    if (s.port !== "443") CONFIG.wss.push(`wss://${s.host}${path}`); // احتياطي على 443
+    if (s.port !== "443") CONFIG.wss.push(`wss://${s.host}${path}`);
+    CONFIG.api = `https://${s.host}/calls-app`;
     $("srvHost").value = s.host; $("srvPort").value = s.port; $("srvPath").value = path;
   },
   save() {
     const s = {
-      host: $("srvHost").value.trim().replace(/^wss?:\/\//, "").replace(/\/.*$/, ""),
+      host: $("srvHost").value.trim().replace(/^wss?:\/\//, "").replace(/^https?:\/\//, "").replace(/\/.*$/, ""),
       port: $("srvPort").value.trim() || "443",
       path: $("srvPath").value.trim() || "/ws"
     };
     if (!s.host) { $("srvMsg").textContent = "اكتب عنوان السيرفر"; return; }
-    try { localStorage.setItem("nq_server", JSON.stringify(s)); } catch (e) {}
-    this.apply(s);
+    store.set("nq_server", s); this.apply(s);
     $("srvMsg").textContent = "اتحفظ ✓ — اضغط دخول";
   },
-  reset() {
-    try { localStorage.removeItem("nq_server"); } catch (e) {}
-    this.apply(DEFAULT_SERVER);
-    $("srvMsg").textContent = "رجعت للإعدادات الافتراضية ✓";
-  }
+  reset() { store.del("nq_server"); this.apply(DEFAULT_SERVER); $("srvMsg").textContent = "رجعت للإعدادات الافتراضية ✓"; }
+};
+const NQPrefs = {
+  get(k, d) { return store.get("nq_pref_" + k, d); },
+  set(k, v) { store.set("nq_pref_" + k, v); }
 };
 
-const $ = id => document.getElementById(id);
+/* ---------- keypads ---------- */
+const KEYS = [["1",""],["2","ABC"],["3","DEF"],["4","GHI"],["5","JKL"],["6","MNO"],["7","PQRS"],["8","TUV"],["9","WXYZ"],["*",""],["0","+"],["#",""]];
+function buildPad(el, onKey) {
+  el.innerHTML = "";
+  KEYS.forEach(([d, l]) => {
+    const b = document.createElement("button");
+    b.className = "key"; b.innerHTML = `${d}<small>${l}</small>`;
+    let longFired = false, t = null;
+    b.onclick = () => { if (longFired) { longFired = false; return; } onKey(d); };
+    if (d === "0") {
+      b.onpointerdown = () => { longFired = false; t = setTimeout(() => { longFired = true; onKey("+"); }, 600); };
+      b.onpointerup = b.onpointerleave = () => clearTimeout(t);
+    }
+    el.appendChild(b);
+  });
+}
+function dialKey(d) {
+  const n = $("dialNum");
+  n.textContent = n.textContent + d;
+  $("dialErr").textContent = "";
+}
+function dialDel() { const n = $("dialNum"); n.textContent = n.textContent.slice(0, -1); }
+function toggleCallPad() { $("callPad").classList.toggle("on"); $("cPad").classList.toggle("on"); }
+function showSettings() {
+  $("crmMode").checked = NQPrefs.get("crm", false);
+  $("crmIn").checked = NQPrefs.get("crmIn", true);
+  $("callVia").value = NQPrefs.get("callVia", "ask");
+  const q = NQNotes.queue().length;
+  $("queueInfo").textContent = q ? `${q} ملخص مستني يتبعت للسيرفر` : "";
+  show("scrSettings");
+}
 
+/* ---------- phone ---------- */
 const NQPhone = {
-  ua: null, session: null, muted: false, callStart: null, direction: null, peer: null,
-
-  // أحداث يربطها الـ CRM
-  onIncoming:  (number) => {},
-  onAnswered:  (info) => {},
-  onCallEnded: (info) => {},
-
-  speaker: false,
-  toggleSpeaker() {
-    this.speaker = !this.speaker;
-    $("btnSpk").textContent = this.speaker ? "سماعة: شغّالة" : "سماعة";
-    if (window.Android) Android.setSpeaker(this.speaker);
-  },
+  ua: null, session: null, muted: false, speaker: false, callStart: null, direction: null, peer: null, timer: null, ext: null, pass: null,
 
   login(ext, password) {
     if (!ext || !password) return this._err("اكتب رقم التحويلة والباسورد");
     if (typeof JsSIP === "undefined") return this._err("مكتبة الاتصال مش محمّلة");
-    this._err("");
-    $("status").innerHTML = 'الحالة: <b style="color:#d97706">جاري الاتصال بالسنترال…</b>';
+    this._err("جاري الاتصال بالسنترال…");
+    store.set("nq_login", { ext, password });
+    this.ext = ext; this.pass = password;
     if (this.ua) { try { this.ua.stop(); } catch (e) {} }
-    try { localStorage.setItem("nq_login", JSON.stringify({ ext, password })); } catch (e) {}
     const sockets = CONFIG.wss.map((u, i) => ({ socket: new JsSIP.WebSocketInterface(u), weight: 10 - i }));
     this.ua = new JsSIP.UA({
-      sockets,
-      connection_recovery_min_interval: 2,
-      connection_recovery_max_interval: 30,
-      uri: `sip:${ext}@${CONFIG.domain}`,
-      password,
-      display_name: ext,
-      register: true,
-      session_timers: false
+      sockets, uri: `sip:${ext}@${CONFIG.domain}`, password, display_name: ext,
+      register: true, session_timers: false,
+      connection_recovery_min_interval: 2, connection_recovery_max_interval: 30
     });
-    this.ua.on("registered",        () => { this._status(true, ext); try { sessionStorage.setItem("nq_ext", ext); } catch(e){} });
-    this.ua.on("unregistered",      () => this._status(false));
-    this.ua.on("registrationFailed",e  => {
-      this._status(false);
-      this._err(e.cause === "Authentication Error" || e.cause === "Rejected"
-        ? "رقم التحويلة أو الباسورد غلط" : "فشل الدخول: " + e.cause);
+    this.ua.on("registered", () => { this._err(""); this._reg(true); if (!this.session) show("scrDial"); NQNotes.flush(); });
+    this.ua.on("unregistered", () => this._reg(false));
+    this.ua.on("registrationFailed", e => {
+      this._reg(false);
+      const bad = e.cause === "Authentication Error" || e.cause === "Rejected";
+      if (bad) { store.del("nq_login"); show("scrLogin"); }
+      this._err(bad ? "رقم التحويلة أو الباسورد غلط" : "فشل الدخول: " + e.cause);
     });
-    this.ua.on("disconnected",      () => { this._status(false); this._err("مش قادر يوصل للسنترال — بيحاول تاني…"); });
-    this.ua.on("connected",         () => this._err(""));
-    this.ua.on("newRTCSession",     e  => this._onSession(e));
+    this.ua.on("disconnected", () => { this._reg(false); this._err("مش قادر يوصل للسنترال — بيحاول تاني…"); });
+    this.ua.on("newRTCSession", e => this._onSession(e));
     this.ua.start();
   },
 
   logout() {
-    try { localStorage.removeItem("nq_login"); } catch (e) {}
-    if (this.ua) this.ua.stop(); this.ua = null; this._status(false);
+    store.del("nq_login");
+    if (this.ua) { try { this.ua.stop(); } catch (e) {} } this.ua = null;
+    this._err(""); show("scrLogin");
   },
 
-  call(number) {
+  call(number, forceVia) {
     number = String(number || "").replace(/[^\d+*#]/g, "");
-    if (!this.ua || !this.ua.isRegistered()) return this._err("التليفون مش متصل");
-    if (this.session) return this._err("في مكالمة شغالة");
     if (!number) return;
+    const via = forceVia || NQPrefs.get("callVia", "ask");
+    if (via === "ask") return NQVia.open(number);
+    if (via === "sim") return NQVia.simCall(number);
+    if (!this.ua || !this.ua.isRegistered()) { $("dialErr").textContent = "التليفون مش متصل بالسنترال"; return; }
+    if (this.session) return;
     if (window.Android) Android.onCallStateChanged(true);
-    this.ua.call(`sip:${number}@${CONFIG.domain}`, {
-      mediaConstraints: { audio: true, video: false },
-      pcConfig: { iceServers: CONFIG.iceServers }
-    });
+    this.ua.call(`sip:${number}@${CONFIG.domain}`, { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: CONFIG.iceServers } });
   },
 
   answer() {
     if (!this.session) return;
-    this._ring(false);
-    this.session.answer({
-      mediaConstraints: { audio: true, video: false },
-      pcConfig: { iceServers: CONFIG.iceServers }
-    });
+    if (window.Android) Android.onCallStateChanged(true);
+    this.session.answer({ mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: CONFIG.iceServers } });
   },
 
-  hangup() { if (this.session) this.session.terminate(); },
+  hangup() { if (this.session) try { this.session.terminate(); } catch (e) {} },
 
   toggleMute() {
     if (!this.session) return;
     this.muted ? this.session.unmute({ audio: true }) : this.session.mute({ audio: true });
-    this.muted = !this.muted;
-    $("btnMute").textContent = this.muted ? "إلغاء الكتم" : "كتم";
+    this.muted = !this.muted; $("cMute").classList.toggle("on", this.muted);
   },
 
-  /* ---------- داخلي ---------- */
+  toggleSpeaker() {
+    this.speaker = !this.speaker; $("cSpk").classList.toggle("on", this.speaker);
+    if (window.Android) Android.setSpeaker(this.speaker);
+  },
+
+  dtmf(d) { if (this.session && this.callStart) try { this.session.sendDTMF(d); } catch (e) {} },
+
+  /* ---- internal ---- */
   _onSession(e) {
     const s = e.session;
-    if (this.session) { s.terminate({ status_code: 486 }); return; } // مشغول
+    if (this.session) { s.terminate({ status_code: 486 }); return; }
     this.session = s;
     this.direction = e.originator === "remote" ? "in" : "out";
     this.peer = s.remote_identity.uri.user;
-    this.callStart = null;
+    this.callStart = null; this.started = new Date();
+    this.muted = false; this.speaker = false;
+    $("cMute").classList.remove("on"); $("cSpk").classList.remove("on");
+    $("callPad").classList.remove("on"); $("cPad").classList.remove("on");
 
     if (this.direction === "in") {
-      this._info("📞 مكالمة واردة من " + this.peer);
-      this._ring(true);
-      this._buttons({ call:false, answer:true, hang:true, mute:false });
+      $("inNum").textContent = this.peer;
+      show("scrIncoming");
       if (window.Android) Android.onIncoming(this.peer);
-      this.onIncoming(this.peer);
     } else {
-      this._info("جاري الاتصال بـ " + this.peer + "...");
-      this._buttons({ call:false, answer:false, hang:true, mute:false });
+      $("cNum").textContent = this.peer; $("cState").textContent = "جاري الاتصال…";
+      show("scrCall");
     }
 
-    s.on("peerconnection", ev => this._attachAudio(ev.peerconnection));
-    if (s.connection) this._attachAudio(s.connection);
-
+    s.on("peerconnection", ev => this._audio(ev.peerconnection));
+    if (s.connection) this._audio(s.connection);
+    s.on("progress", () => { if (this.direction === "out") $("cState").textContent = "بيرن…"; });
     s.on("accepted", () => {
       this.callStart = Date.now();
-      this._ring(false);
-      this._info("متصل: " + this.peer);
-      this._buttons({ call:false, answer:false, hang:true, mute:true });
       if (window.Android) Android.onCallStateChanged(true);
-      this.onAnswered({ number: this.peer, direction: this.direction });
+      $("cNum").textContent = this.peer; show("scrCall");
+      clearInterval(this.timer);
+      this.timer = setInterval(() => {
+        const t = Math.floor((Date.now() - this.callStart) / 1000);
+        $("cState").textContent = `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+      }, 500);
     });
     const end = (ev) => {
+      clearInterval(this.timer);
       const info = {
-        number: this.peer, direction: this.direction,
-        answered: !!this.callStart,
-        duration: this.callStart ? Math.round((Date.now() - this.callStart) / 1000) : 0,
+        number: this.peer, direction: this.direction, started: this.started.toISOString(),
+        answered: !!this.callStart, duration: this.callStart ? Math.round((Date.now() - this.callStart) / 1000) : 0,
         cause: ev && ev.cause
       };
-      this._ring(false);
-      this.session = null; this.muted = false;
-      $("btnMute").textContent = "كتم";
-      this._info(info.answered ? `انتهت المكالمة (${info.duration} ث)` : "المكالمة لم تكتمل: " + info.cause);
-      this._buttons({ call:true, answer:false, hang:false, mute:false });
+      this.session = null; this.muted = false; this.speaker = false;
       if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); }
-      this.speaker = false; $("btnSpk").textContent = "سماعة";
-      this.onCallEnded(info);
+      NQHistory.add(info);
+      $("dialNum").textContent = "";
+      if (!info.answered && info.direction === "out") $("dialErr").textContent = "المكالمة مكملتش: " + (info.cause || "");
+      if (!NQNotes.maybeAsk(info)) show(this.ua && this.ua.isRegistered() ? "scrDial" : "scrLogin");
     };
-    s.on("ended", end);
-    s.on("failed", end);
+    s.on("ended", end); s.on("failed", end);
   },
-
-  _attachAudio(pc) {
-    pc.addEventListener("track", ev => { $("remoteAudio").srcObject = ev.streams[0]; });
-  },
-  _ring(on) { const r = $("ringtone"); try { on ? r.play() : (r.pause(), r.currentTime = 0); } catch(e){} },
-  _info(t) { $("callinfo").textContent = t; },
+  _audio(pc) { pc.addEventListener("track", ev => { $("remoteAudio").srcObject = ev.streams[0]; }); },
   _err(t) { $("err").textContent = t || ""; },
-  _buttons(b) {
-    $("btnCall").disabled = !b.call; $("btnAnswer").disabled = !b.answer;
-    $("btnHang").disabled = !b.hang; $("btnMute").disabled = !b.mute;
-  },
-  _status(on, ext) {
-    $("status").innerHTML = on ? `الحالة: <b class="on">متصل</b> — تحويلة ${ext}` : `الحالة: <b class="off">غير متصل</b>`;
-    $("login").style.display  = on ? "none" : "block";
-    $("dialer").style.display = on ? "block" : "none";
+  _reg(on) {
+    $("regDot").classList.toggle("off", !on);
+    $("whoExt").textContent = "تحويلة " + (this.ext || "—");
+    $("whoSt").textContent = on ? "متصل بالسنترال" : "غير متصل — بيحاول تاني…";
   }
 };
-window.NQPhone = NQPhone;
-NQSettings.apply(NQSettings.load());
-NQPhone._status(false);
-// دخول تلقائي بآخر تحويلة اتسجّلت على الجهاز
-try { const s = JSON.parse(localStorage.getItem("nq_login") || "null"); if (s) NQPhone.login(s.ext, s.password); } catch (e) {}
-$("num").addEventListener("keydown", e => { if (e.key === "Enter") NQPhone.call(e.target.value); });
 
-/* ===== مثال ربط بالـ CRM (عدّله حسب نظامكم) =====
-NQPhone.onIncoming = (num) => {
-  // افتح ملف العميل بالرقم
-  // window.open("/crm/customers/search?phone=" + num, "_blank");
+/* ---------- CRM notes ---------- */
+const OUTCOMES = ["مهتم", "بيع", "يحتاج متابعة", "رفض", "رقم غلط", "أخرى"];
+const NQNotes = {
+  current: null, outcome: "",
+  queue() { return store.get("nq_notes_q", []); },
+  maybeAsk(info) {
+    if (!NQPrefs.get("crm", false) || !info.answered) return false;
+    if (info.direction === "in" && !NQPrefs.get("crmIn", true)) return false;
+    this.current = info; this.outcome = "";
+    const t = new Date(info.started);
+    $("noteMeta").textContent = `${info.via === "sim" ? "📱 من شريحتي · " : ""}${info.direction === "out" ? "↗ صادرة" : "↙ واردة"} · ${info.number} · ${t.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })} · ${Math.floor(info.duration / 60)}:${String(info.duration % 60).padStart(2, "0")}`;
+    const tg = NQTargets.findByNumber(info.number);
+    $("noteCustomer").value = tg ? tg.customer : ""; $("noteSummary").value = ""; $("noteFollow").value = "";
+    const box = $("noteOutcome"); box.innerHTML = "";
+    OUTCOMES.forEach(o => { const c = document.createElement("button"); c.className = "chip"; c.textContent = o; c.onclick = () => { this.outcome = o; box.querySelectorAll(".chip").forEach(x => x.classList.toggle("sel", x === c)); }; box.appendChild(c); });
+    show("scrNote");
+    return true;
+  },
+  save() {
+    const n = {
+      ext: NQPhone.ext, number: this.current.number, direction: this.current.direction,
+      started: this.current.started, duration: this.current.duration,
+      customer: $("noteCustomer").value.trim(), outcome: this.outcome,
+      summary: $("noteSummary").value.trim(), followUp: $("noteFollow").value || null,
+      savedAt: new Date().toISOString()
+    };
+    if (!n.customer && !n.summary) { toast("اكتب اسم العميل أو ملخص المكالمة"); return; }
+    const q = this.queue(); q.push(n); store.set("nq_notes_q", q);
+    NQHistory.attachNote(n);
+    this.current = null; show("scrDial"); toast("اتحفظ ✓"); this.flush();
+  },
+  skip() { this.current = null; show("scrDial"); },
+  async flush() {
+    let q = this.queue(); if (!q.length || !NQPhone.ext) return;
+    const left = [];
+    for (const n of q) {
+      try {
+        const r = await fetch(CONFIG.api + "/notes", {
+          method: "POST", headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ ext: NQPhone.ext, password: NQPhone.pass, note: n })
+        });
+        if (!r.ok && r.status !== 400) left.push(n);
+      } catch (e) { left.push(n); }
+    }
+    store.set("nq_notes_q", left);
+  }
 };
-NQPhone.onCallEnded = (info) => {
-  // سجّل المكالمة في الـ CRM
-  // fetch("/api/calls", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(info) });
+setInterval(() => NQNotes.flush(), 5 * 60 * 1000);
+
+/* ---------- call from: PBX or my SIM ---------- */
+const NQVia = {
+  num: "",
+  open(n) { this.num = n; $("viaNum").textContent = n; $("viaRemember").checked = false; $("viaSheet").classList.add("on"); },
+  close() { $("viaSheet").classList.remove("on"); },
+  pick(v) {
+    if ($("viaRemember").checked) { NQPrefs.set("callVia", v); toast(v === "pbx" ? "هيتصل من السنترال دايمًا — غيّرها من الإعدادات" : "هيتصل من شريحتك دايمًا — غيّرها من الإعدادات"); }
+    this.close(); NQPhone.call(this.num, v);
+  },
+  pending: null,
+  simCall(n) {
+    if (!window.Android || !Android.callWithSim) { toast("الاتصال من الشريحة شغّال من التطبيق بس"); return; }
+    this.pending = { number: n, direction: "out", via: "sim", started: new Date().toISOString(), answered: true, duration: 0 };
+    Android.callWithSim(n);
+  },
+  // لما المستخدم يرجع للتطبيق بعد مكالمة الشريحة
+  back() {
+    const p = this.pending; if (!p) return; this.pending = null;
+    p.duration = Math.max(0, Math.round((Date.now() - new Date(p.started)) / 1000) - 5);
+    NQHistory.add(p);
+    $("dialNum").textContent = "";
+    if (!NQNotes.maybeAsk(p)) show("scrDial");
+  }
 };
-*/
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && NQVia.pending) setTimeout(() => NQVia.back(), 600); });
+
+/* ---------- call history (on this phone) ---------- */
+const digits9 = n => String(n || "").replace(/\D/g, "").slice(-9);
+const isoDay = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+const fmtDur = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+const NQHistory = {
+  all() { return store.get("nq_history", []); },
+  add(info) {
+    const h = this.all();
+    h.push({ ...info, ext: NQPhone.ext });
+    store.set("nq_history", h.slice(-5000));
+    if (info.answered) NQTargets.markCalled(info.number, info.started);
+  },
+  attachNote(n) {
+    const h = this.all(); const e = h.find(x => x.started === n.started && x.number === n.number);
+    if (e) { e.customer = n.customer; e.outcome = n.outcome; e.summary = n.summary; e.followUp = n.followUp; store.set("nq_history", h); }
+    if (n.customer) NQTargets.markCalled(n.number, n.started, n.customer);
+  }
+};
+
+/* ---------- targets ---------- */
+const NQTargets = {
+  all() { return store.get("nq_targets", []); },
+  save(t) { store.set("nq_targets", t); },
+  open() { if (!$("tDate").value) $("tDate").value = isoDay(new Date()); this.render(); show("scrTargets"); },
+  add() {
+    const customer = $("tName").value.trim(), number = $("tPhone").value.trim();
+    if (!customer) { toast("اكتب اسم العميل"); return; }
+    const t = this.all();
+    t.push({ id: Date.now() + "" + Math.random().toString(36).slice(2, 6), date: $("tDate").value || isoDay(new Date()), customer, number, done: false });
+    this.save(t); $("tName").value = ""; $("tPhone").value = ""; this.render(); toast("اتضاف ✓");
+  },
+  remove(id) { this.save(this.all().filter(x => x.id !== id)); this.render(); },
+  toggle(id) { const t = this.all(); const x = t.find(y => y.id === id); if (x) { x.done = !x.done; x.doneAt = x.done ? new Date().toISOString() : null; } this.save(t); this.render(); },
+  findByNumber(num) {
+    const d = digits9(num); if (!d) return null;
+    const t = this.all().filter(x => digits9(x.number) === d);
+    return t.find(x => x.date === isoDay(new Date())) || t[t.length - 1] || null;
+  },
+  markCalled(num, started, customer) {
+    const t = this.all(); const day = isoDay(started || new Date()); const d = digits9(num);
+    const x = t.find(y => y.date === day && !y.done && ((d && digits9(y.number) === d) || (customer && y.customer.trim() === customer.trim())));
+    if (x) { x.done = true; x.doneAt = started; this.save(t); }
+  },
+  forDay(day) { return this.all().filter(x => x.date === day); },
+  render() {
+    const day = $("tDate").value || isoDay(new Date());
+    const list = this.forDay(day); const done = list.filter(x => x.done).length;
+    $("tProgTxt").textContent = `${done} من ${list.length}`;
+    const pct = list.length ? Math.round(done / list.length * 100) : 0;
+    $("tProg").className = "prog" + (pct < 50 ? " low" : pct < 80 ? " mid" : "");
+    $("tProg").firstElementChild.style.width = pct + "%";
+    const box = $("tList"); box.innerHTML = "";
+    if (!list.length) { box.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px">مفيش عملاء في تارجت اليوم ده. ضيف من فوق.</div>'; return; }
+    list.forEach(x => {
+      const row = document.createElement("div"); row.className = "tgt" + (x.done ? " done" : "");
+      const info = document.createElement("div"); info.className = "info";
+      const b = document.createElement("b"); b.textContent = x.customer;
+      const sm = document.createElement("small"); sm.textContent = x.number || "";
+      info.append(b, sm);
+      const pill = document.createElement("span"); pill.className = "pill" + (x.done ? "" : " wait"); pill.textContent = x.done ? "تم ✓" : "لسه"; pill.onclick = () => this.toggle(x.id);
+      row.append(info, pill);
+      if (x.number) { const c = document.createElement("button"); c.className = "mini call"; c.textContent = "📞"; c.onclick = () => { show("scrDial"); $("dialNum").textContent = x.number; NQPhone.call(x.number); }; row.append(c); }
+      const del = document.createElement("button"); del.className = "mini x"; del.textContent = "✕"; del.onclick = () => this.remove(x.id); row.append(del);
+      box.append(row);
+    });
+  }
+};
+
+/* ---------- my stats + report ---------- */
+const NQStats = {
+  period: "day",
+  open() { $("sGoal").value = NQPrefs.get("dailyGoal", 0) || ""; this.render(); show("scrStats"); },
+  range() {
+    const now = new Date(); let from;
+    if (this.period === "day") from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    else if (this.period === "month") from = new Date(now.getFullYear(), now.getMonth(), 1);
+    else from = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    return [from, now];
+  },
+  label() { return { day: "اليوم", month: "الشهر", quarter: "الربع" }[this.period]; },
+  rows() {
+    const [from, to] = this.range();
+    return NQHistory.all().filter(h => { const t = new Date(h.started); return t >= from && t <= to; })
+      .sort((a, b) => new Date(a.started) - new Date(b.started));
+  },
+  render() {
+    document.querySelectorAll("#sSeg button").forEach(b => b.classList.toggle("sel", b.dataset.p === this.period));
+    const rows = this.rows(); const ans = rows.filter(r => r.answered);
+    const talk = ans.reduce((a, r) => a + (r.duration || 0), 0);
+    const today = isoDay(new Date()); const tl = NQTargets.forDay(today); const td = tl.filter(x => x.done).length;
+    const goal = +NQPrefs.get("dailyGoal", 0) || 0;
+    const todayCalls = NQHistory.all().filter(h => isoDay(h.started) === today).length;
+    const bar = (v, max) => { const p = max ? Math.min(100, Math.round(v / max * 100)) : 0; return `<div class="prog${p < 50 ? " low" : p < 80 ? " mid" : ""}"><b style="width:${p}%"></b></div>`; };
+    $("sTarget").innerHTML =
+      `<div style="display:flex;justify-content:space-between"><b>🎯 تارجت العملاء النهارده</b><b>${td} / ${tl.length}</b></div>${bar(td, tl.length)}` +
+      (goal ? `<div style="display:flex;justify-content:space-between;margin-top:14px"><b>📞 هدف المكالمات النهارده</b><b>${todayCalls} / ${goal}</b></div>${bar(todayCalls, goal)}` : "");
+    const k = (l, v) => `<div class="card"><div class="l">${l}</div><div class="v">${v}</div></div>`;
+    $("sKpis").innerHTML = k(`مكالمات ${this.label()}`, rows.length) + k("اتردّ عليها", ans.length) +
+      k("وقت الكلام", fmtDur(talk)) + k("متوسط المكالمة", ans.length ? fmtDur(Math.round(talk / ans.length)) : "0:00") +
+      k("صادرة", rows.filter(r => r.direction === "out").length) + k("واردة", rows.filter(r => r.direction === "in").length);
+    const oc = {}; rows.forEach(r => { if (r.outcome) oc[r.outcome] = (oc[r.outcome] || 0) + 1; });
+    $("sOut").innerHTML = Object.keys(oc).length ? Object.entries(oc).map(([o, n]) => `<div class="orow"><span>${o}</span><b>${n}</b></div>`).join("")
+      : '<div style="color:var(--muted);font-size:13px">لسه مفيش ملخصات. فعّل "وضع موظف CRM" من الإعدادات.</div>';
+  },
+  download() {
+    const rows = this.rows();
+    if (!rows.length) { toast("مفيش مكالمات في الفترة دي"); return; }
+    const q = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    const [from, to] = this.range();
+    const ans = rows.filter(r => r.answered); const talk = ans.reduce((a, r) => a + (r.duration || 0), 0);
+    const lines = [
+      [q("تقرير مكالمات — تحويلة " + (NQPhone.ext || "")), q(this.label() + ": " + isoDay(from) + " → " + isoDay(to))].join(","),
+      [q("إجمالي المكالمات"), rows.length, q("اتردّ عليها"), ans.length, q("وقت الكلام"), q(fmtDur(talk))].join(","),
+      "",
+      ["م", "اسم العميل", "التاريخ", "الوقت", "الرقم", "النوع", "مدة المكالمة", "نتيجة المكالمة", "ملخص حالة العميل", "ميعاد المتابعة"].map(q).join(",")
+    ];
+    rows.forEach((r, i) => {
+      const t = new Date(r.started); const tg = r.customer ? null : NQTargets.findByNumber(r.number);
+      lines.push([i + 1, q(r.customer || (tg && tg.customer) || ""), q(isoDay(t)), q(t.toTimeString().slice(0, 5)), q(r.number),
+        q((r.direction === "out" ? "صادرة" : "واردة") + (r.via === "sim" ? " (شريحتي)" : "")), q(r.answered ? fmtDur(r.duration) : "لم يتم الرد"),
+        q(r.outcome || ""), q(r.summary || ""), q(r.followUp || "")].join(","));
+    });
+    const csv = "\ufeff" + lines.join("\r\n");
+    const name = `NQ-calls-${NQPhone.ext || ""}-${this.period}-${isoDay(new Date())}.csv`;
+    if (window.Android && Android.saveFile) { const where = Android.saveFile(name, csv); toast(where ? "اتحفظ في التنزيلات ✓" : "تعذّر الحفظ"); }
+    else { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = name; a.click(); }
+  }
+};
+document.querySelectorAll("#sSeg button").forEach(b => b.onclick = () => { NQStats.period = b.dataset.p; NQStats.render(); });
+
+/* ---------- start ---------- */
+buildPad($("keypad"), dialKey);
+buildPad($("callPad"), d => NQPhone.dtmf(d));
+NQSettings.apply(NQSettings.load());
+(function boot() {
+  const s = store.get("nq_login", null);
+  if (s && s.ext && s.password) { $("ext").value = s.ext; NQPhone.ext = s.ext; NQPhone._reg(false); show("scrDial"); NQPhone.login(s.ext, s.password); }
+  else show("scrLogin");
+})();
+window.NQPhone = NQPhone;
 </script>
 </body>
 </html>

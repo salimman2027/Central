@@ -6,7 +6,9 @@ NQ Calls — خدمة لوحة المكالمات على سيرفر السنتر
 بتشتغل على 127.0.0.1:8090 وApache بيوصّلها على https://<host>/calls/ ومعاها باسورد.
 """
 import datetime as dt
+import hmac
 import json
+import time
 import os
 import re
 import subprocess
@@ -16,13 +18,14 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pymysql
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 HERE = Path(__file__).resolve().parent
 CONF_DIR = Path(os.environ.get("NQ_CONF", "/etc/nq-calls"))
 DATA_DIR = Path(os.environ.get("NQ_DATA", "/var/lib/nq-calls"))
 ANALYSIS_DIR = DATA_DIR / "analysis"
+NOTES_DIR = DATA_DIR / "notes"
 MONITOR = Path(os.environ.get("NQ_MONITOR", "/var/spool/asterisk/monitor"))
 TZ = ZoneInfo(os.environ.get("NQ_TZ", "Asia/Riyadh"))
 TRUNK = "PJSIP/" + os.environ.get("NQ_TRUNK", "dinastar1")
@@ -41,10 +44,10 @@ def db_conf() -> dict:
     return dict(host=get("AMPDBHOST"), user=get("AMPDBUSER"), password=get("AMPDBPASS"))
 
 
-def query(sql: str, args: tuple) -> list:
+def query(sql: str, args: tuple, database: str | None = None) -> list:
     c = db_conf()
     con = pymysql.connect(host=c["host"], user=c["user"], password=c["password"],
-                          database=os.environ.get("NQ_CDR_DB", "asteriskcdrdb"),
+                          database=database or os.environ.get("NQ_CDR_DB", "asteriskcdrdb"),
                           cursorclass=pymysql.cursors.DictCursor, charset="utf8mb4")
     try:
         with con.cursor() as cur:
@@ -77,6 +80,87 @@ def config():
     return reps
 
 
+# ---------------- CRM notes (from the phone app) ----------------
+def _digits(n: str) -> str:
+    return re.sub(r"\D", "", n or "")[-9:]
+
+
+def load_notes(d_from: dt.date, d_to: dt.date) -> list:
+    out, m = [], dt.date(d_from.year, d_from.month, 1)
+    while m <= d_to:
+        f = NOTES_DIR / f"{m:%Y-%m}.jsonl"
+        if f.exists():
+            for line in f.read_text(encoding="utf-8").splitlines():
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    pass
+        m = (m.replace(day=28) + dt.timedelta(days=4)).replace(day=1)
+    return out
+
+
+def match_note(notes: list, ext: int, number: str, t: dt.datetime):
+    best, best_d = None, 15 * 60
+    for n in notes:
+        if str(n.get("ext")) != str(ext) or _digits(n.get("number")) != _digits(number):
+            continue
+        try:
+            nt = dt.datetime.fromisoformat(n["started"].replace("Z", "+00:00"))
+        except (KeyError, ValueError):
+            continue
+        d = abs((nt - t).total_seconds())
+        if d < best_d:
+            best, best_d = n, d
+    if not best:
+        return None
+    return {k: best.get(k) for k in ("customer", "outcome", "summary", "followUp", "savedAt")}
+
+
+FAILS: dict = {}
+
+
+def check_ext_password(ext: str, password: str) -> bool:
+    if not re.fullmatch(r"\d{2,6}", ext or ""):
+        return False
+    now = time.time()
+    FAILS[ext] = [t for t in FAILS.get(ext, []) if now - t < 900]
+    if len(FAILS[ext]) >= 10:
+        raise HTTPException(429, "محاولات كتير، حاول بعد شوية")
+    rows = query("SELECT data FROM sip WHERE id=%s AND keyword='secret' LIMIT 1", (ext,),
+                 database=os.environ.get("NQ_PBX_DB", "asterisk"))
+    ok = bool(rows) and hmac.compare_digest(str(rows[0]["data"]), password or "")
+    if not ok:
+        FAILS[ext].append(now)
+    return ok
+
+
+@app.post("/app/notes")
+async def app_notes(request: Request):
+    """التطبيق بيبعت ملخص المكالمة هنا (برقم التحويلة وباسوردها)"""
+    hdr = {"Access-Control-Allow-Origin": "*"}
+    try:
+        body = json.loads(await request.body())
+        ext, pw, note = str(body["ext"]), str(body["password"]), dict(body["note"])
+    except (ValueError, KeyError, TypeError):
+        return JSONResponse({"detail": "bad request"}, 400, headers=hdr)
+    if not check_ext_password(ext, pw):
+        return JSONResponse({"detail": "unauthorized"}, 401, headers=hdr)
+    clean = {k: str(note.get(k) or "")[:4000] for k in
+             ("number", "direction", "started", "customer", "outcome", "summary", "followUp", "savedAt")}
+    clean["duration"] = int(note.get("duration") or 0)
+    clean["ext"] = ext
+    clean["received"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    NOTES_DIR.mkdir(parents=True, exist_ok=True)
+    with open(NOTES_DIR / f"{dt.date.today():%Y-%m}.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(clean, ensure_ascii=False) + "\n")
+    return JSONResponse({"ok": True}, headers=hdr)
+
+
+@app.get("/api/notes")
+def notes(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(alias="to")):
+    return load_notes(date_from, date_to)
+
+
 # ---------------- calls ----------------
 @app.get("/api/calls")
 def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(alias="to")):
@@ -95,6 +179,7 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
     for r in rows:
         groups.setdefault(r["linkedid"] or r["uniqueid"], []).append(r)
 
+    notes_all = load_notes(date_from - dt.timedelta(days=1), date_to + dt.timedelta(days=1))
     out = []
     for g in groups.values():
         main = next((r for r in g if r["disposition"] == "ANSWERED"), g[-1])
@@ -111,6 +196,7 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
             ringSec=max(0, int(main["duration"] or 0) - int(main["billsec"] or 0)),
             number=main["src"] if inbound else strip_prefix(main["dst"] or "", ext),
             customer=None,
+            note=match_note(notes_all, ext, main["src"] if inbound else strip_prefix(main["dst"] or "", ext), t),
             hasRecording=bool(rec) and main["disposition"] == "ANSWERED",
             analyzed=bool(rec) and (ANALYSIS_DIR / (stem(rec) + ".json")).exists(),
         ))

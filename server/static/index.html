@@ -279,7 +279,7 @@ async function loadCalls(from,to){
   const rows=await r.json();
   CALLS=rows.filter(c=>REPS.some(x=>x.id===c.ext)).map(c=>({
     id:c.id, t:new Date(c.time), rep:c.ext, dir:c.dir, st:c.status, dur:c.talkSec, ring:c.ringSec,
-    num:c.number, cust:c.customer||'—', rec:!!c.hasRecording, ai:!!c.analyzed
+    num:c.number, cust:(c.note&&c.note.customer)||c.customer||'—', rec:!!c.hasRecording, ai:!!c.analyzed, note:c.note||null
   })).sort((a,b)=>b.t-a.t);
   loadedRange=key;
 }
@@ -404,23 +404,25 @@ function renderLog(){
     <td style="direction:ltr;text-align:right">${c.num}</td><td>${c.cust}</td>
     <td><span class="badge ${c.dir==='out'?'b-out':'b-in'}">${c.dir==='out'?'↗ صادرة':'↙ واردة'}</span></td>
     <td><span class="badge ${stBadge(c.st)}">${c.st}</span></td><td class="c">${ms(c.ring)}</td><td class="c">${c.dur?ms(c.dur):'—'}</td>
-    <td class="c">${c.rec?`<button class="play" onclick="openRec(${CALLS.indexOf(c)})">▶</button>`:'—'}</td></tr>`}).join('');
-  $('logTbl').innerHTML=`<tr><th class="c">#</th><th>التاريخ والوقت</th><th>المندوب</th><th>الفريق</th><th>الرقم</th><th>العميل</th><th>النوع</th><th>الحالة</th><th class="c">الرنين</th><th class="c">المدة</th><th class="c">تسجيل</th></tr>`+(rows||'<tr><td colspan="11" class="c">لا توجد مكالمات</td></tr>');
+    <td class="c">${c.rec?`<button class="play" onclick="openRec(${CALLS.indexOf(c)})">▶</button>`:'—'}</td>
+    <td style="white-space:normal;min-width:220px;max-width:340px">${c.note?`${c.note.outcome?`<span class="badge b-out">${esc(c.note.outcome)}</span> `:''}${esc((c.note.summary||'').slice(0,140))}${c.note.followUp?`<div class="muted">متابعة: ${esc(c.note.followUp)}</div>`:''}`:'<span class="muted">—</span>'}</td></tr>`}).join('');
+  $('logTbl').innerHTML=`<tr><th class="c">#</th><th>التاريخ والوقت</th><th>المندوب</th><th>الفريق</th><th>الرقم</th><th>العميل</th><th>النوع</th><th>الحالة</th><th class="c">الرنين</th><th class="c">المدة</th><th class="c">تسجيل</th><th>ملخص المندوب</th></tr>`+(rows||'<tr><td colspan="12" class="c">لا توجد مكالمات</td></tr>');
   let p='';for(let i=1;i<=Math.min(pages,7);i++)p+=`<button class="${i===logPage?'a':''}" onclick="logPage=${i};renderLog()">${i}</button>`;
   if(pages>7)p+=`<span class="muted">… ${pages}</span><button onclick="logPage=${pages};renderLog()">الأخيرة</button>`;
   $('pager').innerHTML=p+`<span class="muted" style="margin-right:10px">صفحة ${logPage} من ${pages}</span>`;
 }
 function openRec(i){
   const c=CALLS[i];const r=repOf(c.rep);
-  $('mInfo').innerHTML=`${r.name} ← ${c.num} (${c.cust}) — ${dmy(c.t)} ${tm(c.t)} — المدة ${ms(c.dur)}`;
+  $('mInfo').innerHTML=`${esc(r.name)} ← ${esc(c.num)} (${esc(c.cust)}) — ${dmy(c.t)} ${tm(c.t)} — المدة ${ms(c.dur)}`+
+    (c.note?`<div class="note" style="margin-top:8px"><b>ملخص المندوب:</b> ${c.note.outcome?esc(c.note.outcome)+' — ':''}${esc(c.note.summary||'')}${c.note.followUp?`<br><b>متابعة:</b> ${esc(c.note.followUp)}`:''}</div>`:'');
   const url=`${API_BASE}/recording/${encodeURIComponent(c.id)}`;
   $('player').src=url; $('dl').href=url+'?download=1';
   $('modal').classList.add('show'); $('player').play().catch(()=>{});
 }
 function closeRec(){ $('player').pause(); $('modal').classList.remove('show'); }
 function exportCSV(){
-  const h='Date,Rep,Team,Number,Customer,Direction,Status,Ring,Duration,Recorded\n';
-  const b=logList.map(c=>{const r=repOf(c.rep);return [c.t.toISOString(),r.name,teamOf(r.team).name,c.num,c.cust,c.dir,c.st,c.ring,c.dur,c.rec?1:0].join(',')}).join('\n');
+  const h='Date,Rep,Team,Number,Customer,Direction,Status,Ring,Duration,Recorded,Outcome,Summary\n';
+  const b=logList.map(c=>{const r=repOf(c.rep);return [c.t.toISOString(),r.name,teamOf(r.team).name,c.num,'"'+String(c.cust).replace(/"/g,'""')+'"',c.dir,c.st,c.ring,c.dur,c.rec?1:0,c.note?.outcome||'','"'+String(c.note?.summary||'').replace(/"/g,'""')+'"'].join(',')}).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+h+b],{type:'text/csv'}));a.download='calls.csv';a.click();
 }
 
