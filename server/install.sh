@@ -101,6 +101,8 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   # التطبيق بيبعت ملخص المكالمة هنا (بيتحقق برقم التحويلة وباسوردها)
   ProxyPass        /calls-app/notes http://127.0.0.1:8090/app/notes
   ProxyPassReverse /calls-app/notes http://127.0.0.1:8090/app/notes
+  ProxyPass        /calls-app/insight http://127.0.0.1:8090/app/insight
+  ProxyPassReverse /calls-app/insight http://127.0.0.1:8090/app/insight
 
   # لوحة المكالمات
   RedirectMatch ^/calls\$ /calls/

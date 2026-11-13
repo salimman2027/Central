@@ -156,6 +156,58 @@ async def app_notes(request: Request):
     return JSONResponse({"ok": True}, headers=hdr)
 
 
+INSIGHT_PROMPT = """أنت مستشار مبيعات خبير لشركة "الجودة الوطنية لتقنية المعلومات" (NQ) في السعودية.
+موظف مبيعات كتب ملخص مكالمة مع عميل. حلّل الملخص وتوقّع موقف العميل. متخمّنش حاجة مش مكتوبة.
+
+بيانات المكالمة: {meta}
+ملخص الموظف:
+<summary>
+{summary}
+</summary>
+
+النهارده {today}.
+رجّع JSON بس (من غير أي كلام قبله أو بعده) بالشكل ده:
+{{
+  "temperature": "ساخن | دافئ | بارد",
+  "buy_probability": 0,
+  "expectation": "توقّعك لموقف العميل في جملتين بالعامية المصرية البسيطة",
+  "next_action": "أهم خطوة جاية للموظف، محددة وعملية",
+  "followup_date": "YYYY-MM-DD أو null",
+  "risks": ["خطر أو اعتراض محتمل"],
+  "suggested_message": "رسالة واتساب قصيرة مهذبة يبعتها الموظف للعميل للمتابعة"
+}}"""
+
+
+@app.post("/app/insight")
+async def app_insight(request: Request):
+    """تحليل سريع لملخص مكالمة واحدة (التطبيق بيطلبه بعد المكالمة)"""
+    hdr = {"Access-Control-Allow-Origin": "*"}
+    try:
+        body = json.loads(await request.body())
+        ext, pw, note = str(body["ext"]), str(body["password"]), dict(body["note"])
+    except (ValueError, KeyError, TypeError):
+        return JSONResponse({"detail": "bad request"}, 400, headers=hdr)
+    if not check_ext_password(ext, pw):
+        return JSONResponse({"detail": "رقم التحويلة أو الباسورد غلط"}, 401, headers=hdr)
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return JSONResponse({"detail": "مفتاح Claude API مش متضاف على السيرفر"}, 503, headers=hdr)
+    summary = str(note.get("summary") or "")[:4000].strip()
+    if not summary:
+        return JSONResponse({"detail": "الملخص فاضي"}, 400, headers=hdr)
+    meta = {k: note.get(k) for k in ("customer", "outcome", "direction", "duration")}
+    try:
+        import anthropic
+        msg = anthropic.Anthropic().messages.create(
+            model=os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5"), max_tokens=800,
+            messages=[{"role": "user", "content": INSIGHT_PROMPT.format(
+                meta=json.dumps(meta, ensure_ascii=False), summary=summary, today=dt.date.today().isoformat())}])
+        raw = msg.content[0].text
+        out = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse({"detail": f"فشل التحليل: {e}"}, 502, headers=hdr)
+    return JSONResponse(out, headers=hdr)
+
+
 @app.get("/api/notes")
 def notes(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(alias="to")):
     return load_notes(date_from, date_to)

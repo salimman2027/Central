@@ -28,6 +28,12 @@ class MainActivity : Activity() {
     @Deprecated("startActivityForResult is enough for a contact pick")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 4) { // كلام → نص
+            val text = if (resultCode == RESULT_OK)
+                data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: "" else ""
+            web.evaluateJavascript("window.onDictation && onDictation(" + org.json.JSONObject.quote(text) + ")", null)
+            return
+        }
         if (requestCode != 3 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         var name = ""; var number = ""
@@ -163,6 +169,22 @@ class MainActivity : Activity() {
             PhoneService.stopRing()
             val am = getSystemService(AUDIO_SERVICE) as AudioManager
             am.mode = if (active) AudioManager.MODE_IN_COMMUNICATION else AudioManager.MODE_NORMAL
+        }
+
+        /** يسجّل كلام بالمايك ويحوّله لنص عربي */
+        @JavascriptInterface fun dictate(lang: String) {
+            runOnUiThread {
+                val i = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, lang)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "قول ملخص المكالمة")
+                try {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(i, 4)
+                } catch (e: Exception) {
+                    web.evaluateJavascript("window.onDictation && onDictation(null)", null)
+                }
+            }
         }
 
         /** يفتح جهات الاتصال ويرجّع الاسم والرقم */

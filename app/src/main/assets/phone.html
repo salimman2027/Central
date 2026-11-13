@@ -135,6 +135,13 @@
   .logrow .info b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .logrow .info small { color:var(--muted); font-size:12px; }
   .logrow .info .n { direction:ltr; display:inline-block; }
+  .micbtn { background:#e7f3f2; color:var(--pri); border-radius:18px; padding:8px 12px; font-size:14px; margin-bottom:6px; }
+  .micbtn.rec { background:var(--bad); color:#fff; }
+  .aicard { background:#fff; border:1px solid var(--line); border-right:4px solid var(--pri); border-radius:12px; padding:12px 14px; margin-top:10px; font-size:14px; line-height:1.7; }
+  .aicard .hd { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+  .aicard .temp { font-size:12px; padding:3px 10px; border-radius:12px; background:#eef2f5; }
+  .aicard .temp.hot { background:#fde8e8; color:var(--bad); } .aicard .temp.warm { background:#fff4e2; color:#c47a12; } .aicard .temp.cold { background:#e8f0fb; color:#2f6fb5; }
+  .aicard ul { margin:4px 0; padding-inline-start:18px; }
   .toast { position:fixed; bottom:84px; left:50%; transform:translateX(-50%); background:#14202e; color:#fff; padding:10px 18px; border-radius:20px; font-size:14px; display:none; z-index:9; }
 </style>
 </head>
@@ -252,8 +259,13 @@
   <input id="noteCustomer" placeholder="مثلًا: مؤسسة الرواد — أ. خالد">
   <label class="lbl">نتيجة المكالمة</label>
   <div class="chips" id="noteOutcome"></div>
-  <label class="lbl">ملخص المكالمة</label>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between">
+    <label class="lbl">ملخص المكالمة</label>
+    <button class="micbtn" id="micBtn" onclick="NQNotes.dictate()">🎙 سجّل بصوتك</button>
+  </div>
   <textarea id="noteSummary" placeholder="اتكلمنا في إيه؟ العميل محتاج إيه؟ الخطوة الجاية إيه؟"></textarea>
+  <button class="btn light" id="aiBtn" style="margin-top:10px" onclick="NQNotes.insight()">🤖 تحليل العميل بالذكاء الاصطناعي</button>
+  <div class="aicard" id="aiCard" hidden></div>
   <label class="lbl">ميعاد المتابعة (اختياري)</label>
   <input id="noteFollow" type="date" class="ltr">
   <div class="row2">
@@ -575,7 +587,8 @@ const NQNotes = {
     const t = new Date(info.started);
     $("noteMeta").textContent = `${info.via === "sim" ? "📱 من شريحتي · " : ""}${info.direction === "out" ? "↗ صادرة" : "↙ واردة"} · ${info.number} · ${t.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })} · ${Math.floor(info.duration / 60)}:${String(info.duration % 60).padStart(2, "0")}`;
     const tg = NQTargets.findByNumber(info.number);
-    $("noteCustomer").value = tg ? tg.customer : (info.name || ""); $("noteSummary").value = ""; $("noteFollow").value = "";
+    $("noteCustomer").value = tg ? tg.customer : (info.name || "");
+    this.ai = null; $("aiCard").hidden = true; $("aiCard").innerHTML = ""; $("aiBtn").disabled = false; $("noteSummary").value = ""; $("noteFollow").value = "";
     const box = $("noteOutcome"); box.innerHTML = "";
     OUTCOMES.forEach(o => { const c = document.createElement("button"); c.className = "chip"; c.textContent = o; c.onclick = () => { this.outcome = o; box.querySelectorAll(".chip").forEach(x => x.classList.toggle("sel", x === c)); }; box.appendChild(c); });
     show("scrNote");
@@ -586,7 +599,8 @@ const NQNotes = {
       ext: NQPhone.ext, number: this.current.number, direction: this.current.direction,
       started: this.current.started, duration: this.current.duration,
       customer: $("noteCustomer").value.trim(), outcome: this.outcome,
-      summary: $("noteSummary").value.trim(), followUp: $("noteFollow").value || null,
+      summary: $("noteSummary").value.trim(), followUp: $("noteFollow").value || (this.ai && this.ai.followup_date) || null,
+      ai: this.ai || null,
       savedAt: new Date().toISOString()
     };
     if (!n.customer && !n.summary) { toast("اكتب اسم العميل أو ملخص المكالمة"); return; }
@@ -595,6 +609,51 @@ const NQNotes = {
     this.current = null; show("scrDial"); toast("اتحفظ ✓"); this.flush();
   },
   skip() { this.current = null; show("scrDial"); },
+  ai: null,
+  dictate() {
+    if (!window.Android || !Android.dictate) { toast("التسجيل بالصوت شغّال من التطبيق بس"); return; }
+    $("micBtn").classList.add("rec"); $("micBtn").textContent = "🎙 بيسمعك…";
+    Android.dictate(NQPrefs.get("voiceLang", "ar-EG"));
+  },
+  async insight() {
+    const summary = $("noteSummary").value.trim();
+    if (!summary) { toast("اكتب أو سجّل ملخص المكالمة الأول"); return; }
+    if (!NQPhone.ext || !NQPhone.pass) { toast("التحليل محتاج ربط التحويلة من ⚙ الإعدادات"); return; }
+    const card = $("aiCard"); card.hidden = false; card.textContent = "🤖 بيحلّل…"; $("aiBtn").disabled = true;
+    try {
+      const r = await fetch(CONFIG.api + "/insight", {
+        method: "POST", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ ext: NQPhone.ext, password: NQPhone.pass, note: {
+          customer: $("noteCustomer").value.trim(), outcome: this.outcome, summary,
+          direction: this.current && this.current.direction, duration: this.current && this.current.duration } })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      this.ai = j; this.renderAI(j);
+    } catch (e) {
+      card.textContent = "تعذّر التحليل: " + e.message;
+    } finally { $("aiBtn").disabled = false; }
+  },
+  renderAI(a) {
+    const card = $("aiCard"); card.innerHTML = "";
+    const hd = document.createElement("div"); hd.className = "hd";
+    const t = document.createElement("b"); t.textContent = "🤖 توقّع العميل";
+    const temp = document.createElement("span");
+    temp.className = "temp " + ({ "ساخن": "hot", "دافئ": "warm", "بارد": "cold" }[a.temperature] || "");
+    temp.textContent = `${a.temperature || ""}${a.buy_probability != null ? " · احتمال الشراء " + a.buy_probability + "٪" : ""}`;
+    hd.append(t, temp); card.append(hd);
+    const add = (label, text) => { if (!text) return; const d = document.createElement("div"); const b = document.createElement("b"); b.textContent = label + ": "; d.append(b, document.createTextNode(text)); card.append(d); };
+    add("التوقع", a.expectation);
+    add("الخطوة الجاية", a.next_action);
+    add("ميعاد متابعة مقترح", a.followup_date);
+    if (Array.isArray(a.risks) && a.risks.length) {
+      const b = document.createElement("b"); b.textContent = "مخاطر:"; const ul = document.createElement("ul");
+      a.risks.forEach(x => { const li = document.createElement("li"); li.textContent = x; ul.append(li); });
+      card.append(b, ul);
+    }
+    add("رسالة متابعة مقترحة", a.suggested_message);
+    if (a.followup_date && !$("noteFollow").value) $("noteFollow").value = a.followup_date;
+  },
   async flush() {
     let q = this.queue(); if (!q.length || !NQPhone.ext || !NQPhone.pass) return;
     const left = [];
@@ -654,6 +713,14 @@ const NQVia = {
 };
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && NQVia.pending) setTimeout(() => NQVia.back(), 600); });
 
+window.onDictation = function (text) {
+  $("micBtn").classList.remove("rec"); $("micBtn").textContent = "🎙 سجّل بصوتك";
+  if (text === null) { toast("خدمة تحويل الصوت لنص مش موجودة على الموبايل — نزّل تطبيق Google"); return; }
+  if (!text) return;
+  const ta = $("noteSummary"); ta.value = (ta.value ? ta.value.trim() + " " : "") + text;
+  if (NQPhone.ext && NQPhone.pass) NQNotes.insight(); // يحلّل لوحده بعد التسجيل
+};
+
 /* ---------- call history (on this phone) ---------- */
 const digits9 = n => String(n || "").replace(/\D/g, "").slice(-9);
 const isoDay = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
@@ -668,7 +735,7 @@ const NQHistory = {
   },
   attachNote(n) {
     const h = this.all(); const e = h.find(x => x.started === n.started && x.number === n.number);
-    if (e) { e.customer = n.customer; e.outcome = n.outcome; e.summary = n.summary; e.followUp = n.followUp; store.set("nq_history", h); }
+    if (e) { e.customer = n.customer; e.outcome = n.outcome; e.summary = n.summary; e.followUp = n.followUp; e.ai = n.ai || null; store.set("nq_history", h); }
     if (n.customer) NQTargets.markCalled(n.number, n.started, n.customer);
   }
 };
@@ -816,13 +883,15 @@ const NQStats = {
       [q("تقرير مكالمات — تحويلة " + (NQPhone.ext || "")), q(this.label() + ": " + isoDay(from) + " → " + isoDay(to))].join(","),
       [q("إجمالي المكالمات"), rows.length, q("اتردّ عليها"), ans.length, q("وقت الكلام"), q(fmtDur(talk))].join(","),
       "",
-      ["م", "اسم العميل", "التاريخ", "الوقت", "الرقم", "النوع", "مدة المكالمة", "نتيجة المكالمة", "ملخص حالة العميل", "ميعاد المتابعة"].map(q).join(",")
+      ["م", "اسم العميل", "التاريخ", "الوقت", "الرقم", "النوع", "مدة المكالمة", "نتيجة المكالمة", "ملخص حالة العميل", "ميعاد المتابعة", "حرارة العميل (AI)", "احتمال الشراء (AI)", "توقع الذكاء الاصطناعي", "الخطوة الجاية (AI)"].map(q).join(",")
     ];
     rows.forEach((r, i) => {
       const t = new Date(r.started); const tg = r.customer ? null : NQTargets.findByNumber(r.number);
       lines.push([i + 1, q(r.customer || (tg && tg.customer) || ""), q(isoDay(t)), q(t.toTimeString().slice(0, 5)), q(r.number),
         q((r.direction === "out" ? "صادرة" : "واردة") + (r.via === "sim" ? " (شريحتي)" : "")), q(r.answered ? fmtDur(r.duration) : "لم يتم الرد"),
-        q(r.outcome || ""), q(r.summary || ""), q(r.followUp || "")].join(","));
+        q(r.outcome || ""), q(r.summary || ""), q(r.followUp || ""),
+        q(r.ai && r.ai.temperature || ""), q(r.ai && r.ai.buy_probability != null ? r.ai.buy_probability + "%" : ""),
+        q(r.ai && r.ai.expectation || ""), q(r.ai && r.ai.next_action || "")].join(","));
     });
     const csv = "\ufeff" + lines.join("\r\n");
     const name = `NQ-calls-${NQPhone.ext || ""}-${this.period}-${isoDay(new Date())}.csv`;
