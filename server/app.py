@@ -44,6 +44,15 @@ TRUNK = "PJSIP/" + os.environ.get("NQ_TRUNK", "dinastar1")
 app = FastAPI(title="NQ Calls", docs_url=None, redoc_url=None)
 
 
+import files_api  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+app.include_router(files_api.router)
+# التطبيق (WebView) بيكلّم /app/* من origin تاني
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+                   allow_headers=["*"], expose_headers=["Content-Disposition"])
+
+
 @app.middleware("http")
 async def no_cache(request, call_next):
     resp = await call_next(request)
@@ -99,6 +108,10 @@ def config():
     reps = json.loads(f.read_text()) if f.exists() else {"teams": [], "reps": []}
     reps["aiEnabled"] = bool(os.environ.get("ANTHROPIC_API_KEY"))
     return reps
+
+
+files_api.CTX.update(dir=DATA_DIR / "files", auth=lambda e, p: check_ext_password(e, p),
+                     reps=lambda: config(), host=os.environ.get("NQ_HOST", "3.89.245.93.sslip.io"))
 
 
 # ---------------- CRM notes (from the phone app) ----------------

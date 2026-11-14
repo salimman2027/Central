@@ -29,7 +29,7 @@ apt-get install -y -qq python3-venv python3-pip apache2-utils >/dev/null
 
 echo "== app files"
 mkdir -p "$APP" "$CONF" "$DATA/analysis"
-cp -r "$SRC"/app.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
+cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
 sed -i "s/__VER__/$VER/" "$APP/static/index.html"
@@ -149,6 +149,11 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   # التطبيق بيبعت ملخص المكالمة هنا (بيتحقق برقم التحويلة وباسوردها)
   ProxyPass        /calls-app/notes http://127.0.0.1:8090/app/notes
   ProxyPassReverse /calls-app/notes http://127.0.0.1:8090/app/notes
+  # مشاركة الملفات بين الموظفين + اللينكات العامة
+  ProxyPass        /calls-app/files http://127.0.0.1:8090/app/files timeout=600
+  ProxyPassReverse /calls-app/files http://127.0.0.1:8090/app/files
+  ProxyPass        /calls-app/f/ http://127.0.0.1:8090/app/f/
+  ProxyPassReverse /calls-app/f/ http://127.0.0.1:8090/app/f/
   ProxyPass        /calls-app/upload http://127.0.0.1:8090/app/upload timeout=300
   ProxyPassReverse /calls-app/upload http://127.0.0.1:8090/app/upload
   ProxyPass        /calls-app/insight http://127.0.0.1:8090/app/insight

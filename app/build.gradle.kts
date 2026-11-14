@@ -23,3 +23,8 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 }
+
+dependencies {
+    // سكانر المستندات (زي CamScanner) من Google ML Kit
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
+}

@@ -28,6 +28,18 @@ class MainActivity : Activity() {
     @Deprecated("startActivityForResult is enough for a contact pick")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 9) {
+            val cb = fileCb; fileCb = null
+            if (cb == null) return
+            val uris = mutableListOf<Uri>()
+            if (resultCode == RESULT_OK && data != null) {
+                data.clipData?.let { c -> for (k in 0 until c.itemCount) uris += c.getItemAt(k).uri }
+                if (uris.isEmpty()) data.data?.let { uris += it }
+            }
+            cb.onReceiveValue(if (uris.isEmpty()) null else uris.toTypedArray())
+            return
+        }
+        if (requestCode == 10) { onScanResult(resultCode, data); return }
         if (requestCode == 4) { // كلام → نص
             val text = if (resultCode == RESULT_OK)
                 data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: "" else ""
@@ -100,7 +112,7 @@ class MainActivity : Activity() {
     private var dictating = false
     private var dictLang = "ar-EG"
 
-    private fun js(code: String) = web.evaluateJavascript(code, null)
+    private fun js(code: String) = runOnUiThread { web.evaluateJavascript(code, null) }
 
     private fun startDictation(lang: String) {
         dictLang = lang
@@ -219,6 +231,20 @@ class MainActivity : Activity() {
             override fun onPermissionRequest(request: PermissionRequest) {
                 runOnUiThread { grantMic(request) }
             }
+
+            // <input type="file"> جوه الصفحة (إرسال ملفات وصور)
+            override fun onShowFileChooser(view: WebView, cb: android.webkit.ValueCallback<Array<Uri>>,
+                                           params: FileChooserParams): Boolean {
+                fileCb?.onReceiveValue(null)
+                fileCb = cb
+                val types = params.acceptTypes.filter { it.isNotBlank() }
+                val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType(if (types.size == 1) types[0] else "*/*")
+                    .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.mode == FileChooserParams.MODE_OPEN_MULTIPLE)
+                if (types.size > 1) i.putExtra(Intent.EXTRA_MIME_TYPES, types.toTypedArray())
+                return try { startActivityForResult(Intent.createChooser(i, "اختار"), 9); true }
+                catch (e: Exception) { fileCb = null; false }
+            }
         }
         web.addJavascriptInterface(Bridge(), "Android")
         web.loadUrl("file:///android_asset/phone.html")
@@ -288,6 +314,57 @@ class MainActivity : Activity() {
 
     /** صفحة التليفون بتكلّم التطبيق من هنا */
     private var pdfView: WebView? = null
+    private var fileCb: android.webkit.ValueCallback<Array<Uri>>? = null
+    private var lastScan: Uri? = null
+    private var lastScanName = "scan.pdf"
+
+    // ---------- سكانر المستندات (زي CamScanner) ----------
+    private fun startScan() {
+        val opts = com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.Builder()
+            .setGalleryImportAllowed(true)
+            .setPageLimit(50)
+            .setResultFormats(com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.RESULT_FORMAT_PDF)
+            .setScannerMode(com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+            .build()
+        com.google.mlkit.vision.documentscanner.GmsDocumentScanning.getClient(opts)
+            .getStartScanIntent(this)
+            .addOnSuccessListener { sender ->
+                try { startIntentSenderForResult(sender, 10, null, 0, 0, 0) }
+                catch (e: Exception) { scanFail(e.message) }
+            }
+            .addOnFailureListener { e -> scanFail(e.message) }
+    }
+
+    private fun scanFail(msg: String?) =
+        js("window.onScanDone && onScanDone(" + org.json.JSONObject().put("ok", false)
+            .put("error", msg ?: "السكانر مش متاح — حدّث Google Play Services").toString() + ")")
+
+    private fun onScanResult(resultCode: Int, data: Intent?) {
+        if (resultCode != RESULT_OK) { js("window.onScanDone && onScanDone({ok:false,cancel:true})"); return }
+        val res = com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult.fromActivityResultIntent(data)
+        val pdf = res?.pdf ?: run { scanFail("مفيش صفحات"); return }
+        Thread {
+            try {
+                val bytes = contentResolver.openInputStream(pdf.uri)!!.use { it.readBytes() }
+                val name = "NQ-Scan-" + java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
+                    .format(java.util.Date()) + ".pdf"
+                val uri = writeDownload(name, "application/pdf", bytes)
+                lastScan = uri; lastScanName = name
+                js("window.onScanDone && onScanDone(" + org.json.JSONObject().put("ok", true).put("name", name)
+                    .put("pages", pdf.pageCount).put("size", bytes.size).toString() + ")")
+            } catch (e: Exception) { scanFail(e.message) }
+        }.start()
+    }
+
+    private fun shareUri(uri: Uri, mime: String) {
+        try {
+            val i = Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(i, "مشاركة").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(this, "مفيش برنامج للمشاركة", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     private fun writeDownload(name: String, mime: String, bytes: ByteArray): Uri {
         if (Build.VERSION.SDK_INT >= 29) {
@@ -429,6 +506,30 @@ class MainActivity : Activity() {
         @JavascriptInterface fun simUploadStatus(): String = SimRecSync.statusJson(this@MainActivity)
         @JavascriptInterface fun simSyncNow() {
             SimRecSync.runAsync(this@MainActivity) { simStatusToJs() }
+        }
+
+        @JavascriptInterface fun scanDocument() = runOnUiThread { startScan() }
+        @JavascriptInterface fun openLastScan() = runOnUiThread { lastScan?.let { openFile(it, "application/pdf") } }
+        @JavascriptInterface fun shareLastScan() = runOnUiThread { lastScan?.let { shareUri(it, "application/pdf") } }
+        @JavascriptInterface fun sendLastScan(host: String, ext: String, pass: String, to: String) {
+            val u = lastScan ?: return
+            Thread {
+                val r = FilesNet.upload(this@MainActivity, host, ext, pass, to, u, lastScanName, "application/pdf")
+                runOnUiThread { js("window.onScanSent && onScanSent(" + org.json.JSONObject.quote(r) + ")") }
+            }.start()
+        }
+        /** يحفظ ملف جاله في التنزيلات وبعدين يفتحه أو يشاركه */
+        @JavascriptInterface fun saveAndShare(name: String, mime: String, b64: String): Boolean = try {
+            val uri = writeDownload(name, mime, android.util.Base64.decode(b64, android.util.Base64.DEFAULT))
+            runOnUiThread { shareUri(uri, mime) }; true
+        } catch (e: Exception) { false }
+        @JavascriptInterface fun shareText(text: String) = runOnUiThread {
+            startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, text), "مشاركة"))
+        }
+        @JavascriptInterface fun clipboardText(): String {
+            val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            return cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this@MainActivity)?.toString() ?: ""
         }
 
         @JavascriptInterface fun appVersion(): String = try {
