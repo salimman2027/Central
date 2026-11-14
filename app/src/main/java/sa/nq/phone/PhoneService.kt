@@ -78,6 +78,7 @@ class PhoneService : Service() {
     private val syncTick = object : Runnable {
         override fun run() {
             SimRecSync.runAsync(this@PhoneService)
+            Thread { FilesNet.checkNew(this@PhoneService) }.start()
             syncHandler.postDelayed(this, 120_000)
         }
     }

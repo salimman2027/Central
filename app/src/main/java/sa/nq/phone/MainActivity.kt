@@ -40,6 +40,15 @@ class MainActivity : Activity() {
             return
         }
         if (requestCode == 10) { onScanResult(resultCode, data); return }
+        if (requestCode == 11) {
+            val uris = mutableListOf<Uri>()
+            if (resultCode == RESULT_OK && data != null) {
+                data.clipData?.let { c -> for (k in 0 until c.itemCount) uris += c.getItemAt(k).uri }
+                if (uris.isEmpty()) data.data?.let { uris += it }
+            }
+            if (uris.isNotEmpty()) local.sendFiles(localTarget, uris)
+            return
+        }
         if (requestCode == 4) { // كلام → نص
             val text = if (resultCode == RESULT_OK)
                 data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: "" else ""
@@ -263,6 +272,7 @@ class MainActivity : Activity() {
         when (i?.getStringExtra(EXTRA_ACTION)) {
             "answer" -> web.post { web.evaluateJavascript("NQPhone.answer()", null) }
             "reject" -> web.post { web.evaluateJavascript("NQPhone.hangup()", null) }
+            "files" -> web.postDelayed({ web.evaluateJavascript("NQFiles.open(); NQFiles.setPane('inbox')", null) }, 600)
         }
         i?.removeExtra(EXTRA_ACTION)
     }
@@ -315,6 +325,8 @@ class MainActivity : Activity() {
     /** صفحة التليفون بتكلّم التطبيق من هنا */
     private var pdfView: WebView? = null
     private var fileCb: android.webkit.ValueCallback<Array<Uri>>? = null
+    private val local by lazy { LocalNet(this) { fn, json -> js("window.$fn && $fn($json)") } }
+    private var localTarget = ""
     private var lastScan: Uri? = null
     private var lastScanName = "scan.pdf"
 
@@ -508,6 +520,24 @@ class MainActivity : Activity() {
             SimRecSync.runAsync(this@MainActivity) { simStatusToJs() }
         }
 
+        // ---------- نفس الواي فاي (متوافق مع LocalSend) ----------
+        @JavascriptInterface fun localStart(alias: String, receive: Boolean) {
+            local.alias = alias.ifBlank { "NQ Phone" }; local.receiving = receive; local.start(); local.pushDevices()
+        }
+        @JavascriptInterface fun localStop() = local.stop()
+        @JavascriptInterface fun localRefresh() { local.announce(); local.pushDevices() }
+        @JavascriptInterface fun localSetReceive(on: Boolean) { local.receiving = on }
+        @JavascriptInterface fun localPickAndSend(fp: String) = runOnUiThread {
+            localTarget = fp
+            val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            startActivityForResult(Intent.createChooser(i, "اختار الملفات"), 11)
+        }
+        @JavascriptInterface fun localSendLastScan(fp: String) { lastScan?.let { local.sendFiles(fp, listOf(it)) } }
+        @JavascriptInterface fun openUri(uri: String, mime: String) = runOnUiThread { openFile(Uri.parse(uri), mime) }
+        @JavascriptInterface fun shareUriStr(uri: String, mime: String) = runOnUiThread { shareUri(Uri.parse(uri), mime) }
+
+        @JavascriptInterface fun setCreds(host: String, ext: String, pass: String) = FilesNet.saveCreds(this@MainActivity, host, ext, pass)
         @JavascriptInterface fun scanDocument() = runOnUiThread { startScan() }
         @JavascriptInterface fun openLastScan() = runOnUiThread { lastScan?.let { openFile(it, "application/pdf") } }
         @JavascriptInterface fun shareLastScan() = runOnUiThread { lastScan?.let { shareUri(it, "application/pdf") } }

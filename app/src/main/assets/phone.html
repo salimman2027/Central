@@ -232,6 +232,28 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   html[data-theme=light] .seg, html[data-theme=light] .mini.x, html[data-theme=light] .logrow .ic { background:rgba(20,50,90,.06); }
   @media (min-width: 620px) { html[data-theme=light] body.web { background:radial-gradient(900px 500px at 80% -10%,rgba(10,165,140,.16),transparent 60%),#e6edf4; }
     html[data-theme=light] body.web .screen { background:rgba(255,255,255,.9) !important; box-shadow:0 30px 80px -30px rgba(20,50,90,.45); } }
+
+  /* ---------- الملفات ---------- */
+  .fto { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .fto button { border:1px solid var(--line); background:var(--card); color:var(--fg); border-radius:99px; padding:8px 14px; font:inherit; font-size:14px; }
+  .fto button.sel { background:var(--grad); color:#04101a; border-color:transparent; box-shadow:0 0 16px rgba(25,230,193,.45); }
+  .fto button small { opacity:.7; font-size:11px; margin-inline-start:4px; }
+  .fgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0; }
+  .fbtn { border:1px solid var(--line); background:var(--card); color:var(--fg); border-radius:16px; padding:14px 6px; font:inherit; font-size:13px; display:flex; flex-direction:column; align-items:center; gap:6px; backdrop-filter:blur(14px); }
+  .fbtn b { font-size:26px; }
+  .fbtn:active { border-color:var(--pri); box-shadow:0 0 18px rgba(25,230,193,.4); }
+  .fitem { display:flex; gap:12px; align-items:center; padding:12px; border:1px solid var(--line); border-radius:14px; background:var(--card); margin-bottom:8px; }
+  .fitem .ic { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; font-size:22px; background:rgba(25,230,193,.1); flex-shrink:0; }
+  .fitem .t { flex:1; min-width:0; } .fitem .t b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fitem .t small { color:var(--muted); font-size:12px; }
+  .fitem.new { border-color:rgba(25,230,193,.6); box-shadow:0 0 18px -6px rgba(25,230,193,.6); }
+  .fitem .acts2 { display:flex; gap:6px; }
+  .fitem .acts2 button { width:36px; height:36px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--fg); font-size:15px; }
+  .fmsg { white-space:pre-wrap; background:rgba(255,255,255,.04); border-radius:10px; padding:8px 10px; margin-top:6px; font-size:14px; }
+  .badge { background:var(--bad); color:#fff; border-radius:99px; font-size:11px; padding:1px 6px; }
+  .badge:empty, .tbadge:empty { display:none; }
+  .tabbar button { position:relative; }
+  .tbadge { position:absolute; top:6px; left:calc(50% - 18px); background:var(--bad); color:#fff; border-radius:99px; font-size:10px; font-style:normal; padding:0 5px; min-width:16px; }
 </style>
 </head>
 <body>
@@ -411,6 +433,56 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   <button class="btn" onclick="NQStats.download()">📥 تنزيل التقرير (Excel / PDF)</button>
 </section>
 
+
+<section id="scrFiles" class="screen page">
+  <div style="display:flex;align-items:center;gap:10px"><h2 style="flex:1;margin:0">📁 الملفات</h2>
+    <button class="iconbtn" onclick="NQFiles.refresh(true)" aria-label="تحديث">⟳</button></div>
+  <div class="seg" id="fSeg" style="margin-top:12px">
+    <button data-p="send" class="sel">⬆ إرسال</button><button data-p="inbox">⬇ استلام <span class="badge" id="fBadge"></span></button><button data-p="sent">📤 اللي بعته</button>
+  </div>
+
+  <div id="fpSend">
+    <div class="card">
+      <b>لمين؟</b>
+      <div class="fto" id="fTo"></div>
+      <div class="muted" style="font-size:12px;margin-top:6px" id="fToHint">اختار موظف، أو الكل، أو لينك، أو جهاز جنبك على نفس الواي فاي</div>
+    </div>
+    <div class="fgrid">
+      <button class="fbtn" onclick="NQFiles.pick('*/*')"><b>📄</b>ملف</button>
+      <button class="fbtn" onclick="NQFiles.pick('image/*,video/*')"><b>🖼</b>صور وفيديو</button>
+      <button class="fbtn app-only" onclick="NQFiles.scan()"><b>📷</b>سكان مستند</button>
+      <button class="fbtn" onclick="NQFiles.textBox()"><b>📝</b>نص</button>
+      <button class="fbtn" onclick="NQFiles.paste()"><b>📋</b>لصق</button>
+      <button class="fbtn" onclick="NQFiles.pick('*/*', true)"><b>🗂</b>كذا ملف</button>
+    </div>
+    <div class="card" id="fTextCard" style="display:none">
+      <textarea id="fText" rows="4" placeholder="اكتب الرسالة…"></textarea>
+      <button class="btn" style="margin-top:8px" onclick="NQFiles.sendText($('fText').value)">إرسال النص</button>
+    </div>
+    <div id="fProg" class="card" style="display:none"></div>
+    <div class="card app-only" id="fLocalCard">
+      <div class="switch" style="border:0;padding:0">
+        <div><b>📶 استقبال من الأجهزة القريبة</b><small>أي جهاز عليه LocalSend أو NQ Phone على نفس الواي فاي يقدر يبعتلك — الملفات بتتحفظ في التنزيلات/NQ</small></div>
+        <label class="tg"><input type="checkbox" id="fRecv" onchange="NQFiles.setRecv(this.checked)"><span></span></label>
+      </div>
+    </div>
+    <input type="file" id="fInput" style="display:none" onchange="NQFiles.upload([...this.files]); this.value=''">
+  </div>
+
+  <div id="fpInbox" style="display:none"><div id="fInbox"></div></div>
+  <div id="fpSent" style="display:none"><div id="fSent"></div></div>
+</section>
+
+<div class="sheet-bg" id="scanSheet" onclick="if(event.target===this)this.classList.remove('on')">
+  <div class="sheet">
+    <h3>📄 السكان جاهز</h3>
+    <div class="n" id="scanInfo" style="direction:rtl"></div>
+    <button class="opt" onclick="Android.openLastScan()"><b>👁</b><div>فتح الـ PDF<small>اتحفظ في التنزيلات</small></div></button>
+    <button class="opt" onclick="Android.shareLastScan()"><b>📲</b><div>مشاركة<small>واتساب، إيميل، أي برنامج</small></div></button>
+    <button class="opt" onclick="NQFiles.sendScan()"><b>📁</b><div>ابعته من الملفات<small id="scanTo">للي مختاره في "لمين؟"</small></div></button>
+  </div>
+</div>
+
 <div class="sheet-bg" id="viaSheet" onclick="if(event.target===this)NQVia.close()">
   <div class="sheet">
     <h3>تتصل منين؟</h3>
@@ -435,6 +507,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   <button data-s="scrLog" onclick="NQLog.open()"><b>🕘</b>السجل</button>
   <button data-s="scrTargets" onclick="NQTargets.open()"><b>🎯</b>التارجت</button>
   <button data-s="scrStats" onclick="NQStats.open()"><b>📊</b>إنجازي</button>
+  <button data-s="scrFiles" onclick="NQFiles.open()"><b>📁</b>الملفات<i class="tbadge" id="tBadge"></i></button>
 </nav>
 
 <div id="toast" class="toast"></div>
@@ -450,13 +523,14 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
    - وضع CRM: بعد المكالمة يسأل عن العميل والملخص ويبعته للسيرفر
    =================================================================== */
 const $ = id => document.getElementById(id);
-const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats"];
+const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrFiles"];
 function show(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
   const tabs = TAB_SCREENS.includes(id);
   $("tabbar").classList.toggle("on", tabs); document.body.classList.toggle("tabs", tabs);
   document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("sel", b.dataset.s === id));
 }
+function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function toast(t) { const e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = "none", 2500); }
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -559,6 +633,7 @@ const NQPhone = {
     if (typeof JsSIP === "undefined") return this._err("مكتبة الاتصال مش محمّلة");
     this._err("جاري الاتصال بالسنترال…");
     store.set("nq_login", { ext, password });
+    if (IS_APP && Android.setCreds) Android.setCreds(NQSettings.load().host, ext, password);
     if (NQPrefs.get("simUpload", false)) NQSim.cfg(true);
     this.ext = ext; this.pass = password;
     if (this.ua) { try { this.ua.stop(); } catch (e) {} }
@@ -1138,6 +1213,182 @@ const NQSim = {
 };
 window.onSimStatus = st => NQSim.render(st);
 
+
+/* ---------- الملفات: إرسال واستقبال (سيرفر + نفس الواي فاي) ---------- */
+const NQFiles = {
+  to: null, people: [], local: [], data: { inbox: [], sent: [] }, pane: "send", timer: null,
+  creds() { const l = store.get("nq_login", {}) || {}; return { ext: l.ext || "", pass: l.password || "" }; },
+  base() { return `https://${NQSettings.load().host}/calls-app/files`; },
+  hdr(extra = {}) { const c = this.creds(); return { "X-Ext": c.ext, "X-Pass": c.pass, ...extra }; },
+  async api(path, opt = {}) {
+    const r = await fetch(this.base() + path, { ...opt, headers: this.hdr(opt.headers || {}) });
+    if (!r.ok) { let d = ""; try { d = (await r.json()).detail; } catch (e) {} throw new Error(d || ("خطأ " + r.status)); }
+    return r;
+  },
+  open() {
+    show("scrFiles"); this.renderTo();
+    if (!this.creds().ext) { this.prog("⚠️ الإرسال للموظفين محتاج رقم التحويلة والباسورد من ⚙ الإعدادات — الواي فاي شغال من غيرهم", true); }
+    this.refresh(true); this.localStart();
+  },
+  setPane(p) {
+    this.pane = p;
+    document.querySelectorAll("#fSeg button").forEach(b => b.classList.toggle("sel", b.dataset.p === p));
+    $("fpSend").style.display = p === "send" ? "" : "none";
+    $("fpInbox").style.display = p === "inbox" ? "" : "none";
+    $("fpSent").style.display = p === "sent" ? "" : "none";
+    if (p === "inbox") this.renderList("inbox");
+    if (p === "sent") this.renderList("sent");
+  },
+  async refresh(withPeople) {
+    if (!this.creds().ext) return;
+    try {
+      if (withPeople || !this.people.length) this.people = (await (await this.api("/people")).json()).people || [];
+      this.data = await (await this.api("/list")).json();
+      const n = this.data.unseen || 0;
+      $("fBadge").textContent = n || ""; $("tBadge").textContent = n || "";
+      this.renderTo();
+      if (this.pane !== "send") this.renderList(this.pane);
+    } catch (e) { if (/التحويلة/.test(e.message)) this.prog("⚠️ " + e.message, true); }
+  },
+  renderTo() {
+    const btn = (id, label, sub = "") => `<button data-to="${id}" class="${this.to === id ? "sel" : ""}" onclick="NQFiles.pick_to('${id}')">${label}${sub ? `<small>${sub}</small>` : ""}</button>`;
+    let h = "";
+    if (this.creds().ext) {
+      h += this.people.map(p => btn(p.ext, "👤 " + esc(p.name || p.ext), p.name ? p.ext : "")).join("");
+      h += btn("all", "👥 الكل") + btn("link", "🔗 لينك");
+    }
+    h += (IS_APP ? this.local.map(d => btn("lan:" + d.fp, (d.type === "mobile" ? "📱 " : "💻 ") + esc(d.alias), "واي فاي")).join("") : "");
+    if (IS_APP) h += `<button onclick="NQFiles.localRefresh()">📶 دوّر على أجهزة قريبة</button>`;
+    $("fTo").innerHTML = h || '<span class="muted">حط رقم التحويلة من ⚙ عشان تبعت للموظفين</span>';
+  },
+  pick_to(id) { this.to = id; this.renderTo();
+    const d = id.startsWith("lan:") ? this.local.find(x => "lan:" + x.fp === id) : null;
+    $("fToHint").textContent = id === "link" ? "هيتعمل لينك تبعته لأي حد (واتساب مثلاً) — بيخلص بعد 7 أيام"
+      : id === "all" ? "كل الموظفين هيشوفوه في الاستلام" : d ? `مباشرة على الواي فاي لـ ${d.alias} (${d.ip})` : "هيوصله في الاستلام عنده";
+  },
+  need() { if (!this.to) { toast("اختار الأول هتبعت لمين"); $("fTo").scrollIntoView({ behavior: "smooth" }); return false; } return true; },
+  pick(accept, multi) {
+    if (!this.need()) return;
+    if (this.to.startsWith("lan:")) { Android.localPickAndSend(this.to.slice(4)); return; }
+    const i = $("fInput"); i.accept = accept; i.multiple = !!multi || accept.startsWith("image"); i.click();
+  },
+  prog(html, warn) { const p = $("fProg"); p.style.display = html ? "" : "none"; p.innerHTML = html; p.style.borderColor = warn ? "var(--bad)" : ""; },
+  async upload(files) {
+    if (!files.length || !this.need()) return;
+    let ok = 0, links = [];
+    for (const [k, f] of files.entries()) {
+      this.prog(`⏳ بيرفع ${esc(f.name)} (${k + 1}/${files.length}) — ${fmtSize(f.size)}<div class="prog" style="margin-top:8px"><b style="width:30%"></b></div>`);
+      try {
+        const r = await (await this.api("/send", { method: "POST", body: f,
+          headers: { "X-To": this.to, "X-Name": encodeURIComponent(f.name), "Content-Type": f.type || "application/octet-stream" } })).json();
+        ok++; if (r.link) links.push(r.link);
+      } catch (e) { this.prog("✖ " + esc(e.message), true); return; }
+    }
+    this.done(ok, links);
+  },
+  done(ok, links) {
+    this.prog(`✔ اتبعت ${ok} ${ok > 1 ? "ملفات" : "ملف"}` + links.map(l => `<div class="fmsg" style="direction:ltr">${esc(l)}</div>
+      <div style="display:flex;gap:8px;margin-top:6px"><button class="btn light" style="flex:1" onclick="NQFiles.copy('${esc(l)}')">📋 نسخ اللينك</button>
+      ${IS_APP ? `<button class="btn" style="flex:1" onclick="Android.shareText('${esc(l)}')">📲 مشاركة</button>` : ""}</div>`).join(""));
+    this.refresh();
+  },
+  copy(t) { try { navigator.clipboard.writeText(t); toast("اتنسخ ✓"); } catch (e) { prompt("انسخ:", t); } },
+  textBox() { if (!this.need()) return; $("fTextCard").style.display = ""; $("fText").focus(); },
+  async paste() {
+    let t = "";
+    try { t = IS_APP && Android.clipboardText ? Android.clipboardText() : await navigator.clipboard.readText(); } catch (e) {}
+    if (!t) { toast("الحافظة فاضية"); return; }
+    $("fTextCard").style.display = ""; $("fText").value = t; toast("اتلصق — راجعه ودوس إرسال");
+  },
+  async sendText(t) {
+    if (!t.trim() || !this.need()) return;
+    if (this.to.startsWith("lan:")) { toast("النص بيتبعت للموظفين أو كلينك — للواي فاي ابعت ملف"); return; }
+    try {
+      const r = await (await this.api("/send", { method: "POST", body: t, headers: { "X-To": this.to, "X-Kind": "text", "Content-Type": "text/plain; charset=utf-8" } })).json();
+      $("fText").value = ""; $("fTextCard").style.display = "none"; this.done(1, r.link ? [r.link] : []);
+    } catch (e) { this.prog("✖ " + esc(e.message), true); }
+  },
+  icon(f) { return f.kind === "text" ? "💬" : /pdf/.test(f.mime) ? "📕" : /^image/.test(f.mime) ? "🖼" : /^video/.test(f.mime) ? "🎞" : /^audio/.test(f.mime) ? "🎵" : /sheet|excel|csv/.test(f.mime) ? "📗" : /word|document/.test(f.mime) ? "📘" : "📄"; },
+  renderList(which) {
+    const L = this.data[which] || [], el = $(which === "inbox" ? "fInbox" : "fSent");
+    if (!this.creds().ext) { el.innerHTML = '<div class="muted" style="padding:20px;text-align:center">حط رقم التحويلة من ⚙ الإعدادات</div>'; return; }
+    el.innerHTML = L.length ? L.map(f => {
+      const who = which === "inbox" ? `من ${esc(f.fromName || f.from)}${f.to === "all" ? " · للكل" : ""}` : `لـ ${esc(f.toName || f.to)}`;
+      const when = new Date(f.created).toLocaleString("ar-EG", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+      const acts = f.kind === "text"
+        ? `<button onclick="NQFiles.copy(${esc(JSON.stringify(f.text))})">📋</button>`
+        : `<button title="فتح" onclick="NQFiles.get('${f.id}','open')">👁</button><button title="مشاركة" onclick="NQFiles.get('${f.id}','share')">📲</button>`;
+      return `<div class="fitem ${which === "inbox" && !f.seen ? "new" : ""}"><div class="ic">${this.icon(f)}</div>
+        <div class="t"><b>${esc(f.name)}</b><small>${who} · ${when}${f.kind !== "text" ? " · " + fmtSize(f.size) : ""}</small>
+        ${f.kind === "text" ? `<div class="fmsg">${esc(f.text)}</div>` : ""}${f.link ? `<div class="fmsg" style="direction:ltr;font-size:12px" onclick="NQFiles.copy('${f.link}')">🔗 ${f.link}</div>` : ""}</div>
+        <div class="acts2">${acts}${which === "sent" ? `<button title="مسح" onclick="NQFiles.del('${f.id}')">🗑</button>` : ""}</div></div>`;
+    }).join("") : `<div class="muted" style="padding:30px;text-align:center">${which === "inbox" ? "مفيش ملفات جاتلك" : "لسه مبعتش حاجة"}</div>`;
+  },
+  async get(id, mode) {
+    const f = [...this.data.inbox, ...this.data.sent].find(x => x.id === id); if (!f) return;
+    toast("بيحمّل…");
+    try {
+      const blob = await (await this.api(`/get/${id}`)).blob();
+      if (IS_APP) {
+        if (blob.size > 60 * 1024 * 1024) { toast("الملف كبير — افتحه من اللابتوب"); return; }
+        const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1]); fr.readAsDataURL(blob); });
+        mode === "share" ? Android.saveAndShare(f.name, f.mime, b64) : Android.saveAndOpen(f.name, f.mime, b64);
+      } else {
+        const u = URL.createObjectURL(blob), a = document.createElement("a");
+        a.href = u; a.download = f.name; if (mode === "open") a.target = "_blank"; a.click(); setTimeout(() => URL.revokeObjectURL(u), 60000);
+      }
+      f.seen = true; this.refresh();
+    } catch (e) { toast("✖ " + e.message); }
+  },
+  async del(id) { if (!confirm("تمسح الملف ده؟")) return; try { await this.api(`/${id}`, { method: "DELETE" }); this.refresh(); } catch (e) { toast(e.message); } },
+  // سكان
+  scan() { if (!IS_APP || !Android.scanDocument) { toast("السكان من تطبيق الموبايل بس"); return; } Android.scanDocument(); },
+  sendScan() {
+    $("scanSheet").classList.remove("on");
+    if (!this.to) { show("scrFiles"); this.setPane("send"); toast("اختار هتبعته لمين، وبعدين افتح السكان تاني"); return; }
+    if (this.to.startsWith("lan:")) { Android.localSendLastScan(this.to.slice(4)); return; }
+    const c = this.creds(); this.prog("⏳ بيرفع السكان…");
+    Android.sendLastScan(NQSettings.load().host, c.ext, c.pass, this.to);
+  },
+  // الواي فاي
+  localStart() {
+    if (!IS_APP || !Android.localStart) return;
+    const l = store.get("nq_login", {}) || {};
+    $("fRecv").checked = !!NQPrefs.get("lanRecv", true);
+    Android.localStart("NQ " + (l.ext ? "تحويلة " + l.ext : (navigator.userAgent.match(/;\s*([^;)]+)\s+Build/) || [, "Phone"])[1]), $("fRecv").checked);
+  },
+  localRefresh() { if (IS_APP) { Android.localRefresh(); toast("بيدوّر على أجهزة قريبة…"); } },
+  setRecv(on) { NQPrefs.set("lanRecv", on); if (IS_APP) Android.localSetReceive(on); toast(on ? "الأجهزة القريبة تقدر تبعتلك" : "الاستقبال من الواي فاي مقفول"); }
+};
+function fmtSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB"; }
+document.querySelectorAll("#fSeg button").forEach(b => b.onclick = () => NQFiles.setPane(b.dataset.p));
+window.onLocalDevices = list => { NQFiles.local = list || []; if ($("scrFiles").classList.contains("on")) NQFiles.renderTo(); };
+window.onLocalProgress = p => NQFiles.prog("⏳ " + esc(p.text));
+window.onLocalSent = r => r.ok ? NQFiles.prog(`✔ اتبعت ${r.count} ${r.to ? "لـ " + esc(r.to) : ""} على الواي فاي`) : NQFiles.prog("✖ " + esc(r.error), true);
+window.onLocalIncoming = r => toast(`📥 ${r.from} بيبعتلك ${r.files.length} ملف…`);
+window.onLocalReceived = r => {
+  toast(`✔ وصل ${r.name} من ${r.from}`);
+  const h = `<div class="fitem new"><div class="ic">📶</div><div class="t"><b>${esc(r.name)}</b><small>من ${esc(r.from)} على الواي فاي · التنزيلات/NQ</small></div>
+    <div class="acts2"><button onclick="Android.openUri('${r.uri}','${r.mime}')">👁</button><button onclick="Android.shareUriStr('${r.uri}','${r.mime}')">📲</button></div></div>`;
+  $("fInbox").insertAdjacentHTML("afterbegin", h);
+};
+window.onScanDone = r => {
+  if (r.cancel) return;
+  if (!r.ok) { toast("✖ " + (r.error || "السكان مكملش")); return; }
+  $("scanInfo").textContent = `${r.name} — ${r.pages} صفحة · ${fmtSize(r.size)}`;
+  const d = NQFiles.to && NQFiles.to.startsWith("lan:") ? NQFiles.local.find(x => "lan:" + x.fp === NQFiles.to) : null;
+  const p = NQFiles.people.find(x => x.ext === NQFiles.to);
+  $("scanTo").textContent = !NQFiles.to ? "اختار الأول في \"لمين؟\"" : NQFiles.to === "link" ? "لينك تبعته لأي حد" : NQFiles.to === "all" ? "لكل الموظفين" : d ? d.alias + " (واي فاي)" : (p ? p.name || p.ext : NQFiles.to);
+  $("scanSheet").classList.add("on");
+};
+window.onScanSent = raw => {
+  let r = {}; try { r = JSON.parse(raw); } catch (e) {}
+  if (r.code === 200) { let b = {}; try { b = JSON.parse(r.body); } catch (e) {} NQFiles.done(1, b.link ? [b.link] : []); }
+  else NQFiles.prog("✖ تعذّر رفع السكان: " + esc((() => { try { return JSON.parse(r.body).detail; } catch (e) { return r.body || r.code; } })()), true);
+};
+setInterval(() => { if (document.visibilityState === "visible") NQFiles.refresh(); }, 60000);
+setTimeout(() => NQFiles.refresh(true), 3000);
+
 /* ---------- start ---------- */
 buildPad($("keypad"), dialKey);
 buildPad($("callPad"), d => NQPhone.dtmf(d));
@@ -1147,6 +1398,7 @@ NQSettings.apply(NQSettings.load());
   show("scrDial"); NQVia.chip();
   if (s && s.ext && s.password) { $("ext").value = s.ext; $("pwd").value = s.password; NQPhone.ext = s.ext; NQPhone._reg(false); NQPhone.login(s.ext, s.password); }
   else NQPhone._reg(false);
+  if (IS_APP && Android.setCreds && s && s.ext) Android.setCreds(NQSettings.load().host, s.ext, s.password);
   if ($("simUp")) { $("simUp").checked = !!NQPrefs.get("simUpload", false); if ($("simUp").checked) NQSim.cfg(true); NQSim.refresh(); }
 })();
 window.NQPhone = NQPhone;
