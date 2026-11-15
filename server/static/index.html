@@ -334,6 +334,14 @@ html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html
 .crm-sales label{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:6px 10px}
 .crm-sales input{width:90px}
 .crm-err{font-size:12px;color:var(--grey);max-width:300px;margin:4px auto;text-align:right;direction:rtl;white-space:normal;word-break:break-word}
+.crm-f select,.crm-sales select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit;max-width:100%}
+html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{background:#fff}
+.crm-sales select{width:160px}.crm-sales select.auto{border-color:var(--green)}
+.ap-cli{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:5px}.ap-cn{flex-basis:100%;font-size:12px}
+.ap-av{margin-top:5px}.ap-av .alts{justify-content:flex-start;margin:0}.alts .btn.on{background:var(--green);color:#04101a}
+.cus-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.cus-i{display:flex;flex-wrap:wrap;gap:8px;align-items:center;text-align:right;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:12px;padding:9px 12px;cursor:pointer;font:inherit}
+.cus-i:hover{border-color:var(--accent,#19e6c1)}
 .alts{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:300px;margin:0 auto}.alts .btn{padding:5px 10px;font-size:13px}
 /* التقرير ورق أبيض للطباعة */
 .report{color:#1C2B2A;border-radius:14px;--teal:#0F7C7A;--teal-d:#0A5654;--teal-l:#E7F3F2;--border:#D5E2E1;--text:#1C2B2A}
@@ -483,16 +491,23 @@ html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html
       <div class="crm-f"><label>هيدر التوكن</label><input id="crmHdr" dir="ltr" placeholder="Authorization"></div>
       <div class="crm-f"><label>قبل التوكن</label><input id="crmPfx" dir="ltr" placeholder="Bearer "></div>
       <div class="crm-f"><label>مدة الاجتماع (دقيقة)</label><input id="crmDur" type="number" min="5" step="5"></div>
-      <div class="crm-f"><label>termsManagementId</label><input id="crmTerms" type="number" min="0"></div>
+      <div class="crm-f"><label>الشروط (termsManagement)</label><select id="crmTermsSel" style="display:none" onchange="$('crmTerms').value=this.value"></select><input id="crmTerms" type="number" min="0"></div>
       <div class="crm-f"><label>عميل افتراضي (Client ID)</label><input id="crmClient" type="number" min="0" placeholder="لو العميل مش في الـ CRM"></div>
     </div>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="crmMail" style="width:auto"> الـ CRM يبعت إيميل للعميل (sendEmail)</label>
     <div id="crmTok" class="muted" style="margin:8px 0"></div>
     <b>رقم كل موظف في الـ CRM (salesId)</b>
-    <div class="muted" style="font-size:13px">عشان الاجتماع يتسجّل باسم المندوب الصح — اكتب الـ ID بتاعه في الـ CRM جنب تحويلته.</div>
+    <div class="muted" style="font-size:13px">عشان الاجتماع يتسجّل باسم المندوب الصح — اختار اسمه في الـ CRM جنب تحويلته (بنحاول نطابق بالاسم لوحدنا 🤖).</div>
     <div id="crmSales" class="crm-sales"></div>
     <div class="rub-foot"><span class="sp" style="flex:1"></span><button class="btn" onclick="saveCrm()">💾 حفظ</button></div>
     <div id="crmMsg" class="muted"></div>
+  </div>
+</div>
+<div class="modal" id="cusModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="mbox" style="max-width:520px;width:94vw;max-height:85vh;overflow:auto">
+    <h3 style="margin-top:0">🔎 اختار العميل من الـ CRM</h3>
+    <input id="cusQ" class="ap-in" style="width:100%" placeholder="اسم العميل أو رقم تليفونه" oninput="cusSearch()">
+    <div id="cusList" class="cus-list"></div>
   </div>
 </div>
 <div class="page" id="p-appt">
@@ -1122,18 +1137,65 @@ function renderAppt(){
       ?`<div class="ap-when"><input type="date" id="apd-${id}" value="${esc(it.date||'')}"><input type="time" id="apt-${id}" value="${esc(it.time||'')}">
          <select id="apu-${id}" title="المدة">${[30,45,60,90,120].map(m=>`<option value="${m}" ${m===(+it.duration||AP_DUR)?'selected':''}>${m} د</option>`).join('')}</select></div>
          <input class="ap-in" style="margin-top:5px;width:100%" id="apl-${id}" value="${esc(it.location||it.details||'')}" placeholder="المكان أو لينك الاجتماع">
-         <div class="muted" style="font-size:12px;margin-top:3px">${apWhen(it)}</div>`
+         <div class="muted" style="font-size:12px;margin-top:3px">${apWhen(it)}</div>
+         ${AP.crm?`<button class="btn o sm" style="margin-top:5px" onclick="apAvail('${id}')">🕑 المواعيد المتاحة في الـ CRM</button><div class="ap-av" id="apv-${id}"></div>`:''}`
       :`<b>${apWhen(it)}</b>${it.duration?` <span class="muted">(${esc(it.duration)} دقيقة)</span>`:''}`;
     const act=AP_S==='pending'
       ?`<div style="display:flex;gap:6px;justify-content:center"><button class="btn" onclick="apConfirm('${id}')">✔ تأكيد</button><button class="btn o" onclick="apReject('${id}')">✖</button></div>`
       :AP_S==='confirmed'?apCrm(it):`<button class="btn o" onclick="apReopen('${id}')">↩ رجّعه</button>`;
     return `<tr><td><b>${esc(it.repName||it.ext)}</b><br><span class="muted">تحويلة ${esc(it.ext)}</span></td>
-      <td>${AP_S==='pending'?`<input class="ap-in" id="apc-${id}" value="${esc(it.customer||'')}" placeholder="اسم العميل"><input class="ap-in" style="margin-top:5px;width:120px" id="api-${id}" type="number" min="1" value="${esc(it.clientId||'')}" placeholder="Client ID">`
-        :esc(it.customer||'—')+(AP_S==='confirmed'?`<br><input class="ap-in" style="margin-top:5px;width:110px" id="api-${id}" type="number" min="1" value="${esc(it.clientId||'')}" placeholder="Client ID" title="رقم العميل في الـ CRM">`:'')}</td>
+      <td>${AP_S==='pending'?`<input class="ap-in" id="apc-${id}" value="${esc(it.customer||'')}" placeholder="اسم العميل">${apClient(it)}`
+        :esc(it.customer||'—')+(AP_S==='confirmed'&&!(it.crm||{}).ok?apClient(it):(it.clientName?`<div class="muted" style="font-size:12px">CRM: ${esc(it.clientName)} #${esc(it.clientId)}</div>`:''))}</td>
       <td style="direction:ltr;text-align:right">${esc(it.number||'—')}</td>
       <td>${when}</td><td><span class="badge b-out">${esc(it.kind||'—')}</span></td>
       <td style="max-width:320px;white-space:normal"><span class="ap-q">"${esc(it.quote||'')}"</span>${it.details?`<div class="muted" style="font-size:12px">${esc(it.details)}</div>`:''}</td>
       <td class="c">${act}</td></tr>`;}).join('');
+}
+function apClient(it){
+  const id=esc(it.id), has=String(it.clientId||'').trim();
+  return `<div class="ap-cli" id="apk-${id}" data-name="${esc(it.clientName||'')}" data-pot="${it.isPotential?1:''}">
+    <input class="ap-in" style="width:96px" id="api-${id}" type="number" min="1" value="${esc(has)}" placeholder="Client ID" title="رقم العميل في الـ CRM" oninput="this.parentNode.dataset.name='';this.parentNode.dataset.pot=''">
+    ${AP.crm?`<button class="btn o sm" onclick="cusOpen('${id}')" title="دوّر على العميل في الـ CRM">🔎</button>`:''}
+    <div class="ap-cn">${has&&it.clientName?`${it.clientAuto?'🤖 ':''}<b>${esc(it.clientName)}</b>${it.isPotential?' <span class="badge b-in">محتمل</span>':''}`
+      :has?'':AP.crm?'<span style="color:var(--orange)">العميل مش لاقيه بالرقم — دوس 🔎</span>':''}</div></div>`;
+}
+function apCli(id){const k=$('apk-'+id);return k?{clientName:k.dataset.name||'',isPotential:!!k.dataset.pot}:{}}
+let CUS_ID=null,CUS_T=null;
+function cusOpen(id){
+  CUS_ID=id; const it=AP.items.find(x=>x.id===id)||{};
+  $('cusQ').value=it.number||it.customer||''; $('cusList').innerHTML=''; $('cusModal').classList.add('show'); $('cusQ').focus(); cusSearch();
+}
+function cusSearch(){clearTimeout(CUS_T);CUS_T=setTimeout(async()=>{
+  const q=$('cusQ').value.trim(); if(q.length<2){$('cusList').innerHTML='';return}
+  $('cusList').innerHTML='<div class="muted">بيدوّر في الـ CRM…</div>';
+  try{const r=await fetch(API_BASE+'/crm/customers?q='+encodeURIComponent(q),{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    window.CUS_R=j.items;
+    $('cusList').innerHTML=j.items.length?j.items.map((c,i)=>`<button class="cus-i" onclick="cusPick(${i})"><b>${esc(c.name||'—')}</b>${c.potential?' <span class="badge b-in">عميل محتمل</span>':''}
+      <span class="muted" dir="ltr">${esc(c.phone||'')}</span><small class="muted">#${esc(c.id)}${c.code?' · '+esc(c.code):''}</small></button>`).join('')
+      :'<div class="muted">مفيش نتايج — جرّب جزء من الاسم أو آخر أرقام التليفون</div>';
+  }catch(e){$('cusList').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
+},350)}
+async function cusPick(i){
+  const c=CUS_R[i];
+  try{await apPost(`/appointments/${CUS_ID}/client`,{clientId:c.id,clientName:c.name,isPotential:c.potential});
+    $('cusModal').classList.remove('show'); loadAppt();}catch(e){alert(e.message)}
+}
+async function apAvail(id){
+  const box=$('apv-'+id); box.innerHTML='<span class="muted">بيسأل الـ CRM…</span>';
+  const q=new URLSearchParams({date:$('apd-'+id).value,time:$('apt-'+id).value});
+  try{const r=await fetch(`${API_BASE}/crm/availability/${id}?${q}`,{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    const wh=(j.workingHours||[]).filter(w=>w.from).map(w=>`${w.from} → ${w.to}`).join('، ');
+    box.innerHTML=(j.isAvailable?`<div style="color:var(--green)">✔ ${esc(j.timeFrom)} فاضي للمندوب (${j.duration} د)</div>`:j.isAvailable===false?`<div style="color:var(--orange)">⚠️ ${esc(j.timeFrom)} مش فاضي</div>`:'')
+      +(j.slots.length?`<div class="muted" style="font-size:12px;margin:3px 0">فترات فاضية يوم ${esc(j.date)}:</div><div class="alts">${j.slots.map(a=>`<button class="btn o sm" dir="ltr" onclick="apUseSlot('${id}','${esc(a.timeFrom)}','${esc(a.timeTo||'')}')">${esc(a.timeFrom)}${a.timeTo?' → '+esc(a.timeTo):''}</button>`).join('')}</div>`:'<div class="muted" style="font-size:12px">مفيش فترات فاضية راجعة</div>')
+      +((j.busy||[]).length?`<div class="muted" style="font-size:12px;margin-top:3px">مشغول: <span dir="ltr">${j.busy.map(b=>`${esc(b.from)}–${esc(b.to)}`).join(' , ')}</span></div>`:'')
+      +(wh?`<div class="muted" style="font-size:12px">ساعات العمل: <span dir="ltr">${esc(wh)}</span></div>`:'');
+  }catch(e){box.innerHTML=`<div class="crm-err">✖ ${esc(e.message)}</div>`}
+}
+function apUseSlot(id,from,to){
+  $('apt-'+id).value=from;
+  if(to){const m=s=>{const[h,mm]=s.split(':').map(Number);return h*60+mm},len=m(to)-m(from),sel=$('apu-'+id);
+    if(len>0&&len<+sel.value){if(![...sel.options].some(o=>+o.value===len))sel.add(new Option(len+' د',len));sel.value=len;}}
+  $('apv-'+id).querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.textContent.startsWith(from)));
 }
 function apCrmMsg(m){
   // ASP.NET بيرجّع الأخطاء كده: {"errors":{"Field":["..."]}} أو {"message":"..."}
@@ -1158,7 +1220,7 @@ async function apPreview(id){
 }
 async function apPost(path,body){const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);return j;}
 async function apConfirm(id){
-  const body={date:$('apd-'+id).value,time:$('apt-'+id).value,customer:$('apc-'+id).value,duration:$('apu-'+id).value,location:$('apl-'+id).value,clientId:$('api-'+id).value};
+  const body={date:$('apd-'+id).value,time:$('apt-'+id).value,customer:$('apc-'+id).value,duration:$('apu-'+id).value,location:$('apl-'+id).value,clientId:$('api-'+id).value,...apCli(id)};
   if(!body.date){alert('حدد تاريخ الموعد الأول');return}
   try{const it=await apPost(`/appointments/${id}/confirm`,body);
     $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ الموعد اتأكد واتسجّل في الـ CRM':'✔ الموعد اتأكد'+(it.crm&&it.crm.pending?' — هيتبعت للـ CRM أول ما الربط يتظبط':(it.crm?` — بس الـ CRM رفض: ${esc(it.crm.msg||'')}`:''));
@@ -1168,7 +1230,7 @@ async function apReject(id){if(!confirm('ترفض الطلب ده؟'))return;try
 async function apReopen(id){try{await apPost(`/appointments/${id}/reopen`);loadAppt();}catch(e){alert(e.message)}}
 async function apRetry(id,time,timeTo){
   const b=$('apr-'+id); if(b){b.disabled=true;b.textContent='⏳ بيبعت…';}
-  try{const ci=$('api-'+id); const body=ci?{clientId:ci.value}:{}; if(time){body.time=time; if(timeTo)body.timeTo=timeTo;}
+  try{const ci=$('api-'+id); const body=ci?{clientId:ci.value,...apCli(id)}:{}; if(time){body.time=time; if(timeTo)body.timeTo=timeTo;}
     const it=await apPost(`/appointments/${id}/crm`,body);
     $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ اتسجّل في الـ CRM':it.crm&&it.crm.code===409?'⚠️ الميعاد محجوز — اختار فترة من البدائل جنب الطلب':`✖ الـ CRM رفض (${it.crm&&it.crm.code||''}): ${apCrmMsg(it.crm&&it.crm.msg)}`;
     loadAppt();}catch(e){alert(e.message); if(b){b.disabled=false;b.textContent='⟳ ابعت تاني';}}
@@ -1183,7 +1245,7 @@ async function apScan(){
     setTimeout(tick,1500);
   }catch(e){$('apNote').textContent='✖ '+e.message}
 }
-setInterval(()=>{if(!document.querySelector('#p-appt.active input:focus'))loadAppt()},90000);
+setInterval(()=>{if(!document.querySelector('#p-appt.active input:focus,#p-appt.active select:focus,.modal.show')&&![...document.querySelectorAll('.ap-av')].some(x=>x.textContent.trim()))loadAppt()},90000);
 setTimeout(loadAppt,1500);
 
 /* ===================== المشاكل وأسباب عدم الشراء والدروس ===================== */
@@ -1245,11 +1307,31 @@ async function openCrm(){
   $('crmUrl').value=c.url||''; $('crmHdr').value=c.authHeader||'Authorization'; $('crmPfx').value=c.authPrefix??'Bearer ';
   $('crmDur').value=c.duration||60; $('crmTerms').value=c.termsManagementId||0; $('crmClient').value=c.defaultClientId||''; $('crmMail').checked=!!c.sendEmail;
   $('crmTok').innerHTML=c.hasToken?'🔑 التوكن متسجّل على السيرفر ✔':'🔑 التوكن لسه مش متسجّل — على السيرفر اكتب: <code dir="ltr">sudo nq-setkey crm</code> (لو الـ API محتاجه)';
+  $('crmTok').innerHTML+=c.hasLogin?'<br>👤 اليوزر متسجّل — التوكن بيتجدد لوحده ✔':'<br>👤 عشان التوكن يتجدد لوحده من غير ما يخلص: <code dir="ltr">sudo nq-setkey crm-login</code>';
   $('crmSales').innerHTML=REPS.map(r=>`<label><span>${esc(r.name)} <small class="muted">${r.id}</small></span><input type="number" min="0" data-ext="${r.id}" value="${esc(c.salesIds[String(r.id)]||'')}" placeholder="ID"></label>`).join('');
   $('crmMsg').textContent=''; $('crmModal').classList.add('show');
+  crmLists(c);
+}
+const nrm=s=>String(s||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[^\p{L}\p{N} ]/gu,'').replace(/\s+/g,' ').trim().toLowerCase();
+async function crmLists(c){
+  const get=async p=>{const r=await fetch(API_BASE+p,{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);return j.items};
+  try{const T=await get('/crm/terms'); if(T.length){const s=$('crmTermsSel');s.innerHTML='<option value="0">— من غير —</option>'+T.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (#${esc(t.id)})</option>`).join('');
+      s.value=String(c.termsManagementId||0); s.style.display=''; $('crmTerms').style.display='none';}}catch(e){}
+  try{const E=await get('/crm/employees'); if(!E.length)return;
+    const opts='<option value="">— اختار —</option>'+E.map(e=>`<option value="${esc(e.id)}">${esc(e.name)} (#${esc(e.id)})</option>`).join('');
+    let auto=0;
+    document.querySelectorAll('#crmSales input').forEach(i=>{
+      const rep=(REPS.find(r=>String(r.id)===i.dataset.ext)||{}).name||'';
+      const sel=document.createElement('select'); sel.dataset.ext=i.dataset.ext; sel.innerHTML=opts; sel.value=i.value;
+      if(!i.value&&nrm(rep)){const n=nrm(rep),f=n.split(' ')[0];
+        const m=E.find(e=>nrm(e.name)===n)||E.find(e=>nrm(e.name).includes(n)||n.includes(nrm(e.name)))||(f.length>2?E.filter(e=>nrm(e.name).split(' ')[0]===f):[]).find((e,_,a)=>a.length===1);
+        if(m){sel.value=String(m.id);sel.classList.add('auto');auto++}}
+      i.replaceWith(sel);});
+    if(auto)$('crmMsg').innerHTML=`🤖 طابقت ${auto} موظف بالاسم — راجعهم ودوس حفظ`;
+  }catch(e){$('crmMsg').innerHTML=`<span class="muted">مقدرتش أجيب الموظفين من الـ CRM (${esc(e.message)}) — اكتب الأرقام بإيدك</span>`}
 }
 async function saveCrm(){
-  const salesIds={}; document.querySelectorAll('#crmSales input').forEach(i=>{if(i.value)salesIds[i.dataset.ext]=i.value});
+  const salesIds={}; document.querySelectorAll('#crmSales input,#crmSales select').forEach(i=>{if(i.value)salesIds[i.dataset.ext]=i.value});
   const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
     termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds};
   try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();

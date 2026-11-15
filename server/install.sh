@@ -198,8 +198,21 @@ cat > /usr/local/bin/nq-setkey <<'KEY'
 # sudo nq-setkey          -> مفتاح Claude (Anthropic) للتحليل
 # sudo nq-setkey openai   -> مفتاح OpenAI لتحويل الصوت لنص
 # sudo nq-setkey crm      -> توكن الـ CRM لتسجيل المواعيد
+# sudo nq-setkey crm-login -> يوزر وباسورد الـ CRM (التوكن يتجدد لوحده)
 set -e
 F=/etc/nq-calls/env
+setv() { local n=$1 v=$2; grep -v "^$n=" "$F" > "$F.tmp" || true; printf '%s=%s\n' "$n" "$v" >> "$F.tmp"; cat "$F.tmp" > "$F"; rm -f "$F.tmp"; }
+if [[ "${1:-}" == crm-login ]]; then
+  read -rp "يوزر الـ CRM: " U; read -rsp "باسورد الـ CRM: " P; echo; read -rp "companyDB (لو مش عارفه سيبه فاضي): " D
+  [[ -n "$U" && -n "$P" ]] || { echo "✖ لازم يوزر وباسورد"; exit 1; }
+  setv NQ_CRM_USER "$U"; setv NQ_CRM_PASS "$P"; setv NQ_CRM_DB "$D"
+  BASE=$(python3 -c "import json;from urllib.parse import urlsplit as u;x=u(json.load(open('/var/lib/nq-calls/crm.json')).get('url') or 'https://national-quality-api-site-nq.premiumasp.net/');print(x.scheme+'://'+x.netloc)" 2>/dev/null || echo https://national-quality-api-site-nq.premiumasp.net)
+  BODY=$(U="$U" P="$P" D="$D" python3 -c "import json,os;print(json.dumps({'username':os.environ['U'],'password':os.environ['P'],'companyDB':os.environ['D']}))")
+  R=$(curl -s -X POST "$BASE/api/v1/authentication/sign-in" -H 'Content-Type: application/json; ver=1.0' -d "$BODY")
+  systemctl restart nq-calls
+  if printf '%s' "$R" | grep -q '"accessToken" *: *"[^"]'; then echo "✔ الدخول على الـ CRM شغال — التوكن هيتجدد لوحده"; else echo "✖ الـ CRM رفض الدخول: $(printf '%s' "$R" | head -c 300)"; fi
+  exit 0
+fi
 if [[ "${1:-}" == crm ]]; then
   NAME=NQ_CRM_TOKEN; PFX=""; LBL="الـ CRM"
 elif [[ "${1:-}" == openai ]]; then

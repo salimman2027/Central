@@ -1,5 +1,6 @@
 """طلبات تحديد موعد: لو المندوب كتب أو سجّل بصوته ملاحظة فيها ميعاد مع العميل،
 السيستم بيطلّعه لوحده ويحطه في "طلبات تحديد موعد" — والمدير يأكده، ولما يتأكد يتبعت للـ CRM."""
+import asyncio
 import datetime as dt
 import json
 import os
@@ -106,6 +107,8 @@ def process_note(note: dict) -> dict | None:
         "summary": (note.get("summary") or "")[:1500], "callStarted": note.get("started"),
         "crm": None,
     }
+    if crm_configured() and item["number"]:
+        _apply_match(item, match_client(item["number"]))
     with LOCK:
         items = _load()
         if any(x.get("noteKey") == key for x in items):
@@ -113,6 +116,20 @@ def process_note(note: dict) -> dict | None:
         items.append(item)
         _save(items)
     return item
+
+
+def _apply_match(it: dict, c: dict | None):
+    if c:
+        it.update(clientId=str(c["id"]), clientName=c["name"], isPotential=bool(c["potential"]), clientAuto=True)
+
+
+def _ensure_client(aid: str) -> dict:
+    it = next((x for x in _load() if x["id"] == aid), None)
+    if it and not str(it.get("clientId") or "").strip() and it.get("number"):
+        c = match_client(it["number"])
+        if c:
+            return _update(aid, lambda x: _apply_match(x, c))
+    return it
 
 
 def process_async(note: dict):
@@ -150,16 +167,29 @@ async def confirm(aid: str, request: Request):
         pass
 
     def f(it):
-        for k in ("date", "time", "customer", "number", "details", "kind", "location", "duration", "company", "email", "clientId"):
+        for k in ("date", "time", "customer", "number", "details", "kind", "location", "duration", "company", "email", "clientId", "clientName"):
             if body.get(k) is not None:
                 it[k] = str(body[k])[:300]
+        if body.get("isPotential") is not None:
+            it["isPotential"] = bool(body["isPotential"])
         if not it.get("date"):
             raise HTTPException(400, "حدد تاريخ الموعد الأول")
         it["status"] = "confirmed"
         it["confirmedAt"] = dt.datetime.now(dt.timezone.utc).isoformat()
-    it = _update(aid, f)
-    res = push_crm(it)
+    _update(aid, f)
+    it = await asyncio.to_thread(_ensure_client, aid)
+    res = await asyncio.to_thread(push_crm, it)
     return _update(aid, lambda x: x.__setitem__("crm", res))
+
+
+@router.post("/api/appointments/{aid}/client")
+async def set_client(aid: str, request: Request):
+    b = await request.json()
+    cid = str(b.get("clientId") or "").strip()
+    if not cid.isdigit():
+        raise HTTPException(400, "اختار العميل")
+    return _update(aid, lambda x: x.update(clientId=cid, clientName=str(b.get("clientName") or "")[:200],
+                                           isPotential=bool(b.get("isPotential")), clientAuto=False))
 
 
 @router.post("/api/appointments/{aid}/reject")
@@ -194,8 +224,10 @@ async def retry_crm(aid: str, request: Request):
                     x["duration"] = min(cur, slot)
         it = _update(aid, upd)
     if str(body.get("clientId") or "").strip():
-        it = _update(aid, lambda x: x.__setitem__("clientId", str(body["clientId"]).strip()))
-    res = push_crm(it)
+        it = _update(aid, lambda x: x.update(clientId=str(body["clientId"]).strip(), clientName=str(body.get("clientName") or "")[:200],
+                                             isPotential=bool(body.get("isPotential")), clientAuto=False))
+    it = await asyncio.to_thread(_ensure_client, aid)
+    res = await asyncio.to_thread(push_crm, it)
     return _update(aid, lambda x: x.__setitem__("crm", res))
 
 
@@ -276,25 +308,220 @@ def _client_id(it: dict, cfg: dict) -> int:
     return int(v) if v.isdigit() and int(v) > 0 else int(cfg.get("defaultClientId") or 0)
 
 
-def _find_slots(obj, depth=0) -> list:
-    """بيلقط الفترات البديلة من رد الـ CRM لما الميعاد يبقى محجوز (أي list فيها timeFrom/timeTo)"""
+def _find_slots(obj) -> list:
+    """الفترات المتاحة من رد الـ CRM (availableSlots بس — مش occupiedSlots ولا busyEmployees)"""
+    if not isinstance(obj, dict):
+        return []
+    for key in ("availability", "data"):
+        if isinstance(obj.get(key), dict) and "availableSlots" not in obj:
+            r = _find_slots(obj[key])
+            if r:
+                return r
     out = []
-    if depth > 4:
-        return out
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if isinstance(v, list) and v and all(isinstance(x, dict) for x in v) and any("timeFrom" in x or "from" in x for x in v):
-                for x in v:
-                    f = str(x.get("timeFrom") or x.get("from") or "")[:5]
-                    t = str(x.get("timeTo") or x.get("to") or "")[:5]
-                    if f:
-                        out.append({"timeFrom": f, "timeTo": t})
-            elif isinstance(v, (dict, list)):
-                out += _find_slots(v, depth + 1)
-    elif isinstance(obj, list):
-        for x in obj:
-            out += _find_slots(x, depth + 1)
-    return out
+    for x in obj.get("availableSlots") or []:
+        if isinstance(x, dict):
+            f, t = str(x.get("timeFrom") or "")[:5], str(x.get("timeTo") or "")[:5]
+            if f:
+                out.append({"timeFrom": f, "timeTo": t})
+    return sorted(out, key=lambda x: x["timeFrom"])
+
+
+# ------------------------------------------------------------------ CRM client (قراءة من الـ API)
+TOKEN = {"value": "", "exp": None}
+
+
+def _base(cfg: dict | None = None) -> str:
+    from urllib.parse import urlsplit
+    u = urlsplit((cfg or crm_settings())["url"])
+    return f"{u.scheme}://{u.netloc}"
+
+
+def _sign_in() -> str:
+    """لو اليوزر والباسورد متسجلين (sudo nq-setkey crm-login) بنجيب توكن جديد لوحدنا"""
+    user, pw, db = (os.environ.get(k, "").strip() for k in ("NQ_CRM_USER", "NQ_CRM_PASS", "NQ_CRM_DB"))
+    if not (user and pw):
+        return ""
+    import requests
+    r = requests.post(_base() + "/api/v1/authentication/sign-in", timeout=20,
+                      headers={"Content-Type": "application/json; ver=1.0", "Accept": "application/json"},
+                      data=json.dumps({"username": user, "password": pw, "companyDB": db}))
+    j = r.json() if r.content else {}
+    d = j.get("data") if isinstance(j.get("data"), dict) else j
+    tok = d.get("accessToken") or ""
+    if tok:
+        TOKEN["value"] = tok
+        try:
+            TOKEN["exp"] = dt.datetime.fromisoformat(str(d.get("accessTokenExpiresAt")).replace("Z", "+00:00"))
+        except Exception:  # noqa: BLE001
+            TOKEN["exp"] = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1)
+    return tok
+
+
+def _token(force: bool = False) -> str:
+    now = dt.datetime.now(dt.timezone.utc)
+    if TOKEN["value"] and not force and (not TOKEN["exp"] or TOKEN["exp"].tzinfo is None or TOKEN["exp"] > now + dt.timedelta(minutes=2)):
+        return TOKEN["value"]
+    if force or os.environ.get("NQ_CRM_USER"):
+        try:
+            t = _sign_in()
+            if t:
+                return t
+        except Exception as e:  # noqa: BLE001
+            print("crm sign-in failed:", e, flush=True)
+    return os.environ.get("NQ_CRM_TOKEN", "").strip()
+
+
+def crm_headers(cfg: dict | None = None, force: bool = False) -> dict:
+    cfg = cfg or crm_settings()
+    h = {"Content-Type": "application/json; ver=1.0", "Accept": "application/json; ver=1.0, application/json"}
+    tok = _token(force)
+    if tok:
+        pfx = (cfg["authPrefix"] or "").strip()
+        tok = tok.removeprefix("Bearer ").removeprefix("bearer ").strip()
+        h[(cfg["authHeader"] or "Authorization").strip()] = f"{pfx} {tok}" if pfx else tok
+    return h
+
+
+def crm_request(method: str, path: str, params: dict | None = None, body=None):
+    """طلب للـ CRM — لو رجع 401 وعندنا يوزر وباسورد بنعمل sign-in ونعيد مرة"""
+    import requests
+    cfg = crm_settings()
+    url = path if path.startswith("http") else _base(cfg) + path
+    data = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
+    r = requests.request(method, url, params=params, data=data, headers=crm_headers(cfg), timeout=30)
+    if r.status_code == 401 and os.environ.get("NQ_CRM_USER"):
+        r = requests.request(method, url, params=params, data=data, headers=crm_headers(cfg, force=True), timeout=30)
+    return r
+
+
+def _get_json(path: str, params: dict | None = None):
+    r = crm_request("GET", path, params)
+    if r.status_code == 401:
+        raise HTTPException(502, "الـ CRM طالب تسجيل دخول — حط التوكن بـ sudo nq-setkey crm أو اليوزر بـ sudo nq-setkey crm-login")
+    if r.status_code >= 400:
+        raise HTTPException(502, f"الـ CRM رجّع {r.status_code}: {r.text[:300]}")
+    try:
+        return r.json()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(502, "رد الـ CRM مش JSON")
+
+
+def _items(j) -> list:
+    """الـ CRM ممكن يرجّع list على طول، أو {data:[...]}، أو {data:{items:[...]}}"""
+    if isinstance(j, list):
+        return j
+    if isinstance(j, dict):
+        for k in ("data", "items", "result", "value", "records"):
+            v = j.get(k)
+            if isinstance(v, list):
+                return v
+            if isinstance(v, dict):
+                r = _items(v)
+                if r:
+                    return r
+    return []
+
+
+def _digits(s) -> str:
+    d = "".join(c for c in str(s or "") if c.isdigit())
+    return d[-9:]          # آخر 9 أرقام: بيتجاهل 966/0/+ في الأول
+
+
+def search_customers(q: str, limit: int = 20) -> list:
+    out = []
+    try:
+        for c in _items(_get_json("/api/v1/customers", {"q": q, "PageNumber": 1, "PageSize": limit})):
+            out.append({"id": c.get("id"), "name": c.get("name") or c.get("arName") or c.get("enName") or "",
+                        "phone": c.get("phoneNumber") or c.get("mobile") or "", "code": c.get("code") or "",
+                        "potential": False})
+    except HTTPException:
+        if not out:
+            raise
+    try:
+        for c in _items(_get_json("/api/v1/customers-potential", {"q": q, "PageNumber": 1, "PageSize": limit})):
+            out.append({"id": c.get("customersPotentialId") or c.get("id"),
+                        "name": c.get("customerName") or c.get("name") or "",
+                        "phone": c.get("phoneNumber") or c.get("mobile") or c.get("phone") or "",
+                        "code": c.get("code") or "", "potential": True})
+    except HTTPException:
+        pass
+    return [x for x in out if x["id"]]
+
+
+def match_client(number: str) -> dict | None:
+    """بيدوّر على العميل في الـ CRM برقم تليفونه"""
+    d = _digits(number)
+    if len(d) < 7:
+        return None
+    try:
+        for c in search_customers(d):
+            if _digits(c["phone"]) == d:
+                return c
+    except Exception as e:  # noqa: BLE001
+        print("crm match failed:", e, flush=True)
+    return None
+
+
+@router.get("/api/crm/customers")
+def crm_customers(q: str):
+    q = q.strip()
+    if len(q) < 2:
+        return {"items": []}
+    if sum(c.isdigit() for c in q) >= 7:
+        q = _digits(q)
+    return {"items": search_customers(q)}
+
+
+@router.get("/api/crm/employees")
+def crm_employees(q: str = ""):
+    seen, out = set(), []
+    for path, params in (("/api/v1/sales-people", {"q": q, "PageSize": 500}),
+                         ("/api/v1/employees", {"q": q, "IsSales": "true", "PageSize": 500})):
+        try:
+            for e in _items(_get_json(path, params)):
+                eid = e.get("id") or e.get("employeeId")
+                if eid and eid not in seen:
+                    seen.add(eid)
+                    out.append({"id": eid, "name": e.get("name") or e.get("arName") or e.get("employeeName") or ""})
+        except HTTPException:
+            if path.endswith("employees") and not out:
+                raise
+        if out:
+            break
+    return {"items": out}
+
+
+@router.get("/api/crm/terms")
+def crm_terms():
+    return {"items": [{"id": t.get("id"), "name": t.get("name") or t.get("arName") or t.get("title") or str(t.get("id"))}
+                      for t in _items(_get_json("/api/v1/terms-managements", {"PageSize": 200})) if t.get("id")]}
+
+
+@router.get("/api/crm/availability/{aid}")
+def crm_availability(aid: str, date: str = "", time: str = ""):
+    """المواعيد الفاضية للمندوب في اليوم ده — قبل ما نأكد"""
+    it = next((x for x in _load() if x["id"] == aid), None)
+    if not it:
+        raise HTTPException(404, "مش موجود")
+    cfg = crm_settings()
+    sid = cfg["salesIds"].get(str(it.get("ext")), 0)
+    if not sid:
+        raise HTTPException(400, f"رقم الموظف ({it.get('repName') or it.get('ext')}) في الـ CRM مش متحدد — من 🔗 إعدادات الـ CRM")
+    date = (date or it.get("date") or "")[:10]
+    if not date:
+        raise HTTPException(400, "حدد التاريخ الأول")
+    start = (time or it.get("time") or "10:00")[:5]
+    dur = int(it.get("duration") or cfg["duration"] or 60)
+    j = _get_json("/api/v1/crm-appointments/employees-availability",
+                  {"EmployeeIds": sid, "Date": date, "TimeFrom": start, "TimeTo": _add_minutes(start, dur)})
+    d = j.get("data") if isinstance(j, dict) and isinstance(j.get("data"), dict) else (j if isinstance(j, dict) else {})
+    hours = [{"from": str(w.get("startTime") or "")[:5], "to": str(w.get("endTime") or "")[:5]}
+             for w in d.get("workingHours") or [] if isinstance(w, dict)]
+    busy = [{"from": str(b.get("timeFrom") or "")[:5], "to": str(b.get("timeTo") or "")[:5],
+             "code": b.get("appointmentCode") or "", "reason": b.get("reason") or ""}
+            for b in d.get("busyEmployees") or [] if isinstance(b, dict)]
+    return {"date": date, "timeFrom": start, "duration": dur, "isAvailable": d.get("isAvailable"),
+            "slots": _find_slots(d), "busy": busy, "workingHours": hours, "message": j.get("message") if isinstance(j, dict) else ""}
 
 
 def crm_body(it: dict, cfg: dict) -> dict:
@@ -310,7 +537,7 @@ def crm_body(it: dict, cfg: dict) -> dict:
         "objectives": " — ".join(x for x in (it.get("kind"), it.get("details")) if x) or "متابعة مع العميل",
         "requirement": it.get("quote") or "", "results": "",
         "employeeIds": [sales_id] if sales_id else [],
-        "isPotential": not str(it.get("clientId") or "").strip().isdigit(), "termsManagementId": cfg["termsManagementId"],
+        "isPotential": bool(it.get("isPotential")), "termsManagementId": cfg["termsManagementId"],
         "email": it.get("email") or "", "isOnlineMeet": bool(online),
         "meetingLink": place if place.lower().startswith("http") else "",
         "meetingLocation": "" if place.lower().startswith("http") else place,
@@ -326,14 +553,6 @@ def push_crm(it: dict) -> dict:
     now = dt.datetime.now(dt.timezone.utc).isoformat()
     if not cfg["url"]:
         return {"ok": False, "pending": True, "at": now, "msg": "الربط مع الـ CRM لسه متظبطش"}
-    import requests
-    # الـ API بيستخدم إصدار في نوع المحتوى (زي ما في الـ Swagger)
-    headers = {"Content-Type": "application/json; ver=1.0", "Accept": "application/json; ver=1.0, application/json"}
-    tok = os.environ.get("NQ_CRM_TOKEN", "").strip()
-    if tok:
-        pfx = (cfg["authPrefix"] or "").strip()
-        tok = tok.removeprefix("Bearer ").removeprefix("bearer ").strip()
-        headers[(cfg["authHeader"] or "Authorization").strip()] = f"{pfx} {tok}" if pfx else tok
     body = crm_body(it, cfg)
     # نقول السبب بالعربي قبل ما الـ CRM يرفض
     missing = []
@@ -344,10 +563,10 @@ def push_crm(it: dict) -> dict:
     if missing:
         return {"ok": False, "code": "ناقص", "at": now, "msg": json.dumps({"message": " • ".join(missing)}, ensure_ascii=False)}
     try:
-        r = requests.post(cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"), headers=headers, timeout=30)
+        r = crm_request("POST", cfg["url"], body=body)
         res = {"ok": r.status_code < 300, "code": r.status_code, "at": now, "msg": r.text[:4000]}
         if r.status_code == 401:
-            res["msg"] = "الـ CRM طالب تسجيل دخول — حط التوكن بـ sudo nq-setkey crm"
+            res["msg"] = "الـ CRM طالب تسجيل دخول — التوكن خلص أو غلط: sudo nq-setkey crm (أو sudo nq-setkey crm-login عشان يتجدد لوحده)"
         try:
             j = r.json()
             if isinstance(j, dict):
@@ -357,7 +576,7 @@ def push_crm(it: dict) -> dict:
                 res["crmId"] = j.get("id") or data.get("id") or None
                 if j.get("message"):
                     res["text"] = str(j["message"])[:300]
-                alts = _find_slots(data.get("availability") or data)
+                alts = _find_slots(j)
                 if alts:
                     res["alternatives"] = alts[:12]
         except Exception:  # noqa: BLE001
@@ -370,7 +589,8 @@ def push_crm(it: dict) -> dict:
 @router.get("/api/crm/settings")
 def get_crm():
     c = crm_settings()
-    return {**c, "hasToken": bool(os.environ.get("NQ_CRM_TOKEN", "").strip())}
+    return {**c, "hasToken": bool(os.environ.get("NQ_CRM_TOKEN", "").strip()),
+            "hasLogin": bool(os.environ.get("NQ_CRM_USER", "").strip() and os.environ.get("NQ_CRM_PASS", "").strip())}
 
 
 @router.put("/api/crm/settings")
