@@ -333,6 +333,7 @@ html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
 .crm-sales label{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:6px 10px}
 .crm-sales input{width:90px}
+.crm-err{font-size:12px;color:var(--grey);max-width:300px;margin:4px auto;text-align:right;direction:rtl;white-space:normal;word-break:break-word}
 /* التقرير ورق أبيض للطباعة */
 .report{color:#1C2B2A;border-radius:14px;--teal:#0F7C7A;--teal-d:#0A5654;--teal-l:#E7F3F2;--border:#D5E2E1;--text:#1C2B2A}
 .report th{background:#0F7C7A;color:#fff}.report td{border-color:#D5E2E1}.report tr:hover td{background:none}
@@ -1131,11 +1132,23 @@ function renderAppt(){
       <td style="max-width:320px;white-space:normal"><span class="ap-q">"${esc(it.quote||'')}"</span>${it.details?`<div class="muted" style="font-size:12px">${esc(it.details)}</div>`:''}</td>
       <td class="c">${act}</td></tr>`;}).join('');
 }
+function apCrmMsg(m){
+  // ASP.NET بيرجّع الأخطاء كده: {"errors":{"Field":["..."]}} أو {"message":"..."}
+  try{const j=JSON.parse(m);
+    if(j.errors) return Object.entries(j.errors).map(([k,v])=>`<b>${esc(k)}</b>: ${esc([].concat(v).join(' '))}`).join('<br>');
+    return esc(j.message||j.title||j.detail||m);}catch(e){return esc(m||'')}
+}
 function apCrm(it){
-  const c=it.crm||{};
-  if(c.ok) return `<span style="color:var(--green)">✔ اتسجّل في الـ CRM</span>`;
-  if(c.pending) return `<span class="muted" title="${esc(c.msg||'')}">⏳ اتأكد — الربط مع الـ CRM لسه</span>`;
-  return `<span style="color:var(--red)" title="${esc(c.msg||'')}">✖ الـ CRM رفض ${c.code||''}</span><br><button class="btn o" style="margin-top:4px" onclick="apRetry('${esc(it.id)}')">⟳ ابعت تاني</button>`;
+  const c=it.crm||{}, id=esc(it.id);
+  const btns=`<div style="display:flex;gap:6px;justify-content:center;margin-top:6px"><button class="btn o" id="apr-${id}" onclick="apRetry('${id}')">⟳ ابعت تاني</button><button class="btn o" onclick="apPreview('${id}')" title="شوف اللي بيتبعت">👁</button></div>`;
+  if(c.ok) return `<span style="color:var(--green)">✔ اتسجّل في الـ CRM</span>${c.crmId?`<br><small class="muted">رقم ${esc(c.crmId)}</small>`:''}`;
+  if(c.pending) return `<span class="muted">⏳ اتأكد — الربط مع الـ CRM لسه</span>${btns}`;
+  return `<span style="color:var(--red)">✖ الـ CRM رفض ${c.code||''}</span><div class="crm-err">${apCrmMsg(c.msg)}</div>${c.at?`<small class="muted">آخر محاولة ${new Date(c.at).toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'})}</small>`:''}${btns}`;
+}
+async function apPreview(id){
+  try{const j=await apPost(`/crm/preview/${id}`);
+    $('apNote').innerHTML=`👁 ده اللي بيتبعت للـ CRM:<pre dir="ltr" style="text-align:left;white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto">${esc(JSON.stringify(j,null,2))}</pre>`;
+    $('apNote').scrollIntoView({behavior:'smooth'});}catch(e){alert(e.message)}
 }
 async function apPost(path,body){const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);return j;}
 async function apConfirm(id){
@@ -1147,7 +1160,12 @@ async function apConfirm(id){
 }
 async function apReject(id){if(!confirm('ترفض الطلب ده؟'))return;try{await apPost(`/appointments/${id}/reject`);loadAppt();}catch(e){alert(e.message)}}
 async function apReopen(id){try{await apPost(`/appointments/${id}/reopen`);loadAppt();}catch(e){alert(e.message)}}
-async function apRetry(id){try{await apPost(`/appointments/${id}/crm`);loadAppt();}catch(e){alert(e.message)}}
+async function apRetry(id){
+  const b=$('apr-'+id); if(b){b.disabled=true;b.textContent='⏳ بيبعت…';}
+  try{const it=await apPost(`/appointments/${id}/crm`);
+    $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ اتسجّل في الـ CRM':`✖ الـ CRM رفض (${it.crm&&it.crm.code||''}): ${apCrmMsg(it.crm&&it.crm.msg)}`;
+    loadAppt();}catch(e){alert(e.message); if(b){b.disabled=false;b.textContent='⟳ ابعت تاني';}}
+}
 async function apScan(){
   const t=new Date(),f=new Date(t.getTime()-29*864e5);
   try{let j=await apPost(`/appointments/scan?date_from=${isoD(f)}&date_to=${isoD(t)}`);
