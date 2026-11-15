@@ -334,6 +334,7 @@ html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html
 .crm-sales label{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:6px 10px}
 .crm-sales input{width:90px}
 .crm-err{font-size:12px;color:var(--grey);max-width:300px;margin:4px auto;text-align:right;direction:rtl;white-space:normal;word-break:break-word}
+.alts{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:300px;margin:0 auto}.alts .btn{padding:5px 10px;font-size:13px}
 /* التقرير ورق أبيض للطباعة */
 .report{color:#1C2B2A;border-radius:14px;--teal:#0F7C7A;--teal-d:#0A5654;--teal-l:#E7F3F2;--border:#D5E2E1;--text:#1C2B2A}
 .report th{background:#0F7C7A;color:#fff}.report td{border-color:#D5E2E1}.report tr:hover td{background:none}
@@ -1145,6 +1146,9 @@ function apCrm(it){
   const btns=`<div style="display:flex;gap:6px;justify-content:center;margin-top:6px"><button class="btn o" id="apr-${id}" onclick="apRetry('${id}')">⟳ ابعت تاني</button><button class="btn o" onclick="apPreview('${id}')" title="شوف اللي بيتبعت">👁</button></div>`;
   if(c.ok) return `<span style="color:var(--green)">✔ اتسجّل في الـ CRM</span>${c.crmId?`<br><small class="muted">رقم ${esc(c.crmId)}</small>`:''}`;
   if(c.pending) return `<span class="muted">⏳ اتأكد — الربط مع الـ CRM لسه</span>${btns}`;
+  if(c.code===409||(c.alternatives||[]).length) return `<span style="color:var(--orange)">⚠️ الميعاد ده مش متاح في الـ CRM</span>
+    ${(c.alternatives||[]).length?`<div class="muted" style="font-size:12px;margin:4px 0">اختار فترة متاحة نفس اليوم:</div><div class="alts">${c.alternatives.map(a=>`<button class="btn o" onclick="apRetry('${id}','${esc(a.timeFrom)}')">${esc(a.timeFrom)}${a.timeTo?'–'+esc(a.timeTo):''}</button>`).join('')}</div>`
+      :`<div class="crm-err">${esc(c.text||'')}</div>`}${btns}`;
   return `<span style="color:var(--red)">✖ الـ CRM رفض ${c.code||''}</span><div class="crm-err">${apCrmMsg(c.msg)}</div>${c.at?`<small class="muted">آخر محاولة ${new Date(c.at).toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'})}</small>`:''}${btns}`;
 }
 async function apPreview(id){
@@ -1162,10 +1166,11 @@ async function apConfirm(id){
 }
 async function apReject(id){if(!confirm('ترفض الطلب ده؟'))return;try{await apPost(`/appointments/${id}/reject`);loadAppt();}catch(e){alert(e.message)}}
 async function apReopen(id){try{await apPost(`/appointments/${id}/reopen`);loadAppt();}catch(e){alert(e.message)}}
-async function apRetry(id){
+async function apRetry(id,time){
   const b=$('apr-'+id); if(b){b.disabled=true;b.textContent='⏳ بيبعت…';}
-  try{const ci=$('api-'+id); const it=await apPost(`/appointments/${id}/crm`,ci?{clientId:ci.value}:{});
-    $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ اتسجّل في الـ CRM':`✖ الـ CRM رفض (${it.crm&&it.crm.code||''}): ${apCrmMsg(it.crm&&it.crm.msg)}`;
+  try{const ci=$('api-'+id); const body=ci?{clientId:ci.value}:{}; if(time)body.time=time;
+    const it=await apPost(`/appointments/${id}/crm`,body);
+    $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ اتسجّل في الـ CRM':it.crm&&it.crm.code===409?'⚠️ الميعاد محجوز — اختار فترة من البدائل جنب الطلب':`✖ الـ CRM رفض (${it.crm&&it.crm.code||''}): ${apCrmMsg(it.crm&&it.crm.msg)}`;
     loadAppt();}catch(e){alert(e.message); if(b){b.disabled=false;b.textContent='⟳ ابعت تاني';}}
 }
 async function apScan(){

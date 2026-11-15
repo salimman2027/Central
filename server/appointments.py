@@ -182,6 +182,8 @@ async def retry_crm(aid: str, request: Request):
     it = next((x for x in _load() if x["id"] == aid), None)
     if not it or it["status"] != "confirmed":
         raise HTTPException(400, "الطلب لازم يبقى متأكد")
+    if body.get("time"):
+        it = _update(aid, lambda x: x.update(time=str(body["time"])[:5], date=str(body.get("date") or x["date"])[:10]))
     if str(body.get("clientId") or "").strip():
         it = _update(aid, lambda x: x.__setitem__("clientId", str(body["clientId"]).strip()))
     res = push_crm(it)
@@ -265,6 +267,27 @@ def _client_id(it: dict, cfg: dict) -> int:
     return int(v) if v.isdigit() and int(v) > 0 else int(cfg.get("defaultClientId") or 0)
 
 
+def _find_slots(obj, depth=0) -> list:
+    """بيلقط الفترات البديلة من رد الـ CRM لما الميعاد يبقى محجوز (أي list فيها timeFrom/timeTo)"""
+    out = []
+    if depth > 4:
+        return out
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(v, list) and v and all(isinstance(x, dict) for x in v) and any("timeFrom" in x or "from" in x for x in v):
+                for x in v:
+                    f = str(x.get("timeFrom") or x.get("from") or "")[:5]
+                    t = str(x.get("timeTo") or x.get("to") or "")[:5]
+                    if f:
+                        out.append({"timeFrom": f, "timeTo": t})
+            elif isinstance(v, (dict, list)):
+                out += _find_slots(v, depth + 1)
+    elif isinstance(obj, list):
+        for x in obj:
+            out += _find_slots(x, depth + 1)
+    return out
+
+
 def crm_body(it: dict, cfg: dict) -> dict:
     """شكل الطلب زي الـ Swagger بتاع الـ CRM (Meeting)"""
     dur = int(it.get("duration") or cfg["duration"] or 60)
@@ -313,14 +336,21 @@ def push_crm(it: dict) -> dict:
         return {"ok": False, "code": "ناقص", "at": now, "msg": json.dumps({"message": " • ".join(missing)}, ensure_ascii=False)}
     try:
         r = requests.post(cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"), headers=headers, timeout=30)
-        res = {"ok": r.status_code < 300, "code": r.status_code, "at": now, "msg": r.text[:400]}
+        res = {"ok": r.status_code < 300, "code": r.status_code, "at": now, "msg": r.text[:4000]}
         if r.status_code == 401:
             res["msg"] = "الـ CRM طالب تسجيل دخول — حط التوكن بـ sudo nq-setkey crm"
         try:
             j = r.json()
             if isinstance(j, dict):
+                if j.get("succeeded") is False:     # الـ CRM بيرجّع 200 أحيانًا ومعاه succeeded=false
+                    res["ok"] = False
                 data = j.get("data") if isinstance(j.get("data"), dict) else {}
-                res["crmId"] = j.get("id") or data.get("id")
+                res["crmId"] = j.get("id") or data.get("id") or None
+                if j.get("message"):
+                    res["text"] = str(j["message"])[:300]
+                alts = _find_slots(data.get("availability") or data)
+                if alts:
+                    res["alternatives"] = alts[:12]
         except Exception:  # noqa: BLE001
             pass
         return res
