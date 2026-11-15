@@ -329,7 +329,7 @@ html[data-theme=light] .tax-ta{background:#fff}
 .crm-f{display:grid;gap:4px;margin-bottom:8px}.crm-f label{font-size:13px;color:var(--grey)}
 .crm-f input,.crm-sales input,.ap-when select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit}
 html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html[data-theme=light] .ap-when select{background:#fff}
-.crm-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}@media(max-width:700px){.crm-row{grid-template-columns:1fr 1fr}}
+.crm-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}@media(max-width:700px){.crm-row{grid-template-columns:1fr 1fr}}
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
 .crm-sales label{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:6px 10px}
 .crm-sales input{width:90px}
@@ -483,6 +483,7 @@ html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html
       <div class="crm-f"><label>قبل التوكن</label><input id="crmPfx" dir="ltr" placeholder="Bearer "></div>
       <div class="crm-f"><label>مدة الاجتماع (دقيقة)</label><input id="crmDur" type="number" min="5" step="5"></div>
       <div class="crm-f"><label>termsManagementId</label><input id="crmTerms" type="number" min="0"></div>
+      <div class="crm-f"><label>عميل افتراضي (Client ID)</label><input id="crmClient" type="number" min="0" placeholder="لو العميل مش في الـ CRM"></div>
     </div>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="crmMail" style="width:auto"> الـ CRM يبعت إيميل للعميل (sendEmail)</label>
     <div id="crmTok" class="muted" style="margin:8px 0"></div>
@@ -1126,7 +1127,8 @@ function renderAppt(){
       ?`<div style="display:flex;gap:6px;justify-content:center"><button class="btn" onclick="apConfirm('${id}')">✔ تأكيد</button><button class="btn o" onclick="apReject('${id}')">✖</button></div>`
       :AP_S==='confirmed'?apCrm(it):`<button class="btn o" onclick="apReopen('${id}')">↩ رجّعه</button>`;
     return `<tr><td><b>${esc(it.repName||it.ext)}</b><br><span class="muted">تحويلة ${esc(it.ext)}</span></td>
-      <td>${AP_S==='pending'?`<input class="ap-in" id="apc-${id}" value="${esc(it.customer||'')}" placeholder="اسم العميل">`:esc(it.customer||'—')}</td>
+      <td>${AP_S==='pending'?`<input class="ap-in" id="apc-${id}" value="${esc(it.customer||'')}" placeholder="اسم العميل"><input class="ap-in" style="margin-top:5px;width:120px" id="api-${id}" type="number" min="1" value="${esc(it.clientId||'')}" placeholder="Client ID">`
+        :esc(it.customer||'—')+(AP_S==='confirmed'?`<br><input class="ap-in" style="margin-top:5px;width:110px" id="api-${id}" type="number" min="1" value="${esc(it.clientId||'')}" placeholder="Client ID" title="رقم العميل في الـ CRM">`:'')}</td>
       <td style="direction:ltr;text-align:right">${esc(it.number||'—')}</td>
       <td>${when}</td><td><span class="badge b-out">${esc(it.kind||'—')}</span></td>
       <td style="max-width:320px;white-space:normal"><span class="ap-q">"${esc(it.quote||'')}"</span>${it.details?`<div class="muted" style="font-size:12px">${esc(it.details)}</div>`:''}</td>
@@ -1152,7 +1154,7 @@ async function apPreview(id){
 }
 async function apPost(path,body){const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);return j;}
 async function apConfirm(id){
-  const body={date:$('apd-'+id).value,time:$('apt-'+id).value,customer:$('apc-'+id).value,duration:$('apu-'+id).value,location:$('apl-'+id).value};
+  const body={date:$('apd-'+id).value,time:$('apt-'+id).value,customer:$('apc-'+id).value,duration:$('apu-'+id).value,location:$('apl-'+id).value,clientId:$('api-'+id).value};
   if(!body.date){alert('حدد تاريخ الموعد الأول');return}
   try{const it=await apPost(`/appointments/${id}/confirm`,body);
     $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ الموعد اتأكد واتسجّل في الـ CRM':'✔ الموعد اتأكد'+(it.crm&&it.crm.pending?' — هيتبعت للـ CRM أول ما الربط يتظبط':(it.crm?` — بس الـ CRM رفض: ${esc(it.crm.msg||'')}`:''));
@@ -1162,7 +1164,7 @@ async function apReject(id){if(!confirm('ترفض الطلب ده؟'))return;try
 async function apReopen(id){try{await apPost(`/appointments/${id}/reopen`);loadAppt();}catch(e){alert(e.message)}}
 async function apRetry(id){
   const b=$('apr-'+id); if(b){b.disabled=true;b.textContent='⏳ بيبعت…';}
-  try{const it=await apPost(`/appointments/${id}/crm`);
+  try{const ci=$('api-'+id); const it=await apPost(`/appointments/${id}/crm`,ci?{clientId:ci.value}:{});
     $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ اتسجّل في الـ CRM':`✖ الـ CRM رفض (${it.crm&&it.crm.code||''}): ${apCrmMsg(it.crm&&it.crm.msg)}`;
     loadAppt();}catch(e){alert(e.message); if(b){b.disabled=false;b.textContent='⟳ ابعت تاني';}}
 }
@@ -1236,7 +1238,7 @@ let AP_DUR=60;
 async function openCrm(){
   const c=await (await fetch(API_BASE+'/crm/settings',{cache:'no-store'})).json();
   $('crmUrl').value=c.url||''; $('crmHdr').value=c.authHeader||'Authorization'; $('crmPfx').value=c.authPrefix??'Bearer ';
-  $('crmDur').value=c.duration||60; $('crmTerms').value=c.termsManagementId||0; $('crmMail').checked=!!c.sendEmail;
+  $('crmDur').value=c.duration||60; $('crmTerms').value=c.termsManagementId||0; $('crmClient').value=c.defaultClientId||''; $('crmMail').checked=!!c.sendEmail;
   $('crmTok').innerHTML=c.hasToken?'🔑 التوكن متسجّل على السيرفر ✔':'🔑 التوكن لسه مش متسجّل — على السيرفر اكتب: <code dir="ltr">sudo nq-setkey crm</code> (لو الـ API محتاجه)';
   $('crmSales').innerHTML=REPS.map(r=>`<label><span>${esc(r.name)} <small class="muted">${r.id}</small></span><input type="number" min="0" data-ext="${r.id}" value="${esc(c.salesIds[String(r.id)]||'')}" placeholder="ID"></label>`).join('');
   $('crmMsg').textContent=''; $('crmModal').classList.add('show');
@@ -1244,7 +1246,7 @@ async function openCrm(){
 async function saveCrm(){
   const salesIds={}; document.querySelectorAll('#crmSales input').forEach(i=>{if(i.value)salesIds[i.dataset.ext]=i.value});
   const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
-    termsManagementId:+$('crmTerms').value||0,sendEmail:$('crmMail').checked,salesIds};
+    termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds};
   try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
     if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; loadAppt();}
   catch(e){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}

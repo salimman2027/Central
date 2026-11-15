@@ -150,7 +150,7 @@ async def confirm(aid: str, request: Request):
         pass
 
     def f(it):
-        for k in ("date", "time", "customer", "number", "details", "kind", "location", "duration", "company", "email"):
+        for k in ("date", "time", "customer", "number", "details", "kind", "location", "duration", "company", "email", "clientId"):
             if body.get(k) is not None:
                 it[k] = str(body[k])[:300]
         if not it.get("date"):
@@ -173,10 +173,17 @@ def reopen(aid: str):
 
 
 @router.post("/api/appointments/{aid}/crm")
-def retry_crm(aid: str):
+async def retry_crm(aid: str, request: Request):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        pass
     it = next((x for x in _load() if x["id"] == aid), None)
     if not it or it["status"] != "confirmed":
         raise HTTPException(400, "الطلب لازم يبقى متأكد")
+    if str(body.get("clientId") or "").strip():
+        it = _update(aid, lambda x: x.__setitem__("clientId", str(body["clientId"]).strip()))
     res = push_crm(it)
     return _update(aid, lambda x: x.__setitem__("crm", res))
 
@@ -220,7 +227,8 @@ def crm_settings() -> dict:
         c = {}
     return {"url": c.get("url") or "https://national-quality-api-site-nq.premiumasp.net/api/v1/crm-appointments", "authHeader": c.get("authHeader", "Authorization"),
             "authPrefix": c.get("authPrefix", "Bearer "), "duration": int(c.get("duration") or 60),
-            "termsManagementId": int(c.get("termsManagementId") or 0), "sendEmail": bool(c.get("sendEmail", False)),
+            "termsManagementId": int(c.get("termsManagementId") or 0),
+            "defaultClientId": int(c.get("defaultClientId") or 0), "sendEmail": bool(c.get("sendEmail", False)),
             "salesIds": {str(k): int(v) for k, v in (c.get("salesIds") or {}).items() if str(v).strip().isdigit()}}
 
 
@@ -229,7 +237,7 @@ def save_crm_settings(c: dict) -> dict:
     for k in ("url", "authHeader", "authPrefix"):
         if k in c:
             cur[k] = str(c[k] or "").strip()[:500]
-    for k in ("duration", "termsManagementId"):
+    for k in ("duration", "termsManagementId", "defaultClientId"):
         if k in c:
             cur[k] = int(c[k] or 0)
     if "sendEmail" in c:
@@ -252,6 +260,11 @@ def _add_minutes(hhmm: str, mins: int) -> str:
     return f"{(t // 60) % 24:02d}:{t % 60:02d}"
 
 
+def _client_id(it: dict, cfg: dict) -> int:
+    v = str(it.get("clientId") or "").strip()
+    return int(v) if v.isdigit() and int(v) > 0 else int(cfg.get("defaultClientId") or 0)
+
+
 def crm_body(it: dict, cfg: dict) -> dict:
     """شكل الطلب زي الـ Swagger بتاع الـ CRM (Meeting)"""
     dur = int(it.get("duration") or cfg["duration"] or 60)
@@ -260,12 +273,12 @@ def crm_body(it: dict, cfg: dict) -> dict:
     online = place.lower().startswith("http") or it.get("kind") in ("ديمو", "مكالمة") and not place
     sales_id = cfg["salesIds"].get(str(it.get("ext")), 0)
     return {
-        "id": 0, "code": "", "clientId": int(it.get("clientId") or 0),
+        "id": 0, "code": "", "clientId": _client_id(it, cfg),
         "date": f"{it['date']}T00:00:00", "timeFrom": start, "timeTo": _add_minutes(start, dur), "duration": dur,
         "objectives": " — ".join(x for x in (it.get("kind"), it.get("details")) if x) or "متابعة مع العميل",
         "requirement": it.get("quote") or "", "results": "",
         "employeeIds": [sales_id] if sales_id else [],
-        "isPotential": not it.get("clientId"), "termsManagementId": cfg["termsManagementId"],
+        "isPotential": not str(it.get("clientId") or "").strip().isdigit(), "termsManagementId": cfg["termsManagementId"],
         "email": it.get("email") or "", "isOnlineMeet": bool(online),
         "meetingLink": place if place.lower().startswith("http") else "",
         "meetingLocation": "" if place.lower().startswith("http") else place,
@@ -290,6 +303,14 @@ def push_crm(it: dict) -> dict:
         tok = tok.removeprefix("Bearer ").removeprefix("bearer ").strip()
         headers[(cfg["authHeader"] or "Authorization").strip()] = f"{pfx} {tok}" if pfx else tok
     body = crm_body(it, cfg)
+    # نقول السبب بالعربي قبل ما الـ CRM يرفض
+    missing = []
+    if not body["salesId"]:
+        missing.append(f"رقم الموظف ({it.get('repName') or it.get('ext')}) في الـ CRM — اكتبه في 🔗 إعدادات الـ CRM")
+    if not body["clientId"]:
+        missing.append("رقم العميل في الـ CRM (Client ID) — اكتبه في الطلب، أو حط عميل افتراضي في الإعدادات")
+    if missing:
+        return {"ok": False, "code": "ناقص", "at": now, "msg": json.dumps({"message": " • ".join(missing)}, ensure_ascii=False)}
     try:
         r = requests.post(cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"), headers=headers, timeout=30)
         res = {"ok": r.status_code < 300, "code": r.status_code, "at": now, "msg": r.text[:400]}
