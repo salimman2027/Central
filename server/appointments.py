@@ -218,7 +218,7 @@ def crm_settings() -> dict:
         c = json.loads((CTX["dir"] / "crm.json").read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         c = {}
-    return {"url": c.get("url", ""), "authHeader": c.get("authHeader", "Authorization"),
+    return {"url": c.get("url") or "https://national-quality-api-site-nq.premiumasp.net/api/v1/crm-appointments", "authHeader": c.get("authHeader", "Authorization"),
             "authPrefix": c.get("authPrefix", "Bearer "), "duration": int(c.get("duration") or 60),
             "termsManagementId": int(c.get("termsManagementId") or 0), "sendEmail": bool(c.get("sendEmail", False)),
             "salesIds": {str(k): int(v) for k, v in (c.get("salesIds") or {}).items() if str(v).strip().isdigit()}}
@@ -282,14 +282,17 @@ def push_crm(it: dict) -> dict:
     if not cfg["url"]:
         return {"ok": False, "pending": True, "at": now, "msg": "الربط مع الـ CRM لسه متظبطش"}
     import requests
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    # الـ API بيستخدم إصدار في نوع المحتوى (زي ما في الـ Swagger)
+    headers = {"Content-Type": "application/json; ver=1.0", "Accept": "application/json; ver=1.0, application/json"}
     tok = os.environ.get("NQ_CRM_TOKEN", "").strip()
     if tok:
         headers[cfg["authHeader"] or "Authorization"] = (cfg["authPrefix"] or "") + tok
     body = crm_body(it, cfg)
     try:
-        r = requests.post(cfg["url"], json=body, headers=headers, timeout=30)
+        r = requests.post(cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"), headers=headers, timeout=30)
         res = {"ok": r.status_code < 300, "code": r.status_code, "at": now, "msg": r.text[:400]}
+        if r.status_code == 401:
+            res["msg"] = "الـ CRM طالب تسجيل دخول — حط التوكن بـ sudo nq-setkey crm"
         try:
             j = r.json()
             if isinstance(j, dict):
