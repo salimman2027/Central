@@ -273,6 +273,33 @@ tr.pnl-row td{background:transparent!important;white-space:normal;padding:0 8px 
 html[data-theme=light] .pnl-ta{background:#fff}
 .pnl-btns{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
 .btn.rec{background:var(--red)!important;color:#fff!important;border-color:transparent!important;animation:breathe 1.6s infinite}
+
+.rank{display:flex;align-items:center;gap:14px;padding:12px 4px;border-bottom:1px solid var(--border)}
+.rank:last-child{border-bottom:0}
+.rk{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:var(--glass);border:1px solid var(--border);font-size:16px;flex-shrink:0}
+.rk.top{font-size:22px;border:0;background:none}
+.bigscore{font-size:30px;font-weight:800;min-width:84px;text-align:center}.bigscore small{font-size:12px;color:var(--grey);font-weight:400}
+.s-hi{color:var(--green)}.s-mid{color:var(--teal)}.s-lo{color:var(--orange)}.s-bad{color:var(--red)}
+.hm{display:inline-block;min-width:44px;padding:4px 6px;border-radius:8px;font-weight:700}
+.hm.s-hi{background:rgba(62,240,160,.14)}.hm.s-mid{background:rgba(25,230,193,.12)}.hm.s-lo{background:rgba(255,181,71,.14)}.hm.s-bad{background:rgba(255,77,115,.14)}
+#eHeat th small{font-weight:400}
+.rub-row{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:14px;margin-bottom:8px;background:var(--glass)}
+.rub-n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--teal-l);color:var(--teal);font-weight:800;flex-shrink:0}
+.rub-row input,.rub-row textarea{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;width:100%}
+html[data-theme=light] .rub-row input,html[data-theme=light] .rub-row textarea{background:#fff}
+.rub-name{flex:1;font-weight:700}
+.rub-w{display:flex;align-items:center;gap:4px;width:96px}.rub-w input{text-align:center}
+.rub-ops{display:flex;flex-direction:column;gap:4px}.rub-ops button{border:1px solid var(--border);background:var(--glass);color:var(--grey);border-radius:8px;width:30px;height:26px;cursor:pointer}
+.rub-foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;position:sticky;bottom:-1px;background:var(--glass2);padding:10px 0}
+.rub-total{font-weight:800;padding:6px 12px;border-radius:99px}.rub-total.ok{color:var(--green);background:rgba(62,240,160,.1)}.rub-total.bad{color:var(--red);background:rgba(255,77,115,.1)}
+.crit{display:grid;gap:4px;margin:10px 0}
+.cr summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;padding:5px 0}.cr summary::-webkit-details-marker{display:none}
+.cr-n{width:230px;flex-shrink:0;font-size:13.5px}.cr-bar{flex:1;height:8px;border-radius:99px;background:rgba(148,190,255,.12);overflow:hidden}
+.cr-bar b{display:block;height:100%;border-radius:99px;background:currentColor}
+.cr-s{width:48px;text-align:left;font-weight:800;font-size:13px}
+.cr-d{font-size:13px;padding:4px 240px 8px 0;display:grid;gap:3px}
+.ai-meta{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:13px;color:var(--grey)}.ai-meta b{color:var(--text)}
+@media(max-width:700px){.cr-n{width:120px;font-size:12px}.cr-d{padding:4px 0 8px}}
 /* التقرير ورق أبيض للطباعة */
 .report{color:#1C2B2A;border-radius:14px;--teal:#0F7C7A;--teal-d:#0A5654;--teal-l:#E7F3F2;--border:#D5E2E1;--text:#1C2B2A}
 .report th{background:#0F7C7A;color:#fff}.report td{border-color:#D5E2E1}.report tr:hover td{background:none}
@@ -296,6 +323,7 @@ html[data-theme=light] .pnl-ta{background:#fff}
   <div class="tab" data-p="log">📞 سجل المكالمات والتسجيلات</div>
   <div class="tab" data-p="report">🖨️ تقرير عدد المكالمات</div>
   <div class="tab" data-p="ai">🤖 تحليل المكالمات</div>
+  <div class="tab" data-p="eval">⭐ تقييم الموظفين</div>
 </div>
 
 <div class="wrap">
@@ -380,6 +408,36 @@ html[data-theme=light] .pnl-ta{background:#fff}
 
 
 <!-- ================= AI ANALYSIS ================= -->
+
+<div class="page" id="p-eval">
+  <div class="filters">
+    <div class="f"><label>من تاريخ</label><input type="date" id="eFrom"></div>
+    <div class="f"><label>إلى تاريخ</label><input type="date" id="eTo"></div>
+    <div class="f"><label>الفريق</label><select id="eTeam" onchange="renderEval()"></select></div>
+    <button class="btn" onclick="loadEval()">عرض التقييم</button>
+    <span class="sp" style="flex:1"></span>
+    <button class="btn o" onclick="openRubric()">⚙️ بنود التقييم والأوزان</button>
+  </div>
+  <div class="kpis" id="eKpis"></div>
+  <div class="card" style="margin-bottom:14px"><h3>🏆 ترتيب الموظفين<span class="sp"></span><span class="muted" id="eHint"></span></h3><div id="eRank"></div></div>
+  <div class="card"><h3>🧩 كل موظف في كل بند <span class="muted" style="font-weight:400;font-size:13px">— متوسط الدرجة من 10</span></h3><div class="tw"><table id="eHeat"></table></div></div>
+</div>
+
+<div class="modal" id="rubModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="mbox" style="max-width:860px;width:96vw;max-height:90vh;overflow:auto">
+    <h3 style="margin-top:0">⚙️ بنود تقييم المكالمات</h3>
+    <div class="muted" style="font-size:13px;margin-bottom:10px">الـ AI بيدّي كل بند درجة من 10 مع دليل من المكالمة ونقطة تحسين، والدرجة الكلية = مجموع (الدرجة × الوزن ÷ 10). التعديل بيتطبّق على المكالمات اللي هتتحلّل بعد كده.</div>
+    <div id="rubList"></div>
+    <div class="rub-foot">
+      <button class="btn o" onclick="rubAdd()">＋ بند جديد</button>
+      <span id="rubTotal" class="rub-total"></span>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn o" onclick="rubReset()">↺ الافتراضي</button>
+      <button class="btn" onclick="rubSave()">💾 حفظ</button>
+    </div>
+    <div id="rubMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+</div>
 <div class="page" id="p-ai">
   <div class="filters">
     <div class="f"><label>من تاريخ</label><input type="date" id="aFrom"></div>
@@ -625,7 +683,7 @@ async function pollAI(){
       setNote(`<div class="prog-h"><b>⚡ التحليل شغّال</b><span>${tot?`${dn} / ${tot} مكالمة`:'بيجهّز النموذج…'}</span><span class="muted">${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}</span></div>
         <div class="prog"><b style="width:${tot?Math.max(4,pct):8}%"></b></div>
         <div class="muted" style="margin-top:6px">${!tot||(!dn&&P?.stage==='transcribe')?'أول مرة بينزّل نموذج تحويل الصوت لنص — بعد كده هيبقى أسرع. ':''}النتايج بتظهر تحت كل مكالمة أول ما تخلص.</div>`);
-      if(P&&P.done!==AI_LASTDONE){ AI_LASTDONE=P.done; loadAI(); } else renderAI();
+      if(!$('aList').querySelector('.pnl')){ if(P&&P.done!==AI_LASTDONE){ AI_LASTDONE=P.done; loadAI(); } else renderAI(); }
       clearTimeout(aiPoll); aiPoll=setTimeout(pollAI,4000);
     } else {
       const log=(j.log||'').trim().split('\n').filter(l=>l&&!/^\s*(File|Traceback|\^|from |import )/.test(l)).slice(-3).join('\n');
@@ -708,9 +766,10 @@ function renderAI(){
     const tr=(x.transcript||[]).map(l=>`<div><span>${l.start!=null?l.start+"s":"•"}</span> ${esc(l.text)}</div>`).join('');
     return `<div class="ai-card" id="row-${esc(c.id)}">${head}
       <p style="margin:0 0 10px">${esc(a.summary||'')}</p>
+      ${(a.criteria||[]).length?critBlock(a)+`<div class="ai-cols" style="margin-top:10px"><div><b class="muted">💡 نصيحة للمندوب</b><p style="margin:4px 0">${esc(a.coaching_tip||'')}</p></div><div><b class="muted">📅 مهام متابعة</b><ul style="margin:4px 0">${tasks}</ul></div></div>`:`
       <div class="ai-cols"><div><b class="muted">نقط التقييم</b><ul class="ai-chk">${chk}</ul></div>
       <div><b class="muted">نصيحة للمندوب</b><p style="margin:4px 0 10px">${esc(a.coaching_tip||'')}</p><b class="muted">مهام متابعة</b><ul style="margin:4px 0">${tasks}</ul>
-      ${(a.objections||[]).length?`<b class="muted">اعتراضات العميل</b><ul style="margin:4px 0">${a.objections.map(o=>`<li>${esc(o)}</li>`).join('')}</ul>`:''}</div></div>
+      ${(a.objections||[]).length?`<b class="muted">اعتراضات العميل</b><ul style="margin:4px 0">${a.objections.map(o=>`<li>${esc(typeof o==='object'?o.objection:o)}</li>`).join('')}</ul>`:''}</div></div>`}
       <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">نص المكالمة</summary><div class="tr">${tr}</div></details></div>`}).join('')
    :'<div class="note">مفيش مكالمات متسجّلة في الفترة دي.</div>';
   aiSelInfo();
@@ -727,10 +786,12 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));$('p-'+t.dataset.p).classList.add('active');
   if(t.dataset.p==='ai')loadAI();
+  if(t.dataset.p==='eval')loadEval();
 });
 loadConfig().then(()=>{fillSelects();refresh();initAI();}).catch(e=>{$('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل الإعدادات</div><div class="s">${e.message}</div></div>`});
 // تحديث تلقائي كل دقيقة
-setInterval(()=>{loadedRange='';refresh()},60000);
+// (بيتخطّى التحديث لو في لوحة نص/تحليل/ملاحظة مفتوحة أو تسجيل شغال، عشان متقفلش في وشك)
+setInterval(()=>{ if(document.querySelector('.pnl')||(typeof IP!=='undefined'&&!IP.paused)||document.querySelector('.modal.show'))return; loadedRange='';refresh()},60000);
 /* ===================== أزرار المكالمة: سماع / تحميل / نص / تحليل / ملاحظة المدير ===================== */
 const IP=new Audio(); let IP_ID=null;
 IP.addEventListener('timeupdate',()=>{const b=document.querySelector(`.acts[data-id="${CSS.escape(IP_ID||'')}"] .a-play`);if(b&&IP.duration)b.style.setProperty('--p',(IP.currentTime/IP.duration*100).toFixed(1));
@@ -791,8 +852,8 @@ function aiBlock(a,tr){
   const tasks=(a.follow_up_tasks||[]).map(k=>`<li>${esc(k.task)}${k.due?' — '+esc(k.due):''}</li>`).join('')||'<li>—</li>';
   return `<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="ai-score">${esc(a.agent_score??'—')}<small>تقييم الموظف</small></div>
     <div><span class="badge b-out">${esc(a.outcome||'')}</span> <span class="badge ${a.customer_sentiment==='متضايق'?'b-miss':a.customer_sentiment==='راضي'?'b-ans':'b-no'}">${esc(a.customer_sentiment||'')}</span></div></div>
-    <p>${esc(a.summary||'')}</p><div class="ai-cols"><div><b class="muted">نقط التقييم</b><ul class="ai-chk">${chk}</ul></div>
-    <div><b class="muted">نصيحة للمندوب</b><p style="margin:4px 0 10px">${esc(a.coaching_tip||'')}</p><b class="muted">مهام متابعة</b><ul>${tasks}</ul></div></div>
+    <p>${esc(a.summary||'')}</p>${(a.criteria||[]).length?critBlock(a)+`<p class="muted" style="margin:8px 0 0">💡 ${esc(a.coaching_tip||'')}</p>`:`<div class="ai-cols"><div><b class="muted">نقط التقييم</b><ul class="ai-chk">${chk}</ul></div>
+    <div><b class="muted">نصيحة للمندوب</b><p style="margin:4px 0 10px">${esc(a.coaching_tip||'')}</p><b class="muted">مهام متابعة</b><ul>${tasks}</ul></div></div>`}
     ${tr&&tr.length?`<details><summary class="muted" style="cursor:pointer">نص المكالمة</summary><div class="tr">${tr.map(l=>`<div><span>${l.start!=null?l.start+"s":"•"}</span> ${esc(l.text)}</div>`).join('')}</div></details>`:''}`;
 }
 async function callJob(id,kind){
@@ -839,6 +900,94 @@ function supDictate(id){
   r.onend=()=>{if(SUP_REC===r&&!r._stop){try{r.start();return}catch(e){}} SUP_REC=null;btn.textContent='🎙 سجّل بصوتك';btn.classList.remove('rec');ta.value=base;};
   const stop=r.stop.bind(r); r.stop=()=>{r._stop=true;stop()};
   r.start();
+}
+
+/* ===================== تقييم الموظفين + بنود التقييم ===================== */
+let RUB=[], RUB_DEF=[], EVAL_ROWS=[];
+async function loadRubric(){ try{const j=await (await fetch(API_BASE+'/rubric',{cache:'no-store'})).json(); RUB=j.items||[]; RUB_DEF=j.default||[];}catch(e){} }
+function scoreCls(v){return v>=8?'s-hi':v>=6?'s-mid':v>=4?'s-lo':'s-bad'}
+async function loadEval(){
+  if(!$('eFrom').value){const t=new Date(),f=new Date(t.getTime()-29*864e5);$('eFrom').value=isoD(f);$('eTo').value=isoD(t);}
+  if(!$('eTeam').options.length){$('eTeam').innerHTML='<option value="">كل الفرق</option>'+TEAMS.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');}
+  $('eRank').innerHTML='<div class="muted">جاري التحميل…</div>';
+  await loadRubric();
+  try{ EVAL_ROWS=await (await fetch(`${API_BASE}/analysis?from=${$('eFrom').value}&to=${$('eTo').value}`,{cache:'no-store'})).json(); }
+  catch(e){ $('eRank').innerHTML=`<div class="note">تعذّر التحميل: ${esc(e.message)}</div>`; return; }
+  renderEval();
+}
+function isoD(d){return d.toISOString().slice(0,10)}
+function renderEval(){
+  const team=$('eTeam').value;
+  const rows=EVAL_ROWS.filter(x=>x.analysis&&REPS.some(r=>r.id===x.call.ext&&(!team||r.team===team)));
+  const by={};
+  rows.forEach(x=>{(by[x.call.ext]=by[x.call.ext]||[]).push(x.analysis)});
+  const avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
+  const reps=Object.entries(by).map(([ext,list])=>{
+    const crit={}; RUB.forEach(r=>{const v=list.map(a=>(a.criteria||[]).find(c=>c.key===r.key)).filter(Boolean).map(c=>+c.score); crit[r.key]=avg(v);});
+    const tot=avg(list.map(a=>+a.agent_score).filter(v=>!isNaN(v)));
+    const close=avg(list.map(a=>+a.close_probability).filter(v=>!isNaN(v)));
+    const won=list.filter(a=>['بيع','ميعاد'].includes(a.outcome)).length;
+    const weak=RUB.map(r=>({r,v:crit[r.key]})).filter(x=>x.v!=null).sort((a,b)=>a.v-b.v)[0];
+    return {ext:+ext,rep:repOf(+ext),n:list.length,tot,close,won,crit,weak};
+  }).sort((a,b)=>(b.tot??0)-(a.tot??0));
+  const all=rows.map(x=>+x.analysis.agent_score).filter(v=>!isNaN(v));
+  $('eKpis').innerHTML=`
+    <div class="kpi"><div class="l">مكالمات متقيّمة</div><div class="v">${rows.length}</div><div class="s">${reps.length} موظف</div></div>
+    <div class="kpi green"><div class="l">متوسط الشركة</div><div class="v">${all.length?Math.round(avg(all)):'—'}</div><div class="s">من 100</div></div>
+    <div class="kpi blue"><div class="l">بيع / ميعاد</div><div class="v">${rows.filter(x=>['بيع','ميعاد'].includes(x.analysis.outcome)).length}</div></div>
+    <div class="kpi orange"><div class="l">متوسط احتمال الإغلاق</div><div class="v">${(()=>{const v=rows.map(x=>+x.analysis.close_probability).filter(v=>!isNaN(v));return v.length?Math.round(avg(v))+'%':'—'})()}</div></div>`;
+  $('eHint').textContent=rows.some(x=>!(x.analysis.criteria||[]).length)?'بعض المكالمات اتحلّلت بالنظام القديم — حلّلها تاني عشان تظهر بنودها':'';
+  $('eRank').innerHTML=reps.length?reps.map((r,i)=>`<div class="rank">
+      <div class="rk ${i<3?'top':''}">${i<3?['🥇','🥈','🥉'][i]:i+1}</div>
+      <div style="flex:1;min-width:0"><b>${esc(r.rep.name)}</b> <span class="muted">${esc(teamOf(r.rep.team)?.name||'')} · ${r.n} مكالمة · بيع/ميعاد ${r.won}${r.close!=null?` · احتمال إغلاق ${Math.round(r.close)}%`:''}</span>
+        ${r.weak?`<div class="muted" style="font-size:12px;margin-top:3px">🎯 يحتاج يشتغل على: <b style="color:var(--orange)">${esc(r.weak.r.name)}</b> (${r.weak.v.toFixed(1)}/10)</div>`:''}</div>
+      <div class="bigscore ${scoreCls((r.tot??0)/10)}">${r.tot!=null?Math.round(r.tot):'—'}<small>/100</small></div></div>`).join('')
+    :'<div class="note">مفيش مكالمات متحلّلة في الفترة دي — حلّل مكالمات من تبويب "تحليل المكالمات".</div>';
+  $('eHeat').innerHTML=reps.length?`<tr><th>الموظف</th>${RUB.map(r=>`<th class="c" title="${esc(r.look_for)}">${esc(r.name)}<br><small class="muted">${r.weight}%</small></th>`).join('')}<th class="c">الكلية</th></tr>`+
+    reps.map(r=>`<tr><td><b>${esc(r.rep.name)}</b></td>${RUB.map(c=>{const v=r.crit[c.key];return `<td class="c"><span class="hm ${v==null?'':scoreCls(v)}">${v==null?'—':v.toFixed(1)}</span></td>`}).join('')}<td class="c"><b>${r.tot!=null?Math.round(r.tot):'—'}</b></td></tr>`).join(''):'';
+}
+/* --- محرّر البنود --- */
+let RUB_EDIT=[];
+async function openRubric(){ await loadRubric(); RUB_EDIT=RUB.map(x=>({...x})); rubRender(); $('rubMsg').textContent=''; $('rubModal').classList.add('show'); }
+function rubRender(){
+  $('rubList').innerHTML=RUB_EDIT.map((r,i)=>`<div class="rub-row">
+    <div class="rub-n">${i+1}</div>
+    <div style="flex:1;display:grid;gap:6px">
+      <div style="display:flex;gap:8px"><input class="rub-name" value="${esc(r.name)}" placeholder="اسم البند" oninput="RUB_EDIT[${i}].name=this.value">
+        <div class="rub-w"><input type="number" min="0" max="100" value="${r.weight}" oninput="RUB_EDIT[${i}].weight=+this.value;rubTotal()"><span>%</span></div></div>
+      <textarea rows="2" placeholder="الـ AI يدور على إيه في المكالمة؟" oninput="RUB_EDIT[${i}].look_for=this.value">${esc(r.look_for||'')}</textarea>
+    </div>
+    <div class="rub-ops"><button title="لفوق" onclick="rubMove(${i},-1)">▲</button><button title="لتحت" onclick="rubMove(${i},1)">▼</button><button title="مسح" onclick="RUB_EDIT.splice(${i},1);rubRender()">✕</button></div>
+  </div>`).join('');
+  rubTotal();
+}
+function rubTotal(){const t=RUB_EDIT.reduce((s,r)=>s+(+r.weight||0),0);$('rubTotal').textContent=`مجموع الأوزان: ${t}%`;$('rubTotal').className='rub-total '+(t===100?'ok':'bad');}
+function rubMove(i,d){const j=i+d;if(j<0||j>=RUB_EDIT.length)return;[RUB_EDIT[i],RUB_EDIT[j]]=[RUB_EDIT[j],RUB_EDIT[i]];rubRender();}
+function rubAdd(){RUB_EDIT.push({key:'',name:'',weight:0,look_for:''});rubRender();setTimeout(()=>{const l=$('rubList').querySelectorAll('.rub-name');l[l.length-1].focus()},50);}
+function rubReset(){if(!confirm('ترجّع البنود العشرة الافتراضية؟'))return;RUB_EDIT=RUB_DEF.map(x=>({...x}));rubRender();}
+async function rubSave(){
+  $('rubMsg').textContent='بيحفظ…';
+  try{const r=await fetch(API_BASE+'/rubric',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:RUB_EDIT})});
+    const j=await r.json(); if(!r.ok) throw new Error(j.detail||r.status);
+    RUB=j.items; $('rubMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظت — المكالمات اللي هتتحلّل من دلوقتي هتتقيّم بالبنود دي</span>'; renderEval();
+  }catch(e){$('rubMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+}
+/* --- تفاصيل تحليل مكالمة بالبنود --- */
+function critBlock(a){
+  if(!(a.criteria||[]).length) return '';
+  const obj=(a.objections||[]).filter(o=>o&&typeof o==='object');
+  return `<div class="crit">${a.criteria.map(c=>`<details class="cr"><summary>
+      <span class="cr-n">${esc(c.name)} <small class="muted">${c.weight}%</small></span>
+      <span class="cr-bar"><b class="${scoreCls(c.score)}" style="width:${c.score*10}%"></b></span><span class="cr-s ${scoreCls(c.score)}">${(+c.score).toFixed(0)}/10</span></summary>
+      <div class="cr-d"><div>📌 <span class="muted">الدليل:</span> ${esc(c.evidence||'—')}</div><div>💡 <span class="muted">التحسين:</span> ${esc(c.improvement||'—')}</div></div></details>`).join('')}</div>
+    <div class="ai-cols" style="margin-top:10px">
+      <div><b class="muted">💪 أقوى نقاط</b><ul class="ai-chk">${(a.strengths||[]).map(x=>`<li class="ok">✔ ${esc(x)}</li>`).join('')}</ul></div>
+      <div><b class="muted">⚠️ أضعف نقاط</b><ul class="ai-chk">${(a.weaknesses||[]).map(x=>`<li class="no">✖ ${esc(x)}</li>`).join('')}</ul></div></div>
+    ${obj.length?`<b class="muted">🛡 الاعتراضات</b><ul class="ai-chk">${obj.map(o=>`<li class="${o.resolved?'ok':'no'}">${o.resolved?'✔ اتحل':'✖ متحلش'} — <b>${esc(o.objection)}</b>${o.how?` <span class="muted">(${esc(o.how)})</span>`:''}</li>`).join('')}</ul>`:''}
+    <div class="ai-meta">${a.close_probability!=null?`<span>🎯 احتمال الإغلاق <b>${a.close_probability}%</b></span>`:''}
+      ${a.talk_ratio?`<span>🗣 كلام الموظف/العميل <b>${a.talk_ratio.agent}:${a.talk_ratio.customer}</b></span>`:''}
+      ${a.sentiment_start?`<span>😊 المشاعر <b>${esc(a.sentiment_start)} ← ${esc(a.sentiment_end||'')}</b></span>`:''}
+      ${(a.buying_signals||[]).length?`<span>💰 إشارات شراء: <b>${a.buying_signals.map(esc).join('، ')}</b></span>`:''}</div>`;
 }
 </script>
 </body>

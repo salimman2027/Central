@@ -31,8 +31,8 @@ CHECKLIST = [
     "كان مهذّب ومحترف طول المكالمة",
 ]
 
-PROMPT = """أنت محلل جودة مكالمات لشركة "الجودة الوطنية لتقنية المعلومات" (NQ) في السعودية.
-ده نص مكالمة بين موظف مبيعات وعميل (النص متحوّل آليًا من الصوت، فممكن يكون فيه أخطاء — متخمّنش حاجة مش موجودة).
+PROMPT = """أنت محلل جودة مكالمات تيلي سيلز محترف لشركة "الجودة الوطنية لتقنية المعلومات" (NQ) في السعودية.
+ده نص مكالمة بين موظف مبيعات وعميل (النص متحوّل آليًا من الصوت، فممكن يكون فيه أخطاء — متخمّنش حاجة مش موجودة في النص).
 
 بيانات المكالمة: {meta}
 
@@ -41,21 +41,35 @@ PROMPT = """أنت محلل جودة مكالمات لشركة "الجودة ا�
 {transcript}
 </transcript>
 
+حلّل المكالمة على أساس البنود دي (كل بند: اسمه، ووزنه من 100، والحاجات اللي تدور عليها):
+<rubric>
+{rubric}
+</rubric>
+
+لكل بند اديني:
+- score: درجة من 0 لـ 10 (لو البند مش موجود خالص في المكالمة أو مش منطبق، ادي درجة على قد اللي حصل وقول السبب)
+- evidence: دليل من نص المكالمة (اقتباس قصير بين علامات تنصيص) أو "مفيش" لو مش موجود
+- improvement: نقطة تحسين واحدة عملية
+
 رجّع JSON بس (من غير أي كلام قبله أو بعده) بالشكل ده بالظبط:
 {{
-  "summary": "ملخص المكالمة في سطرين بالعربي",
-  "customer_sentiment": "راضي | محايد | متضايق",
-  "sentiment_reason": "سبب قصير",
-  "outcome": "بيع | مهتم | يحتاج متابعة | رفض | لم يكتمل",
+  "criteria": [{{"key": "مفتاح البند زي ما هو", "score": 0, "evidence": "...", "improvement": "..."}}],
+  "strengths": ["أقوى نقطة 1", "2", "3"],
+  "weaknesses": ["أضعف نقطة 1", "2", "3"],
+  "objections": [{{"objection": "الاعتراض", "resolved": true, "how": "اتحل إزاي أو ليه متحلش"}}],
+  "outcome": "بيع | ميعاد | متابعة | رفض | لم يكتمل",
   "outcome_reason": "سبب قصير",
-  "customer_needs": ["احتياج 1", "..."],
-  "objections": ["اعتراض 1", "..."],
-  "checklist": [{{"item": "...", "done": true, "evidence": "جملة قصيرة من المكالمة أو null"}}],
-  "agent_score": 0,
-  "coaching_tip": "نصيحة واحدة عملية للموظف",
+  "close_probability": 0,
+  "buying_signals": ["إشارة شراء ظهرت من العميل"],
+  "talk_ratio": {{"agent": 0, "customer": 0}},
+  "customer_sentiment": "راضي | محايد | متضايق",
+  "sentiment_start": "إيجابي | محايد | سلبي",
+  "sentiment_end": "إيجابي | محايد | سلبي",
+  "summary": "ملخص المكالمة في سطرين بالعربي",
+  "coaching_tip": "أهم نصيحة واحدة للموظف",
   "follow_up_tasks": [{{"task": "...", "due": "ميعاد لو اتذكر أو null"}}]
 }}
-agent_score من 0 لـ 100 حسب نقط التقييم دي: {checklist}"""
+close_probability من 0 لـ 100. talk_ratio تقدير نسبة كلام كل طرف (مجموعهم 100). رجّع كل بنود الـ rubric بنفس الـ key."""
 
 
 _MODEL = None
@@ -127,16 +141,29 @@ def transcribe(wav: str) -> dict:
 def analyze(transcript_lines: list, meta: dict) -> dict:
     import anthropic
     text = "\n".join((f"[{l['start']:>6}s] " if l.get("start") is not None else "- ") + l["text"] for l in transcript_lines)
+    import rubric as R
+    rub = R.load()
     msg = anthropic.Anthropic().messages.create(
         model=CLAUDE_MODEL,
-        max_tokens=2000,
+        max_tokens=6000,
         messages=[{"role": "user", "content": PROMPT.format(
             meta=json.dumps(meta, ensure_ascii=False), transcript=text,
-            checklist=json.dumps(CHECKLIST, ensure_ascii=False))}],
+            rubric=json.dumps(rub, ensure_ascii=False, indent=1))}],
     )
     raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
     raw = raw[raw.find("{"): raw.rfind("}") + 1]
-    return json.loads(raw)
+    a = json.loads(raw)
+    # الدرجة الكلية بنحسبها إحنا بالأوزان (مش بنسيبها للنموذج)
+    by = {c.get("key"): c for c in a.get("criteria") or []}
+    a["criteria"] = [{"key": r["key"], "name": r["name"], "weight": r["weight"],
+                      "score": max(0, min(10, float(by.get(r["key"], {}).get("score") or 0))),
+                      "evidence": by.get(r["key"], {}).get("evidence", ""),
+                      "improvement": by.get(r["key"], {}).get("improvement", "")} for r in rub]
+    a["agent_score"] = R.weighted_total(rub, a["criteria"])
+    # توافق مع الشاشات القديمة
+    a["checklist"] = [{"item": c["name"], "done": c["score"] >= 6, "evidence": c["evidence"]} for c in a["criteria"]]
+    a["objections_text"] = [o.get("objection", "") for o in a.get("objections") or [] if isinstance(o, dict)]
+    return a
 
 
 def meta_from_name(path: str) -> dict:

@@ -539,6 +539,24 @@ async def save_supnote(request: Request):
     return {"ok": True}
 
 
+# ---------------- بنود التقييم ----------------
+import rubric as RUBRIC  # noqa: E402
+
+
+@app.get("/api/rubric")
+def get_rubric():
+    return {"items": RUBRIC.load(), "default": RUBRIC.DEFAULT}
+
+
+@app.put("/api/rubric")
+async def put_rubric(request: Request):
+    try:
+        items = (await request.json()).get("items")
+        return {"items": RUBRIC.save(items)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 # ---------------- page ----------------
 @app.get("/")
 def index():
