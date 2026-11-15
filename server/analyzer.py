@@ -51,8 +51,17 @@ PROMPT = """أنت محلل جودة مكالمات تيلي سيلز محترف
 - evidence: دليل من نص المكالمة (اقتباس قصير بين علامات تنصيص) أو "مفيش" لو مش موجود
 - improvement: نقطة تحسين واحدة عملية
 
+وكمان صنّف المكالمة بالأنواع دي بس (اختار من القوايم بالنص زي ما هو، ولو مفيش حاجة مناسبة اختار "أخرى" واشرح في detail):
+<types>
+{taxonomy}
+</types>
+
 رجّع JSON بس (من غير أي كلام قبله أو بعده) بالشكل ده بالظبط:
 {{
+  "customer_pains": [{{"type": "نوع من customer_pains", "detail": "المشكلة زي ما العميل قالها باختصار"}}],
+  "agent_issues": [{{"type": "نوع من agent_issues", "detail": "إيه اللي حصل بالظبط في المكالمة"}}],
+  "no_buy_reason": {{"type": "نوع من no_buy أو null لو العميل اشترى/حجز ميعاد", "detail": "السبب زي ما العميل قاله"}},
+  "lesson": "الدرس المستفاد من المكالمة دي في جملة واحدة عملية (إيه اللي يتعمل المرة الجاية)",
   "criteria": [{{"key": "مفتاح البند زي ما هو", "score": 0, "evidence": "...", "improvement": "..."}}],
   "strengths": ["أقوى نقطة 1", "2", "3"],
   "weaknesses": ["أضعف نقطة 1", "2", "3"],
@@ -142,13 +151,16 @@ def analyze(transcript_lines: list, meta: dict) -> dict:
     import anthropic
     text = "\n".join((f"[{l['start']:>6}s] " if l.get("start") is not None else "- ") + l["text"] for l in transcript_lines)
     import rubric as R
+    import taxonomy as T
     rub = R.load()
+    tax = T.load()
     msg = anthropic.Anthropic().messages.create(
         model=CLAUDE_MODEL,
         max_tokens=6000,
         messages=[{"role": "user", "content": PROMPT.format(
             meta=json.dumps(meta, ensure_ascii=False), transcript=text,
-            rubric=json.dumps(rub, ensure_ascii=False, indent=1))}],
+            rubric=json.dumps(rub, ensure_ascii=False, indent=1),
+            taxonomy=json.dumps(tax, ensure_ascii=False, indent=1))}],
     )
     raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
     raw = raw[raw.find("{"): raw.rfind("}") + 1]
@@ -160,6 +172,17 @@ def analyze(transcript_lines: list, meta: dict) -> dict:
                       "evidence": by.get(r["key"], {}).get("evidence", ""),
                       "improvement": by.get(r["key"], {}).get("improvement", "")} for r in rub]
     a["agent_score"] = R.weighted_total(rub, a["criteria"])
+    # الأنواع لازم تبقى من القوايم
+    def fix(lst, allowed):
+        out = []
+        for x in lst or []:
+            if isinstance(x, dict) and x.get("type"):
+                out.append({"type": x["type"] if x["type"] in allowed else "أخرى", "detail": str(x.get("detail") or "")[:300]})
+        return out
+    a["customer_pains"] = fix(a.get("customer_pains"), tax["customer_pains"])
+    a["agent_issues"] = fix(a.get("agent_issues"), tax["agent_issues"])
+    nb = a.get("no_buy_reason")
+    a["no_buy_reason"] = (fix([nb], tax["no_buy"]) or [None])[0] if isinstance(nb, dict) and nb.get("type") else None
     # توافق مع الشاشات القديمة
     a["checklist"] = [{"item": c["name"], "done": c["score"] >= 6, "evidence": c["evidence"]} for c in a["criteria"]]
     a["objections_text"] = [o.get("objection", "") for o in a.get("objections") or [] if isinstance(o, dict)]

@@ -308,6 +308,24 @@ html[data-theme=light] .rub-row input,html[data-theme=light] .rub-row textarea{b
 html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#fff;color-scheme:light}
 .ap-q{font-style:italic}
 #apTbl td{vertical-align:middle}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+.ib summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;padding:7px 0;border-bottom:1px solid var(--border)}.ib summary::-webkit-details-marker{display:none}
+.ib-n{width:42%;font-size:14px}.ib-bar{flex:1;height:10px;border-radius:99px;background:rgba(148,190,255,.12);overflow:hidden}
+.ib-bar b{display:block;height:100%;border-radius:99px}.ib-bar b.red{background:linear-gradient(90deg,#ff4d73,#ff8a6b)}.ib-bar b.orange{background:linear-gradient(90deg,#ffb547,#ffd36b)}
+.ib-c{width:64px;text-align:left;font-weight:800}
+.ib-ex{margin:6px 0 10px;padding-inline-start:18px;font-size:13px;display:grid;gap:5px}.ib-l{color:var(--teal);font-size:12.5px;margin-top:2px}
+.ls-over{display:grid;gap:8px}.ls-i{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--teal-l)}
+.ls-i b{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#19e6c1,#5aa8ff);color:#04101a;display:grid;place-items:center;flex-shrink:0;font-size:13px}
+.ls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.ls-card{border:1px solid var(--border);border-radius:14px;padding:12px;background:var(--glass);display:grid;gap:5px;font-size:14px}
+.ls-script{background:rgba(25,230,193,.08);border-inline-start:3px solid var(--teal);padding:8px 10px;border-radius:8px;font-size:13.5px}
+#p-ins h4{margin:16px 0 8px}
+.tax-ta{width:100%;margin-top:6px;background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px;font:inherit;font-size:13.5px;line-height:1.7}
+html[data-theme=light] .tax-ta{background:#fff}
+.ai-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.ai-tags span{border-radius:99px;padding:3px 10px;font-size:12.5px;border:1px solid}
+.tg-r{color:var(--red);background:rgba(255,77,115,.08)}.tg-o{color:var(--orange);background:rgba(255,181,71,.08)}.tg-b{color:var(--blue);background:rgba(90,168,255,.08)}
 /* التقرير ورق أبيض للطباعة */
 .report{color:#1C2B2A;border-radius:14px;--teal:#0F7C7A;--teal-d:#0A5654;--teal-l:#E7F3F2;--border:#D5E2E1;--text:#1C2B2A}
 .report th{background:#0F7C7A;color:#fff}.report td{border-color:#D5E2E1}.report tr:hover td{background:none}
@@ -332,6 +350,7 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
   <div class="tab" data-p="report">🖨️ تقرير عدد المكالمات</div>
   <div class="tab" data-p="ai">🤖 تحليل المكالمات</div>
   <div class="tab" data-p="eval">⭐ تقييم الموظفين</div>
+  <div class="tab" data-p="ins">🧭 المشاكل وأسباب عدم الشراء</div>
   <div class="tab" data-p="appt">📅 طلبات تحديد موعد <span class="tcount" id="apCount"></span></div>
 </div>
 
@@ -419,6 +438,33 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 <!-- ================= AI ANALYSIS ================= -->
 
 
+
+<div class="page" id="p-ins">
+  <div class="filters">
+    <div class="f"><label>من تاريخ</label><input type="date" id="iFrom"></div>
+    <div class="f"><label>إلى تاريخ</label><input type="date" id="iTo"></div>
+    <button class="btn" onclick="loadIns()">عرض</button>
+    <span class="sp" style="flex:1"></span>
+    <button class="btn o" onclick="openTax()">⚙️ الأنواع</button>
+  </div>
+  <div class="note" id="iNote" style="margin-bottom:14px"></div>
+  <div class="grid2">
+    <div class="card"><h3>🚫 أسباب عدم الشراء</h3><div id="iNoBuy"></div></div>
+    <div class="card"><h3>😟 مشاكل العملاء</h3><div id="iPains"></div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>👤 مشاكل كل موظف في المكالمات <span class="muted" style="font-weight:400;font-size:13px">— عدد المرات</span></h3><div class="tw"><table id="iReps"></table></div></div>
+  <div class="card" style="margin-top:14px"><h3>🎓 الدروس المستفادة<span class="sp"></span><button class="btn" id="iLessBtn" onclick="makeLessons()">🧠 استخرج الدروس المستفادة</button></h3><div id="iLessons"></div></div>
+</div>
+
+<div class="modal" id="taxModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="mbox" style="max-width:900px;width:96vw;max-height:90vh;overflow:auto">
+    <h3 style="margin-top:0">⚙️ الأنواع اللي الـ AI بيصنّف بيها المكالمات</h3>
+    <div class="muted" style="font-size:13px;margin-bottom:10px">نوع في كل سطر. التعديل بيتطبّق على المكالمات اللي هتتحلّل بعد كده. "أخرى" بتتضاف لوحدها.</div>
+    <div class="grid3" id="taxBox"></div>
+    <div class="rub-foot"><span class="sp" style="flex:1"></span><button class="btn o" onclick="taxReset()">↺ الافتراضي</button><button class="btn" onclick="taxSave()">💾 حفظ</button></div>
+    <div id="taxMsg" class="muted"></div>
+  </div>
+</div>
 <div class="page" id="p-appt">
   <div class="filters">
     <div class="seg2" id="apSeg">
@@ -811,6 +857,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.p==='ai')loadAI();
   if(t.dataset.p==='eval')loadEval();
   if(t.dataset.p==='appt')loadAppt();
+  if(t.dataset.p==='ins')loadIns();
 });
 loadConfig().then(()=>{fillSelects();refresh();initAI();}).catch(e=>{$('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل الإعدادات</div><div class="s">${e.message}</div></div>`});
 // تحديث تلقائي كل دقيقة
@@ -1008,6 +1055,11 @@ function critBlock(a){
       <div><b class="muted">💪 أقوى نقاط</b><ul class="ai-chk">${(a.strengths||[]).map(x=>`<li class="ok">✔ ${esc(x)}</li>`).join('')}</ul></div>
       <div><b class="muted">⚠️ أضعف نقاط</b><ul class="ai-chk">${(a.weaknesses||[]).map(x=>`<li class="no">✖ ${esc(x)}</li>`).join('')}</ul></div></div>
     ${obj.length?`<b class="muted">🛡 الاعتراضات</b><ul class="ai-chk">${obj.map(o=>`<li class="${o.resolved?'ok':'no'}">${o.resolved?'✔ اتحل':'✖ متحلش'} — <b>${esc(o.objection)}</b>${o.how?` <span class="muted">(${esc(o.how)})</span>`:''}</li>`).join('')}</ul>`:''}
+    ${a.no_buy_reason||(a.customer_pains||[]).length||(a.agent_issues||[]).length?`<div class="ai-tags">
+      ${a.no_buy_reason?`<span class="tg-r">🚫 ${esc(a.no_buy_reason.type)}</span>`:''}
+      ${(a.customer_pains||[]).map(p=>`<span class="tg-o" title="${esc(p.detail)}">😟 ${esc(p.type)}</span>`).join('')}
+      ${(a.agent_issues||[]).map(p=>`<span class="tg-b" title="${esc(p.detail)}">👤 ${esc(p.type)}</span>`).join('')}</div>`:''}
+    ${a.lesson?`<div class="ib-l" style="margin-top:6px">🎓 ${esc(a.lesson)}</div>`:''}
     <div class="ai-meta">${a.close_probability!=null?`<span>🎯 احتمال الإغلاق <b>${a.close_probability}%</b></span>`:''}
       ${a.talk_ratio?`<span>🗣 كلام الموظف/العميل <b>${a.talk_ratio.agent}:${a.talk_ratio.customer}</b></span>`:''}
       ${a.sentiment_start?`<span>😊 المشاعر <b>${esc(a.sentiment_start)} ← ${esc(a.sentiment_end||'')}</b></span>`:''}
@@ -1077,6 +1129,59 @@ async function apScan(){
 }
 setInterval(()=>{if(!document.querySelector('#p-appt.active input:focus'))loadAppt()},90000);
 setTimeout(loadAppt,1500);
+
+/* ===================== المشاكل وأسباب عدم الشراء والدروس ===================== */
+let INS=null, TAX=null;
+async function loadIns(){
+  if(!$('iFrom').value){const t=new Date(),f=new Date(t.getTime()-29*864e5);$('iFrom').value=isoD(f);$('iTo').value=isoD(t);}
+  $('iNoBuy').innerHTML=$('iPains').innerHTML='<div class="muted">جاري التحميل…</div>';
+  try{INS=await (await fetch(`${API_BASE}/insights?from=${$('iFrom').value}&to=${$('iTo').value}`,{cache:'no-store'})).json();}
+  catch(e){$('iNote').textContent='تعذّر التحميل: '+e.message;return}
+  $('iNote').innerHTML=`${INS.classified} مكالمة متصنّفة من ${INS.analyzed} متحلّلة في الفترة.`+(INS.analyzed>INS.classified?` <b>${INS.analyzed-INS.classified}</b> اتحلّلت قبل الخاصية دي — حلّلها تاني من "تحليل المكالمات" عشان تدخل هنا.`:'');
+  const bars=(list,cls,key)=>{const mx=Math.max(1,...list.map(v=>v.count));return list.length?list.map((v,i)=>`<details class="ib"><summary>
+      <span class="ib-n">${esc(v.type)}</span><span class="ib-bar"><b class="${cls}" style="width:${v.count*100/mx}%"></b></span><span class="ib-c">${v.count}${v.pct!=null?` <small class="muted">${v.pct}%</small>`:''}</span></summary>
+      <ul class="ib-ex">${v.examples.map(e=>`<li>"${esc(e.detail)}" <span class="muted">— ${esc(e.rep)} · ${dmy(new Date(e.time))}</span>${e.lesson&&key==='nb'?`<div class="ib-l">🎓 ${esc(e.lesson)}</div>`:''}</li>`).join('')}</ul></details>`).join('')
+    :'<div class="muted" style="padding:14px">مفيش لسه</div>'};
+  $('iNoBuy').innerHTML=bars(INS.no_buy,'red','nb');
+  $('iPains').innerHTML=bars(INS.pains,'orange','p');
+  const types=INS.taxonomy.agent_issues.filter(t=>INS.reps.some(r=>r.issues[t]));
+  $('iReps').innerHTML=INS.reps.length?`<tr><th>الموظف</th><th class="c">مكالمات</th>${types.map(t=>`<th class="c">${esc(t)}</th>`).join('')}<th>أكتر مشكلة</th></tr>`+
+    INS.reps.map(r=>{const mx=Math.max(1,...Object.values(r.issues));return `<tr><td><b>${esc(r.name)}</b></td><td class="c">${r.calls}</td>${types.map(t=>{const v=r.issues[t]||0;
+      return `<td class="c">${v?`<span class="hm ${v/mx>.66?'s-bad':v/mx>.33?'s-lo':'s-mid'}" title="${esc((r.examples[t]||[]).map(e=>e.detail).join(' | '))}">${v}</span>`:'<span class="muted">—</span>'}</td>`}).join('')}
+      <td>${r.top?`<b style="color:var(--orange)">${esc(r.top)}</b>`:'—'}</td></tr>`}).join(''):'<tr><td class="muted">مفيش لسه</td></tr>';
+  renderLessons(INS.lessons);
+}
+function renderLessons(L){
+  if(!L){$('iLessons').innerHTML='<div class="muted">دوس "استخرج الدروس المستفادة" والـ AI هيقرا كل أسباب الرفض ومشاكل الموظفين في الفترة دي ويطلّع الدروس وجمل جاهزة للمناديب.</div>';return}
+  const reps=Object.fromEntries((REPS||[]).map(r=>[r.id,r.name]));
+  $('iLessons').innerHTML=`<div class="muted" style="font-size:12px;margin-bottom:8px">من ${L.calls} مكالمة · اتعملت ${new Date(L.generated).toLocaleString('ar-EG')}</div>
+    <div class="ls-over">${(L.overall||[]).map((x,i)=>`<div class="ls-i"><b>${i+1}</b>${esc(x)}</div>`).join('')}</div>
+    ${(L.by_reason||[]).length?`<h4>🚫 لكل سبب رفض</h4><div class="ls-grid">${L.by_reason.map(r=>`<div class="ls-card"><b>${esc(r.type)}</b>
+      <div class="muted" style="font-size:13px;margin:4px 0">${esc(r.insight||'')}</div><div>✅ ${esc(r.what_to_do||'')}</div>
+      ${r.script?`<div class="ls-script">💬 "${esc(r.script)}"</div>`:''}</div>`).join('')}</div>`:''}
+    ${(L.by_rep||[]).length?`<h4>👤 لكل موظف</h4><div class="ls-grid">${L.by_rep.map(r=>`<div class="ls-card"><b>${esc(reps[+r.ext]||r.ext)}</b><div>🎯 ${esc(r.focus||'')}</div><div class="muted" style="font-size:13px">🏋️ ${esc(r.training||'')}</div></div>`).join('')}</div>`:''}
+    ${(L.opportunities||[]).length?`<h4>💡 فرص بيع</h4><ul>${L.opportunities.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`;
+}
+async function makeLessons(){
+  const b=$('iLessBtn'); b.disabled=true; b.textContent='⏳ بيفكّر… (ممكن دقيقة)';
+  try{const r=await fetch(`${API_BASE}/insights/lessons?from=${$('iFrom').value}&to=${$('iTo').value}`,{method:'POST'});const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||r.status); renderLessons(j);}
+  catch(e){$('iLessons').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
+  b.disabled=false; b.textContent='🧠 استخرج الدروس المستفادة';
+}
+let TAX_DEF=null, TAX_LBL={};
+async function openTax(){
+  const j=await (await fetch(API_BASE+'/taxonomy',{cache:'no-store'})).json(); TAX=j.items; TAX_DEF=j.default; TAX_LBL=j.labels;
+  taxRender(TAX); $('taxMsg').textContent=''; $('taxModal').classList.add('show');
+}
+function taxRender(t){$('taxBox').innerHTML=Object.keys(TAX_LBL).map(k=>`<div><b>${esc(TAX_LBL[k])}</b><textarea id="tax-${k}" rows="14" class="tax-ta">${esc((t[k]||[]).join('\n'))}</textarea></div>`).join('');}
+function taxReset(){if(confirm('ترجّع الأنواع الافتراضية؟'))taxRender(TAX_DEF);}
+async function taxSave(){
+  const items=Object.fromEntries(Object.keys(TAX_LBL).map(k=>[k,$('tax-'+k).value.split('\n').map(x=>x.trim()).filter(Boolean)]));
+  try{const r=await fetch(API_BASE+'/taxonomy',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||r.status); taxRender(j.items); $('taxMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظت</span>';}
+  catch(e){$('taxMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+}
 </script>
 </body>
 </html>

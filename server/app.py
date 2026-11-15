@@ -564,6 +564,121 @@ async def put_rubric(request: Request):
         raise HTTPException(400, str(e))
 
 
+# ---------------- مشاكل العملاء + أخطاء الموظفين + أسباب عدم الشراء ----------------
+import taxonomy as TAX  # noqa: E402
+
+
+@app.get("/api/taxonomy")
+def get_taxonomy():
+    return {"items": TAX.load(), "default": TAX.DEFAULT, "labels": TAX.LABELS}
+
+
+@app.put("/api/taxonomy")
+async def put_taxonomy(request: Request):
+    try:
+        return {"items": TAX.save((await request.json()).get("items") or {})}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/insights")
+def insights(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(alias="to")):
+    rows = analysis(date_from, date_to)
+    names = {r.get("id"): r.get("name", "") for r in config().get("reps", [])}
+    tax = TAX.load()
+    nb, pains, reps = {}, {}, {}
+    classified = 0
+    for x in rows:
+        a, c = x["analysis"], x["call"]
+        if not any(k in a for k in ("customer_pains", "agent_issues", "no_buy_reason")):
+            continue
+        classified += 1
+        ex = {"id": c["id"], "time": c["time"], "number": c["number"], "rep": names.get(c["ext"], str(c["ext"])),
+              "lesson": a.get("lesson") or ""}
+        r = a.get("no_buy_reason")
+        if isinstance(r, dict) and r.get("type"):
+            e = nb.setdefault(r["type"], {"type": r["type"], "count": 0, "examples": []})
+            e["count"] += 1
+            e["examples"].append({**ex, "detail": r.get("detail", "")})
+        for p in a.get("customer_pains") or []:
+            e = pains.setdefault(p["type"], {"type": p["type"], "count": 0, "examples": []})
+            e["count"] += 1
+            e["examples"].append({**ex, "detail": p.get("detail", "")})
+        rp = reps.setdefault(c["ext"], {"ext": c["ext"], "name": names.get(c["ext"], str(c["ext"])), "calls": 0, "issues": {}, "examples": {}})
+        rp["calls"] += 1
+        for i in a.get("agent_issues") or []:
+            rp["issues"][i["type"]] = rp["issues"].get(i["type"], 0) + 1
+            rp["examples"].setdefault(i["type"], []).append({**ex, "detail": i.get("detail", "")})
+    tot_nb = sum(v["count"] for v in nb.values()) or 1
+    for v in nb.values():
+        v["pct"] = round(v["count"] * 100 / tot_nb)
+        v["examples"] = sorted(v["examples"], key=lambda e: e["time"], reverse=True)[:8]
+    for v in pains.values():
+        v["examples"] = sorted(v["examples"], key=lambda e: e["time"], reverse=True)[:8]
+    for v in reps.values():
+        v["top"] = max(v["issues"], key=v["issues"].get) if v["issues"] else None
+        v["examples"] = {k: e[:5] for k, e in v["examples"].items()}
+    return {"analyzed": len(rows), "classified": classified, "taxonomy": tax,
+            "no_buy": sorted(nb.values(), key=lambda v: -v["count"]),
+            "pains": sorted(pains.values(), key=lambda v: -v["count"]),
+            "reps": sorted(reps.values(), key=lambda v: -sum(v["issues"].values())),
+            "lessons": _lessons_cache().get(f"{date_from}|{date_to}")}
+
+
+LESSONS_FILE = DATA_DIR / "lessons.json"
+LESSONS_PROMPT = """إنت مدير مبيعات خبير لشركة "الجودة الوطنية لتقنية المعلومات" (NQ) — برامج محاسبة وإدارة في السعودية.
+دي خلاصة تحليل مكالمات التيلي سيلز في الفترة من {d1} لـ {d2}: أسباب عدم الشراء بعددها وأمثلة، ومشاكل العملاء، وأخطاء كل موظف، والدروس من كل مكالمة.
+<data>
+{data}
+</data>
+
+طلّع الدروس المستفادة. رجّع JSON بس:
+{{
+  "overall": ["أهم 5 دروس للفريق كله — عملية ومحددة"],
+  "by_reason": [{{"type": "سبب عدم الشراء", "insight": "ليه بيحصل", "what_to_do": "إيه اللي المندوب يعمله", "script": "جملة يقولها المندوب بالعامية لما العميل يقول السبب ده"}}],
+  "by_rep": [{{"ext": 100, "focus": "أهم حاجة الموظف ده يشتغل عليها", "training": "تمرين أو تدريب مقترح"}}],
+  "opportunities": ["فرص بيع أو منتجات/خدمات العملاء محتاجينها من المشاكل اللي اتقالت"]
+}}"""
+
+
+def _lessons_cache() -> dict:
+    try:
+        return json.loads(LESSONS_FILE.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+@app.post("/api/insights/lessons")
+def make_lessons(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(alias="to")):
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise HTTPException(400, "مفتاح Claude API مش متضاف على السيرفر")
+    ins = insights(date_from, date_to)
+    if not ins["classified"]:
+        raise HTTPException(400, "مفيش مكالمات متحلّلة بالأنواع في الفترة دي — حلّل مكالمات الأول")
+    slim = {
+        "no_buy": [{"type": v["type"], "count": v["count"], "examples": [e["detail"] for e in v["examples"][:5]]} for v in ins["no_buy"]],
+        "customer_pains": [{"type": v["type"], "count": v["count"], "examples": [e["detail"] for e in v["examples"][:4]]} for v in ins["pains"]],
+        "reps": [{"ext": v["ext"], "name": v["name"], "calls": v["calls"], "issues": v["issues"]} for v in ins["reps"]],
+        "call_lessons": [e["lesson"] for v in ins["no_buy"] for e in v["examples"] if e.get("lesson")][:40],
+    }
+    import anthropic
+    msg = anthropic.Anthropic().messages.create(
+        model=os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5"), max_tokens=6000,
+        messages=[{"role": "user", "content": LESSONS_PROMPT.format(
+            d1=date_from, d2=date_to, data=json.dumps(slim, ensure_ascii=False, indent=1))}])
+    raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
+    try:
+        res = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+    except ValueError:
+        raise HTTPException(502, "رد Claude مش مفهوم — جرّب تاني")
+    res["generated"] = dt.datetime.now(TZ).isoformat()
+    res["calls"] = ins["classified"]
+    cache = _lessons_cache()
+    cache[f"{date_from}|{date_to}"] = res
+    LESSONS_FILE.write_text(json.dumps(dict(list(cache.items())[-30:]), ensure_ascii=False), encoding="utf-8")
+    return res
+
+
 # ---------------- page ----------------
 @app.get("/")
 def index():
