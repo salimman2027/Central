@@ -1123,7 +1123,7 @@ function renderAppt(){
          <select id="apu-${id}" title="المدة">${[30,45,60,90,120].map(m=>`<option value="${m}" ${m===(+it.duration||AP_DUR)?'selected':''}>${m} د</option>`).join('')}</select></div>
          <input class="ap-in" style="margin-top:5px;width:100%" id="apl-${id}" value="${esc(it.location||it.details||'')}" placeholder="المكان أو لينك الاجتماع">
          <div class="muted" style="font-size:12px;margin-top:3px">${apWhen(it)}</div>`
-      :`<b>${apWhen(it)}</b>`;
+      :`<b>${apWhen(it)}</b>${it.duration?` <span class="muted">(${esc(it.duration)} دقيقة)</span>`:''}`;
     const act=AP_S==='pending'
       ?`<div style="display:flex;gap:6px;justify-content:center"><button class="btn" onclick="apConfirm('${id}')">✔ تأكيد</button><button class="btn o" onclick="apReject('${id}')">✖</button></div>`
       :AP_S==='confirmed'?apCrm(it):`<button class="btn o" onclick="apReopen('${id}')">↩ رجّعه</button>`;
@@ -1147,7 +1147,7 @@ function apCrm(it){
   if(c.ok) return `<span style="color:var(--green)">✔ اتسجّل في الـ CRM</span>${c.crmId?`<br><small class="muted">رقم ${esc(c.crmId)}</small>`:''}`;
   if(c.pending) return `<span class="muted">⏳ اتأكد — الربط مع الـ CRM لسه</span>${btns}`;
   if(c.code===409||(c.alternatives||[]).length) return `<span style="color:var(--orange)">⚠️ الميعاد ده مش متاح في الـ CRM</span>
-    ${(c.alternatives||[]).length?`<div class="muted" style="font-size:12px;margin:4px 0">اختار فترة متاحة نفس اليوم:</div><div class="alts">${c.alternatives.map(a=>`<button class="btn o" onclick="apRetry('${id}','${esc(a.timeFrom)}')">${esc(a.timeFrom)}${a.timeTo?'–'+esc(a.timeTo):''}</button>`).join('')}</div>`
+    ${(c.alternatives||[]).length?`<div class="muted" style="font-size:12px;margin:4px 0">اختار فترة متاحة نفس اليوم:</div><div class="alts">${c.alternatives.slice().sort((x,y)=>x.timeFrom.localeCompare(y.timeFrom)).map(a=>`<button class="btn o" dir="ltr" onclick="apRetry('${id}','${esc(a.timeFrom)}','${esc(a.timeTo||'')}')">${esc(a.timeFrom)}${a.timeTo?' → '+esc(a.timeTo):''}</button>`).join('')}</div>`
       :`<div class="crm-err">${esc(c.text||'')}</div>`}${btns}`;
   return `<span style="color:var(--red)">✖ الـ CRM رفض ${c.code||''}</span><div class="crm-err">${apCrmMsg(c.msg)}</div>${c.at?`<small class="muted">آخر محاولة ${new Date(c.at).toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'})}</small>`:''}${btns}`;
 }
@@ -1166,9 +1166,9 @@ async function apConfirm(id){
 }
 async function apReject(id){if(!confirm('ترفض الطلب ده؟'))return;try{await apPost(`/appointments/${id}/reject`);loadAppt();}catch(e){alert(e.message)}}
 async function apReopen(id){try{await apPost(`/appointments/${id}/reopen`);loadAppt();}catch(e){alert(e.message)}}
-async function apRetry(id,time){
+async function apRetry(id,time,timeTo){
   const b=$('apr-'+id); if(b){b.disabled=true;b.textContent='⏳ بيبعت…';}
-  try{const ci=$('api-'+id); const body=ci?{clientId:ci.value}:{}; if(time)body.time=time;
+  try{const ci=$('api-'+id); const body=ci?{clientId:ci.value}:{}; if(time){body.time=time; if(timeTo)body.timeTo=timeTo;}
     const it=await apPost(`/appointments/${id}/crm`,body);
     $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ اتسجّل في الـ CRM':it.crm&&it.crm.code===409?'⚠️ الميعاد محجوز — اختار فترة من البدائل جنب الطلب':`✖ الـ CRM رفض (${it.crm&&it.crm.code||''}): ${apCrmMsg(it.crm&&it.crm.msg)}`;
     loadAppt();}catch(e){alert(e.message); if(b){b.disabled=false;b.textContent='⟳ ابعت تاني';}}

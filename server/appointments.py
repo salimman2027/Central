@@ -183,7 +183,16 @@ async def retry_crm(aid: str, request: Request):
     if not it or it["status"] != "confirmed":
         raise HTTPException(400, "الطلب لازم يبقى متأكد")
     if body.get("time"):
-        it = _update(aid, lambda x: x.update(time=str(body["time"])[:5], date=str(body.get("date") or x["date"])[:10]))
+        def upd(x):
+            x.update(time=str(body["time"])[:5], date=str(body.get("date") or x["date"])[:10])
+            to = str(body.get("timeTo") or "")[:5]
+            if to:   # الفترة البديلة ممكن تكون أقصر من مدة الاجتماع — ناخد الأقل
+                fh, fm = (int(v) for v in x["time"].split(":")); th, tm = (int(v) for v in to.split(":"))
+                slot = (th * 60 + tm) - (fh * 60 + fm)
+                cur = int(x.get("duration") or crm_settings()["duration"] or 60)
+                if slot > 0:
+                    x["duration"] = min(cur, slot)
+        it = _update(aid, upd)
     if str(body.get("clientId") or "").strip():
         it = _update(aid, lambda x: x.__setitem__("clientId", str(body["clientId"]).strip()))
     res = push_crm(it)
