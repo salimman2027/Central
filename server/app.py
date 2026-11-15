@@ -273,7 +273,7 @@ async def app_insight(request: Request):
             model=os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5"), max_tokens=800,
             messages=[{"role": "user", "content": INSIGHT_PROMPT.format(
                 meta=json.dumps(meta, ensure_ascii=False), summary=summary, today=dt.date.today().isoformat())}])
-        raw = msg.content[0].text
+        raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
         out = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
     except Exception as e:  # noqa: BLE001
         m = str(e)

@@ -134,7 +134,7 @@ def analyze(transcript_lines: list, meta: dict) -> dict:
             meta=json.dumps(meta, ensure_ascii=False), transcript=text,
             checklist=json.dumps(CHECKLIST, ensure_ascii=False))}],
     )
-    raw = msg.content[0].text.strip()
+    raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
     raw = raw[raw.find("{"): raw.rfind("}") + 1]
     return json.loads(raw)
 
