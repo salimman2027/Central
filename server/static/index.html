@@ -326,6 +326,13 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 html[data-theme=light] .tax-ta{background:#fff}
 .ai-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.ai-tags span{border-radius:99px;padding:3px 10px;font-size:12.5px;border:1px solid}
 .tg-r{color:var(--red);background:rgba(255,77,115,.08)}.tg-o{color:var(--orange);background:rgba(255,181,71,.08)}.tg-b{color:var(--blue);background:rgba(90,168,255,.08)}
+.crm-f{display:grid;gap:4px;margin-bottom:8px}.crm-f label{font-size:13px;color:var(--grey)}
+.crm-f input,.crm-sales input,.ap-when select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit}
+html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html[data-theme=light] .ap-when select{background:#fff}
+.crm-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}@media(max-width:700px){.crm-row{grid-template-columns:1fr 1fr}}
+.crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
+.crm-sales label{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:6px 10px}
+.crm-sales input{width:90px}
 /* التقرير ورق أبيض للطباعة */
 .report{color:#1C2B2A;border-radius:14px;--teal:#0F7C7A;--teal-d:#0A5654;--teal-l:#E7F3F2;--border:#D5E2E1;--text:#1C2B2A}
 .report th{background:#0F7C7A;color:#fff}.report td{border-color:#D5E2E1}.report tr:hover td{background:none}
@@ -465,6 +472,26 @@ html[data-theme=light] .tax-ta{background:#fff}
     <div id="taxMsg" class="muted"></div>
   </div>
 </div>
+
+<div class="modal" id="crmModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="mbox" style="max-width:720px;width:96vw;max-height:90vh;overflow:auto">
+    <h3 style="margin-top:0">🔗 الربط مع الـ CRM (حجز الاجتماع)</h3>
+    <div class="crm-f"><label>رابط الـ endpoint (POST)</label><input id="crmUrl" placeholder="https://national-quality-api-site-nq.premiumasp.net/api/..." dir="ltr"></div>
+    <div class="crm-row">
+      <div class="crm-f"><label>هيدر التوكن</label><input id="crmHdr" dir="ltr" placeholder="Authorization"></div>
+      <div class="crm-f"><label>قبل التوكن</label><input id="crmPfx" dir="ltr" placeholder="Bearer "></div>
+      <div class="crm-f"><label>مدة الاجتماع (دقيقة)</label><input id="crmDur" type="number" min="5" step="5"></div>
+      <div class="crm-f"><label>termsManagementId</label><input id="crmTerms" type="number" min="0"></div>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="crmMail" style="width:auto"> الـ CRM يبعت إيميل للعميل (sendEmail)</label>
+    <div id="crmTok" class="muted" style="margin:8px 0"></div>
+    <b>رقم كل موظف في الـ CRM (salesId)</b>
+    <div class="muted" style="font-size:13px">عشان الاجتماع يتسجّل باسم المندوب الصح — اكتب الـ ID بتاعه في الـ CRM جنب تحويلته.</div>
+    <div id="crmSales" class="crm-sales"></div>
+    <div class="rub-foot"><span class="sp" style="flex:1"></span><button class="btn" onclick="saveCrm()">💾 حفظ</button></div>
+    <div id="crmMsg" class="muted"></div>
+  </div>
+</div>
 <div class="page" id="p-appt">
   <div class="filters">
     <div class="seg2" id="apSeg">
@@ -474,6 +501,7 @@ html[data-theme=light] .tax-ta{background:#fff}
     </div>
     <span class="sp" style="flex:1"></span>
     <button class="btn o" onclick="apScan()">🔍 دوّر في ملاحظات آخر 30 يوم</button>
+    <button class="btn o" onclick="openCrm()">🔗 إعدادات الـ CRM</button>
   </div>
   <div class="note" id="apNote" style="margin-bottom:14px">لما المندوب يكتب أو يسجّل بصوته ملاحظة بعد المكالمة فيها ميعاد مع العميل، الطلب بيظهر هنا لوحده. راجع الموعد وعدّله لو محتاج، وبعدين دوس ✔ تأكيد.</div>
   <div class="card"><div class="tw"><table id="apTbl"></table></div></div>
@@ -1088,7 +1116,10 @@ function renderAppt(){
   $('apTbl').innerHTML=head+L.map(it=>{
     const id=esc(it.id);
     const when=AP_S==='pending'
-      ?`<div class="ap-when"><input type="date" id="apd-${id}" value="${esc(it.date||'')}"><input type="time" id="apt-${id}" value="${esc(it.time||'')}"></div><div class="muted" style="font-size:12px;margin-top:3px">${apWhen(it)}</div>`
+      ?`<div class="ap-when"><input type="date" id="apd-${id}" value="${esc(it.date||'')}"><input type="time" id="apt-${id}" value="${esc(it.time||'')}">
+         <select id="apu-${id}" title="المدة">${[30,45,60,90,120].map(m=>`<option value="${m}" ${m===(+it.duration||AP_DUR)?'selected':''}>${m} د</option>`).join('')}</select></div>
+         <input class="ap-in" style="margin-top:5px;width:100%" id="apl-${id}" value="${esc(it.location||it.details||'')}" placeholder="المكان أو لينك الاجتماع">
+         <div class="muted" style="font-size:12px;margin-top:3px">${apWhen(it)}</div>`
       :`<b>${apWhen(it)}</b>`;
     const act=AP_S==='pending'
       ?`<div style="display:flex;gap:6px;justify-content:center"><button class="btn" onclick="apConfirm('${id}')">✔ تأكيد</button><button class="btn o" onclick="apReject('${id}')">✖</button></div>`
@@ -1108,7 +1139,7 @@ function apCrm(it){
 }
 async function apPost(path,body){const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);return j;}
 async function apConfirm(id){
-  const body={date:$('apd-'+id).value,time:$('apt-'+id).value,customer:$('apc-'+id).value};
+  const body={date:$('apd-'+id).value,time:$('apt-'+id).value,customer:$('apc-'+id).value,duration:$('apu-'+id).value,location:$('apl-'+id).value};
   if(!body.date){alert('حدد تاريخ الموعد الأول');return}
   try{const it=await apPost(`/appointments/${id}/confirm`,body);
     $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ الموعد اتأكد واتسجّل في الـ CRM':'✔ الموعد اتأكد'+(it.crm&&it.crm.pending?' — هيتبعت للـ CRM أول ما الربط يتظبط':(it.crm?` — بس الـ CRM رفض: ${esc(it.crm.msg||'')}`:''));
@@ -1181,6 +1212,24 @@ async function taxSave(){
   try{const r=await fetch(API_BASE+'/taxonomy',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});const j=await r.json();
     if(!r.ok)throw new Error(j.detail||r.status); taxRender(j.items); $('taxMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظت</span>';}
   catch(e){$('taxMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+}
+
+let AP_DUR=60;
+async function openCrm(){
+  const c=await (await fetch(API_BASE+'/crm/settings',{cache:'no-store'})).json();
+  $('crmUrl').value=c.url||''; $('crmHdr').value=c.authHeader||'Authorization'; $('crmPfx').value=c.authPrefix??'Bearer ';
+  $('crmDur').value=c.duration||60; $('crmTerms').value=c.termsManagementId||0; $('crmMail').checked=!!c.sendEmail;
+  $('crmTok').innerHTML=c.hasToken?'🔑 التوكن متسجّل على السيرفر ✔':'🔑 التوكن لسه مش متسجّل — على السيرفر اكتب: <code dir="ltr">sudo nq-setkey crm</code> (لو الـ API محتاجه)';
+  $('crmSales').innerHTML=REPS.map(r=>`<label><span>${esc(r.name)} <small class="muted">${r.id}</small></span><input type="number" min="0" data-ext="${r.id}" value="${esc(c.salesIds[String(r.id)]||'')}" placeholder="ID"></label>`).join('');
+  $('crmMsg').textContent=''; $('crmModal').classList.add('show');
+}
+async function saveCrm(){
+  const salesIds={}; document.querySelectorAll('#crmSales input').forEach(i=>{if(i.value)salesIds[i.dataset.ext]=i.value});
+  const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
+    termsManagementId:+$('crmTerms').value||0,sendEmail:$('crmMail').checked,salesIds};
+  try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; loadAppt();}
+  catch(e){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
 </script>
 </body>

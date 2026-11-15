@@ -150,7 +150,7 @@ async def confirm(aid: str, request: Request):
         pass
 
     def f(it):
-        for k in ("date", "time", "customer", "number", "details", "kind"):
+        for k in ("date", "time", "customer", "number", "details", "kind", "location", "duration", "company", "email"):
             if body.get(k) is not None:
                 it[k] = str(body[k])[:300]
         if not it.get("date"):
@@ -212,29 +212,116 @@ def scan_status():
 
 
 # ------------------------------------------------------------------ CRM
+def crm_settings() -> dict:
+    """إعدادات الربط (من غير التوكن — ده في env بـ sudo nq-setkey crm)"""
+    try:
+        c = json.loads((CTX["dir"] / "crm.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        c = {}
+    return {"url": c.get("url", ""), "authHeader": c.get("authHeader", "Authorization"),
+            "authPrefix": c.get("authPrefix", "Bearer "), "duration": int(c.get("duration") or 60),
+            "termsManagementId": int(c.get("termsManagementId") or 0), "sendEmail": bool(c.get("sendEmail", False)),
+            "salesIds": {str(k): int(v) for k, v in (c.get("salesIds") or {}).items() if str(v).strip().isdigit()}}
+
+
+def save_crm_settings(c: dict) -> dict:
+    cur = crm_settings()
+    for k in ("url", "authHeader", "authPrefix"):
+        if k in c:
+            cur[k] = str(c[k] or "").strip()[:500]
+    for k in ("duration", "termsManagementId"):
+        if k in c:
+            cur[k] = int(c[k] or 0)
+    if "sendEmail" in c:
+        cur["sendEmail"] = bool(c["sendEmail"])
+    if "salesIds" in c:
+        cur["salesIds"] = {str(k): int(v) for k, v in (c["salesIds"] or {}).items() if str(v).strip().isdigit()}
+    if cur["url"] and not cur["url"].startswith("https://"):
+        raise ValueError("رابط الـ CRM لازم يبدأ بـ https://")
+    (CTX["dir"] / "crm.json").write_text(json.dumps(cur, ensure_ascii=False, indent=1), encoding="utf-8")
+    return cur
+
+
 def crm_configured() -> bool:
-    return bool(os.environ.get("NQ_CRM_URL"))
+    return bool(crm_settings()["url"])
+
+
+def _add_minutes(hhmm: str, mins: int) -> str:
+    h, m = (int(x) for x in hhmm.split(":")[:2])
+    t = h * 60 + m + mins
+    return f"{(t // 60) % 24:02d}:{t % 60:02d}"
+
+
+def crm_body(it: dict, cfg: dict) -> dict:
+    """شكل الطلب زي الـ Swagger بتاع الـ CRM (Meeting)"""
+    dur = int(it.get("duration") or cfg["duration"] or 60)
+    start = (it.get("time") or "10:00")[:5]
+    place = (it.get("location") or "").strip()
+    online = place.lower().startswith("http") or it.get("kind") in ("ديمو", "مكالمة") and not place
+    sales_id = cfg["salesIds"].get(str(it.get("ext")), 0)
+    return {
+        "id": 0, "code": "", "clientId": int(it.get("clientId") or 0),
+        "date": f"{it['date']}T00:00:00", "timeFrom": start, "timeTo": _add_minutes(start, dur), "duration": dur,
+        "objectives": " — ".join(x for x in (it.get("kind"), it.get("details")) if x) or "متابعة مع العميل",
+        "requirement": it.get("quote") or "", "results": "",
+        "employeeIds": [sales_id] if sales_id else [],
+        "isPotential": not it.get("clientId"), "termsManagementId": cfg["termsManagementId"],
+        "email": it.get("email") or "", "isOnlineMeet": bool(online),
+        "meetingLink": place if place.lower().startswith("http") else "",
+        "meetingLocation": "" if place.lower().startswith("http") else place,
+        "customerNameForMeet": it.get("customer") or "", "customerPhoneForMeet": it.get("number") or "",
+        "companyName": it.get("company") or it.get("customer") or "",
+        "salesId": sales_id, "salesName": it.get("repName") or "",
+        "details": [], "files": [], "sendEmail": cfg["sendEmail"],
+    }
 
 
 def push_crm(it: dict) -> dict:
-    """بيبعت الموعد المتأكد للـ CRM (بيتظبط لما نعرف الـ endpoint من الـ Swagger)"""
-    url = os.environ.get("NQ_CRM_URL", "")
+    cfg = crm_settings()
     now = dt.datetime.now(dt.timezone.utc).isoformat()
-    if not url:
+    if not cfg["url"]:
         return {"ok": False, "pending": True, "at": now, "msg": "الربط مع الـ CRM لسه متظبطش"}
     import requests
-    when = f"{it['date']}T{(it.get('time') or '09:00')}:00"
-    body = {
-        "customerName": it.get("customer"), "customerPhone": it.get("number"),
-        "appointmentDate": when, "type": it.get("kind"), "notes": it.get("details") or it.get("quote"),
-        "salesRepName": it.get("repName"), "salesRepExtension": it.get("ext"), "source": "NQ Calls",
-    }
-    headers = {"Content-Type": "application/json"}
-    tok = os.environ.get("NQ_CRM_TOKEN", "")
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    tok = os.environ.get("NQ_CRM_TOKEN", "").strip()
     if tok:
-        headers[os.environ.get("NQ_CRM_AUTH_HEADER", "Authorization")] = (os.environ.get("NQ_CRM_AUTH_PREFIX", "Bearer ") + tok)
+        headers[cfg["authHeader"] or "Authorization"] = (cfg["authPrefix"] or "") + tok
+    body = crm_body(it, cfg)
     try:
-        r = requests.post(url, json=body, headers=headers, timeout=30)
-        return {"ok": r.status_code < 300, "code": r.status_code, "at": now, "msg": r.text[:300]}
+        r = requests.post(cfg["url"], json=body, headers=headers, timeout=30)
+        res = {"ok": r.status_code < 300, "code": r.status_code, "at": now, "msg": r.text[:400]}
+        try:
+            j = r.json()
+            if isinstance(j, dict):
+                data = j.get("data") if isinstance(j.get("data"), dict) else {}
+                res["crmId"] = j.get("id") or data.get("id")
+        except Exception:  # noqa: BLE001
+            pass
+        return res
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "at": now, "msg": str(e)[:300]}
+
+
+@router.get("/api/crm/settings")
+def get_crm():
+    c = crm_settings()
+    return {**c, "hasToken": bool(os.environ.get("NQ_CRM_TOKEN", "").strip())}
+
+
+@router.put("/api/crm/settings")
+async def put_crm(request: Request):
+    try:
+        return save_crm_settings(await request.json())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/api/crm/preview/{aid}")
+def preview(aid: str):
+    """يوريك الطلب اللي هيتبعت للـ CRM من غير ما يبعته"""
+    it = next((x for x in _load() if x["id"] == aid), None)
+    if not it:
+        raise HTTPException(404, "مش موجود")
+    if not it.get("date"):
+        raise HTTPException(400, "مفيش تاريخ")
+    return crm_body(it, crm_settings())

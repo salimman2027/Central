@@ -197,9 +197,12 @@ cat > /usr/local/bin/nq-setkey <<'KEY'
 #!/bin/bash
 # sudo nq-setkey          -> مفتاح Claude (Anthropic) للتحليل
 # sudo nq-setkey openai   -> مفتاح OpenAI لتحويل الصوت لنص
+# sudo nq-setkey crm      -> توكن الـ CRM لتسجيل المواعيد
 set -e
 F=/etc/nq-calls/env
-if [[ "${1:-}" == openai ]]; then
+if [[ "${1:-}" == crm ]]; then
+  NAME=NQ_CRM_TOKEN; PFX=""; LBL="الـ CRM"
+elif [[ "${1:-}" == openai ]]; then
   NAME=OPENAI_API_KEY; PFX=sk-; LBL="OpenAI"
 else
   NAME=ANTHROPIC_API_KEY; PFX=sk-ant-; LBL="Anthropic"
@@ -209,6 +212,9 @@ K=$(printf '%s' "$K" | tr -d '[:space:]')
 [[ "$K" == $PFX* ]] || { echo "✖ المفتاح لازم يبدأ بـ $PFX"; exit 1; }
 if grep -q "^$NAME=" "$F"; then sed -i "s|^$NAME=.*|$NAME=$K|" "$F"; else echo "$NAME=$K" >> "$F"; fi
 systemctl restart nq-calls
+if [[ $NAME == NQ_CRM_TOKEN ]]; then
+  echo "✔ توكن الـ CRM اتحفظ — جرّب تأكيد موعد من اللوحة"; exit 0
+fi
 if [[ $NAME == OPENAI_API_KEY ]]; then
   CODE=$(curl -s -o /dev/null -w '%{http_code}' https://api.openai.com/v1/models -H "Authorization: Bearer $K")
 else
