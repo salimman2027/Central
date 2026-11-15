@@ -286,7 +286,9 @@ def push_crm(it: dict) -> dict:
     headers = {"Content-Type": "application/json; ver=1.0", "Accept": "application/json; ver=1.0, application/json"}
     tok = os.environ.get("NQ_CRM_TOKEN", "").strip()
     if tok:
-        headers[cfg["authHeader"] or "Authorization"] = (cfg["authPrefix"] or "") + tok
+        pfx = (cfg["authPrefix"] or "").strip()
+        tok = tok.removeprefix("Bearer ").removeprefix("bearer ").strip()
+        headers[(cfg["authHeader"] or "Authorization").strip()] = f"{pfx} {tok}" if pfx else tok
     body = crm_body(it, cfg)
     try:
         r = requests.post(cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"), headers=headers, timeout=30)
