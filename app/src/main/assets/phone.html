@@ -753,7 +753,14 @@ const NQPhone = {
       if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); } else NQWeb.stopRing();
       NQHistory.add(info);
       $("dialNum").textContent = "";
-      if (!info.answered && info.direction === "out") $("dialErr").textContent = /Media Access/i.test(info.cause || "") ? "المايك مش مسموح للتطبيق — اسمح بيه من الإعدادات وجرّب تاني" : "المكالمة مكملتش: " + (info.cause || "");
+      if (!info.answered && info.direction === "out") {
+        const code = ev && ev.message && ev.message.status_code, why = ev && ev.message && ev.message.reason_phrase;
+        const ar = { 403: "السنترال رفض — التحويلة مش مسموحلها تتصل بره", 404: "الرقم مش متعرّف على السنترال", 408: "مفيش رد من الخط",
+          480: "الخط مش متاح دلوقتي", 484: "الرقم ناقص أو غلط", 486: "الرقم مشغول", 487: "اتلغت", 488: "مشكلة في الصوت (codec)",
+          500: "خطأ في السنترال", 502: "جهاز الشرايح (Dinstar) مش راد", 503: "الشريحة مشغولة أو مفيش شبكة على الخط", 603: "اترفضت" }[code];
+        $("dialErr").textContent = /Media Access/i.test(info.cause || "") ? "المايك مش مسموح للتطبيق — اسمح بيه من الإعدادات وجرّب تاني"
+          : "المكالمة مكملتش: " + (ar || info.cause || "") + (code ? ` (${code}${why ? " " + why : ""})` : "");
+      }
       if (!NQNotes.maybeAsk(info)) show("scrDial");
     };
     s.on("ended", end); s.on("failed", end);
