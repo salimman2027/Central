@@ -47,7 +47,10 @@ app = FastAPI(title="NQ Calls", docs_url=None, redoc_url=None)
 import files_api  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
+import appointments as APPT  # noqa: E402
+
 app.include_router(files_api.router)
+app.include_router(APPT.router)
 # التطبيق (WebView) بيكلّم /app/* من origin تاني
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
                    allow_headers=["*"], expose_headers=["Content-Disposition"])
@@ -110,6 +113,9 @@ def config():
     return reps
 
 
+APPT.CTX.update(dir=DATA_DIR,
+                names=lambda: {str(r.get("id")): r.get("name", "") for r in config().get("reps", [])},
+                notes=lambda a, b: load_notes(a, b))
 files_api.CTX.update(dir=DATA_DIR / "files", auth=lambda e, p: check_ext_password(e, p),
                      reps=lambda: config(), host=os.environ.get("NQ_HOST", "3.89.245.93.sslip.io"))
 
@@ -187,6 +193,7 @@ async def app_notes(request: Request):
     NOTES_DIR.mkdir(parents=True, exist_ok=True)
     with open(NOTES_DIR / f"{dt.date.today():%Y-%m}.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(clean, ensure_ascii=False) + "\n")
+    APPT.process_async(clean)   # لو الملاحظة فيها ميعاد → طلبات تحديد موعد
     return JSONResponse({"ok": True}, headers=hdr)
 
 
@@ -270,7 +277,7 @@ async def app_insight(request: Request):
     try:
         import anthropic
         msg = anthropic.Anthropic().messages.create(
-            model=os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5"), max_tokens=800,
+            model=os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5"), max_tokens=3000,
             messages=[{"role": "user", "content": INSIGHT_PROMPT.format(
                 meta=json.dumps(meta, ensure_ascii=False), summary=summary, today=dt.date.today().isoformat())}])
         raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")

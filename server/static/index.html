@@ -300,6 +300,14 @@ html[data-theme=light] .rub-row input,html[data-theme=light] .rub-row textarea{b
 .cr-d{font-size:13px;padding:4px 240px 8px 0;display:grid;gap:3px}
 .ai-meta{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:13px;color:var(--grey)}.ai-meta b{color:var(--text)}
 @media(max-width:700px){.cr-n{width:120px;font-size:12px}.cr-d{padding:4px 0 8px}}
+
+.tcount{background:var(--red);color:#fff;border-radius:99px;font-size:11px;padding:1px 7px;margin-inline-start:4px}.tcount:empty{display:none}
+.seg2{display:flex;gap:6px;flex-wrap:wrap}.seg2 button{border:1px solid var(--border);background:var(--glass);color:var(--grey);border-radius:99px;padding:8px 14px;cursor:pointer;font:inherit}
+.seg2 button.on{background:linear-gradient(135deg,#19e6c1,#5aa8ff);color:#04101a;border-color:transparent;font-weight:700}
+.ap-when{display:flex;gap:6px}.ap-when input,.ap-in{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:6px 8px;font:inherit;color-scheme:dark}
+html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#fff;color-scheme:light}
+.ap-q{font-style:italic}
+#apTbl td{vertical-align:middle}
 /* التقرير ورق أبيض للطباعة */
 .report{color:#1C2B2A;border-radius:14px;--teal:#0F7C7A;--teal-d:#0A5654;--teal-l:#E7F3F2;--border:#D5E2E1;--text:#1C2B2A}
 .report th{background:#0F7C7A;color:#fff}.report td{border-color:#D5E2E1}.report tr:hover td{background:none}
@@ -324,6 +332,7 @@ html[data-theme=light] .rub-row input,html[data-theme=light] .rub-row textarea{b
   <div class="tab" data-p="report">🖨️ تقرير عدد المكالمات</div>
   <div class="tab" data-p="ai">🤖 تحليل المكالمات</div>
   <div class="tab" data-p="eval">⭐ تقييم الموظفين</div>
+  <div class="tab" data-p="appt">📅 طلبات تحديد موعد <span class="tcount" id="apCount"></span></div>
 </div>
 
 <div class="wrap">
@@ -409,6 +418,20 @@ html[data-theme=light] .rub-row input,html[data-theme=light] .rub-row textarea{b
 
 <!-- ================= AI ANALYSIS ================= -->
 
+
+<div class="page" id="p-appt">
+  <div class="filters">
+    <div class="seg2" id="apSeg">
+      <button data-s="pending" class="on">⏳ مستنية تأكيد <span id="apN-pending"></span></button>
+      <button data-s="confirmed">✔ متأكدة <span id="apN-confirmed"></span></button>
+      <button data-s="rejected">✖ مرفوضة <span id="apN-rejected"></span></button>
+    </div>
+    <span class="sp" style="flex:1"></span>
+    <button class="btn o" onclick="apScan()">🔍 دوّر في ملاحظات آخر 30 يوم</button>
+  </div>
+  <div class="note" id="apNote" style="margin-bottom:14px">لما المندوب يكتب أو يسجّل بصوته ملاحظة بعد المكالمة فيها ميعاد مع العميل، الطلب بيظهر هنا لوحده. راجع الموعد وعدّله لو محتاج، وبعدين دوس ✔ تأكيد.</div>
+  <div class="card"><div class="tw"><table id="apTbl"></table></div></div>
+</div>
 <div class="page" id="p-eval">
   <div class="filters">
     <div class="f"><label>من تاريخ</label><input type="date" id="eFrom"></div>
@@ -787,6 +810,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));$('p-'+t.dataset.p).classList.add('active');
   if(t.dataset.p==='ai')loadAI();
   if(t.dataset.p==='eval')loadEval();
+  if(t.dataset.p==='appt')loadAppt();
 });
 loadConfig().then(()=>{fillSelects();refresh();initAI();}).catch(e=>{$('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل الإعدادات</div><div class="s">${e.message}</div></div>`});
 // تحديث تلقائي كل دقيقة
@@ -989,6 +1013,70 @@ function critBlock(a){
       ${a.sentiment_start?`<span>😊 المشاعر <b>${esc(a.sentiment_start)} ← ${esc(a.sentiment_end||'')}</b></span>`:''}
       ${(a.buying_signals||[]).length?`<span>💰 إشارات شراء: <b>${a.buying_signals.map(esc).join('، ')}</b></span>`:''}</div>`;
 }
+
+/* ===================== طلبات تحديد موعد ===================== */
+let AP={items:[],counts:{},crm:false}, AP_S='pending';
+document.querySelectorAll('#apSeg button').forEach(b=>b.onclick=()=>{AP_S=b.dataset.s;document.querySelectorAll('#apSeg button').forEach(x=>x.classList.toggle('on',x===b));renderAppt();});
+async function loadAppt(){
+  try{AP=await (await fetch(API_BASE+'/appointments',{cache:'no-store'})).json();}catch(e){$('apTbl').innerHTML=`<tr><td>تعذّر التحميل: ${esc(e.message)}</td></tr>`;return}
+  ['pending','confirmed','rejected'].forEach(k=>$('apN-'+k).textContent=AP.counts[k]?`(${AP.counts[k]})`:'');
+  $('apCount').textContent=AP.counts.pending||'';
+  renderAppt();
+}
+function apWhen(it){
+  if(!it.date) return '<span style="color:var(--orange)">⚠️ من غير تاريخ</span>';
+  const d=new Date(it.date+'T'+(it.time||'12:00'));
+  const day=d.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
+  return `${day}${it.time?` — ${d.toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'})}`:''}`;
+}
+function renderAppt(){
+  const L=AP.items.filter(x=>x.status===AP_S);
+  const head=`<tr><th>المندوب</th><th>العميل</th><th>رقم العميل</th><th>الموعد المقترح</th><th>النوع</th><th>من كلام المندوب</th><th class="c">${AP_S==='pending'?'الإجراء':AP_S==='confirmed'?'الـ CRM':''}</th></tr>`;
+  if(!L.length){$('apTbl').innerHTML=head+`<tr><td colspan="7" class="c muted" style="padding:30px">${AP_S==='pending'?'مفيش طلبات مستنية — أول ما مندوب يكتب ملاحظة فيها ميعاد هتظهر هنا':'مفيش'}</td></tr>`;return}
+  $('apTbl').innerHTML=head+L.map(it=>{
+    const id=esc(it.id);
+    const when=AP_S==='pending'
+      ?`<div class="ap-when"><input type="date" id="apd-${id}" value="${esc(it.date||'')}"><input type="time" id="apt-${id}" value="${esc(it.time||'')}"></div><div class="muted" style="font-size:12px;margin-top:3px">${apWhen(it)}</div>`
+      :`<b>${apWhen(it)}</b>`;
+    const act=AP_S==='pending'
+      ?`<div style="display:flex;gap:6px;justify-content:center"><button class="btn" onclick="apConfirm('${id}')">✔ تأكيد</button><button class="btn o" onclick="apReject('${id}')">✖</button></div>`
+      :AP_S==='confirmed'?apCrm(it):`<button class="btn o" onclick="apReopen('${id}')">↩ رجّعه</button>`;
+    return `<tr><td><b>${esc(it.repName||it.ext)}</b><br><span class="muted">تحويلة ${esc(it.ext)}</span></td>
+      <td>${AP_S==='pending'?`<input class="ap-in" id="apc-${id}" value="${esc(it.customer||'')}" placeholder="اسم العميل">`:esc(it.customer||'—')}</td>
+      <td style="direction:ltr;text-align:right">${esc(it.number||'—')}</td>
+      <td>${when}</td><td><span class="badge b-out">${esc(it.kind||'—')}</span></td>
+      <td style="max-width:320px;white-space:normal"><span class="ap-q">"${esc(it.quote||'')}"</span>${it.details?`<div class="muted" style="font-size:12px">${esc(it.details)}</div>`:''}</td>
+      <td class="c">${act}</td></tr>`;}).join('');
+}
+function apCrm(it){
+  const c=it.crm||{};
+  if(c.ok) return `<span style="color:var(--green)">✔ اتسجّل في الـ CRM</span>`;
+  if(c.pending) return `<span class="muted" title="${esc(c.msg||'')}">⏳ اتأكد — الربط مع الـ CRM لسه</span>`;
+  return `<span style="color:var(--red)" title="${esc(c.msg||'')}">✖ الـ CRM رفض ${c.code||''}</span><br><button class="btn o" style="margin-top:4px" onclick="apRetry('${esc(it.id)}')">⟳ ابعت تاني</button>`;
+}
+async function apPost(path,body){const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);return j;}
+async function apConfirm(id){
+  const body={date:$('apd-'+id).value,time:$('apt-'+id).value,customer:$('apc-'+id).value};
+  if(!body.date){alert('حدد تاريخ الموعد الأول');return}
+  try{const it=await apPost(`/appointments/${id}/confirm`,body);
+    $('apNote').innerHTML=it.crm&&it.crm.ok?'✔ الموعد اتأكد واتسجّل في الـ CRM':'✔ الموعد اتأكد'+(it.crm&&it.crm.pending?' — هيتبعت للـ CRM أول ما الربط يتظبط':(it.crm?` — بس الـ CRM رفض: ${esc(it.crm.msg||'')}`:''));
+    loadAppt();}catch(e){alert('✖ '+e.message)}
+}
+async function apReject(id){if(!confirm('ترفض الطلب ده؟'))return;try{await apPost(`/appointments/${id}/reject`);loadAppt();}catch(e){alert(e.message)}}
+async function apReopen(id){try{await apPost(`/appointments/${id}/reopen`);loadAppt();}catch(e){alert(e.message)}}
+async function apRetry(id){try{await apPost(`/appointments/${id}/crm`);loadAppt();}catch(e){alert(e.message)}}
+async function apScan(){
+  const t=new Date(),f=new Date(t.getTime()-29*864e5);
+  try{let j=await apPost(`/appointments/scan?date_from=${isoD(f)}&date_to=${isoD(t)}`);
+    $('apNote').innerHTML=`🔍 بيدوّر في ${j.total} ملاحظة…`;
+    const tick=async()=>{j=await (await fetch(API_BASE+'/appointments/scan',{cache:'no-store'})).json();
+      $('apNote').innerHTML=j.running?`🔍 بيدوّر… ${j.done}/${j.total} — لقى ${j.found} ميعاد`:`✔ خلص — لقى ${j.found} ميعاد جديد في ${j.total} ملاحظة`;
+      if(j.running)setTimeout(tick,2000);else loadAppt();};
+    setTimeout(tick,1500);
+  }catch(e){$('apNote').textContent='✖ '+e.message}
+}
+setInterval(()=>{if(!document.querySelector('#p-appt.active input:focus'))loadAppt()},90000);
+setTimeout(loadAppt,1500);
 </script>
 </body>
 </html>

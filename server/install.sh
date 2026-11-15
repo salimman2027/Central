@@ -29,7 +29,7 @@ apt-get install -y -qq python3-venv python3-pip apache2-utils >/dev/null
 
 echo "== app files"
 mkdir -p "$APP" "$CONF" "$DATA/analysis"
-cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
+cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/appointments.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
 sed -i "s/__VER__/$VER/" "$APP/static/index.html"
