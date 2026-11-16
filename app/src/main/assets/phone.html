@@ -232,6 +232,10 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   html[data-theme=light] .seg, html[data-theme=light] .mini.x, html[data-theme=light] .logrow .ic { background:rgba(20,50,90,.06); }
   @media (min-width: 620px) { html[data-theme=light] body.web { background:radial-gradient(900px 500px at 80% -10%,rgba(10,165,140,.16),transparent 60%),#e6edf4; }
     html[data-theme=light] body.web .screen { background:rgba(255,255,255,.9) !important; box-shadow:0 30px 80px -30px rgba(20,50,90,.45); } }
+  /* شاشة المكالمة بتفضل غامقة في الوضعين — الكلام عليها أبيض */
+  html[data-theme=light] .screen.callscr, html[data-theme=light] body.web .screen.callscr {
+    background:radial-gradient(500px 360px at 50% 20%,rgba(25,230,193,.22),transparent 70%),linear-gradient(170deg,#13314a,#0a1424) !important; color:#fff; }
+  html[data-theme=light] .callscr .ctrl { color:#fff; }
 
   /* ---------- الملفات ---------- */
   .fto { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
