@@ -330,6 +330,7 @@ html[data-theme=light] .tax-ta{background:#fff}
 .crm-f input,.crm-sales input,.ap-when select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit}
 html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html[data-theme=light] .ap-when select{background:#fff}
 .crm-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.crm-row .crm-f{min-width:0}.crm-row input,.crm-row select{width:100%;box-sizing:border-box}@media(max-width:700px){.crm-row{grid-template-columns:1fr 1fr}}
+.set-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}.set-c{display:flex;flex-direction:column;gap:8px}.set-c h3{margin:0}.set-c p{margin:0;flex:1;line-height:1.7}.set-c .btn{align-self:flex-start}
 .crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
 .crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
@@ -371,6 +372,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div class="tab" data-p="eval">⭐ تقييم الموظفين</div>
   <div class="tab" data-p="ins">🧭 المشاكل وأسباب عدم الشراء</div>
   <div class="tab" data-p="appt">📅 طلبات تحديد موعد <span class="tcount" id="apCount"></span></div>
+  <div class="tab" data-p="set">⚙️ الإعدادات</div>
 </div>
 
 <div class="wrap">
@@ -464,7 +466,6 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="f"><label>إلى تاريخ</label><input type="date" id="iTo"></div>
     <button class="btn" onclick="loadIns()">عرض</button>
     <span class="sp" style="flex:1"></span>
-    <button class="btn o" onclick="openTax()">⚙️ الأنواع</button>
   </div>
   <div class="note" id="iNote" style="margin-bottom:14px"></div>
   <div class="grid2">
@@ -524,10 +525,22 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     </div>
     <span class="sp" style="flex:1"></span>
     <button class="btn o" onclick="apScan()">🔍 دوّر في ملاحظات آخر 30 يوم</button>
-    <button class="btn o" onclick="openCrm()">🔗 إعدادات الـ CRM</button>
   </div>
   <div class="note" id="apNote" style="margin-bottom:14px">لما المندوب يكتب أو يسجّل بصوته ملاحظة بعد المكالمة فيها ميعاد مع العميل، الطلب بيظهر هنا لوحده. راجع الموعد وعدّله لو محتاج، وبعدين دوس ✔ تأكيد.</div>
   <div class="card"><div class="tw"><table id="apTbl"></table></div></div>
+</div>
+<div class="page" id="p-set">
+  <div class="set-grid">
+    <div class="card set-c"><h3>⭐ بنود التقييم والأوزان</h3>
+      <p class="muted">البنود اللي الـ AI بيقيّم بيها كل مكالمة، ووزن كل بند من 100. التعديل بيتطبّق على المكالمات اللي هتتحلّل بعد كده.</p>
+      <button class="btn" onclick="openRubric()">تعديل البنود</button></div>
+    <div class="card set-c"><h3>🔗 الربط مع الـ CRM</h3>
+      <p class="muted">رابط حجز الاجتماعات، مدة الاجتماع، الشروط، والموظف في الـ CRM قصاد كل تحويلة.</p>
+      <button class="btn" onclick="openCrm()">إعدادات الـ CRM والموظفين</button></div>
+    <div class="card set-c"><h3>🧭 أنواع التصنيف</h3>
+      <p class="muted">أنواع مشاكل العملاء، وأخطاء الموظفين، وأسباب عدم الشراء اللي الـ AI بيصنّف بيها.</p>
+      <button class="btn" onclick="openTax()">تعديل الأنواع</button></div>
+  </div>
 </div>
 <div class="page" id="p-eval">
   <div class="filters">
@@ -535,8 +548,6 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="f"><label>إلى تاريخ</label><input type="date" id="eTo"></div>
     <div class="f"><label>الفريق</label><select id="eTeam" onchange="renderEval()"></select></div>
     <button class="btn" onclick="loadEval()">عرض التقييم</button>
-    <span class="sp" style="flex:1"></span>
-    <button class="btn o" onclick="openRubric()">⚙️ بنود التقييم والأوزان</button>
   </div>
   <div class="kpis" id="eKpis"></div>
   <div class="card" style="margin-bottom:14px"><h3>🏆 ترتيب الموظفين<span class="sp"></span><span class="muted" id="eHint"></span></h3><div id="eRank"></div></div>

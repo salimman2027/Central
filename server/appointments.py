@@ -506,7 +506,7 @@ def crm_availability(aid: str, date: str = "", time: str = ""):
     cfg = crm_settings()
     sid = cfg["salesIds"].get(str(it.get("ext")), 0)
     if not sid:
-        raise HTTPException(400, f"رقم الموظف ({it.get('repName') or it.get('ext')}) في الـ CRM مش متحدد — من 🔗 إعدادات الـ CRM")
+        raise HTTPException(400, f"رقم الموظف ({it.get('repName') or it.get('ext')}) في الـ CRM مش متحدد — من تابة ⚙️ الإعدادات ← الربط مع الـ CRM")
     date = (date or it.get("date") or "")[:10]
     if not date:
         raise HTTPException(400, "حدد التاريخ الأول")
@@ -557,7 +557,7 @@ def push_crm(it: dict) -> dict:
     # نقول السبب بالعربي قبل ما الـ CRM يرفض
     missing = []
     if not body["salesId"]:
-        missing.append(f"رقم الموظف ({it.get('repName') or it.get('ext')}) في الـ CRM — اكتبه في 🔗 إعدادات الـ CRM")
+        missing.append(f"رقم الموظف ({it.get('repName') or it.get('ext')}) في الـ CRM — اكتبه في تابة ⚙️ الإعدادات ← الربط مع الـ CRM")
     if not body["clientId"]:
         missing.append("رقم العميل في الـ CRM (Client ID) — اكتبه في الطلب، أو حط عميل افتراضي في الإعدادات")
     if missing:
