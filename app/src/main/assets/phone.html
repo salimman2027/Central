@@ -102,6 +102,8 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     body.web .screen, body.web .tabbar { left:calc(50% - 220px); right:calc(50% - 220px); }
     body.web .screen { top:16px; bottom:16px; border-radius:18px; box-shadow:0 10px 40px rgba(0,0,0,.15); background:var(--bg); overflow:hidden; }
     body.web.tabs .screen { bottom:76px; border-bottom-left-radius:0; border-bottom-right-radius:0; }
+    body.web .screen.page, body.web #scrSettings { overflow-y:auto; overflow-x:hidden; }
+    body.web.tabs .screen.page { padding-bottom:28px; }
     body.web .tabbar { bottom:16px; border-radius:0 0 18px 18px; }
     body.web .sheet { max-width:440px; margin:0 auto; }
   }
