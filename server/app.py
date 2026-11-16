@@ -97,6 +97,17 @@ def ext_from(chan: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+def caller_number(r: dict) -> str:
+    """رقم المتصل للمكالمات الواردة: الجيتواي ساعات بيحط اسم حسابه (dinastar1) مكان الرقم
+    والرقم الحقيقي في اسم العرض — ناخد أول واحد شكله رقم"""
+    for v in (r.get("src"), r.get("cnum"), r.get("cnam"),
+              (re.search(r'"([^"]*)"', r.get("clid") or "") or [None, None])[1]):
+        v = str(v or "").strip()
+        if re.fullmatch(r"\+?\d{6,}", v):
+            return v
+    return r.get("src") or ""
+
+
 def strip_prefix(dst: str, ext: int) -> str:
     p = str(ext)
     return dst[len(p):] if len(dst) > 10 and dst.startswith(p) else dst
@@ -347,7 +358,7 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
     start = start_a.astimezone(SERVER_TZ).replace(tzinfo=None)
     end = end_a.astimezone(SERVER_TZ).replace(tzinfo=None)
     rows = query(
-        """SELECT uniqueid, linkedid, calldate, src, cnum, dst, channel, dstchannel,
+        """SELECT uniqueid, linkedid, calldate, src, cnum, cnam, clid, dst, channel, dstchannel,
                   disposition, duration, billsec, recordingfile
            FROM cdr
            WHERE calldate >= %s AND calldate < %s
@@ -374,9 +385,9 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
             id=main["uniqueid"], time=t.isoformat(), ext=ext, dir="in" if inbound else "out",
             status=status, talkSec=int(main["billsec"] or 0),
             ringSec=max(0, int(main["duration"] or 0) - int(main["billsec"] or 0)),
-            number=main["src"] if inbound else strip_prefix(main["dst"] or "", ext),
+            number=caller_number(main) if inbound else strip_prefix(main["dst"] or "", ext),
             customer=None,
-            note=match_note(notes_all, ext, main["src"] if inbound else strip_prefix(main["dst"] or "", ext), t),
+            note=match_note(notes_all, ext, caller_number(main) if inbound else strip_prefix(main["dst"] or "", ext), t),
             hasRecording=bool(rec) and main["disposition"] == "ANSWERED",
             analyzed=bool(rec) and (ANALYSIS_DIR / (stem(rec) + ".json")).exists(),
             rec=stem(rec) if rec else "",
