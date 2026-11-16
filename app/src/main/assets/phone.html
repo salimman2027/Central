@@ -774,11 +774,11 @@ const NQPhone = {
 
   answer() {
     if (!this.session) return;
-    if (window.Android) Android.onCallStateChanged(true);
+    if (window.Android) Android.onCallStateChanged(true); else NQWeb.stopRing();
     this.session.answer({ mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: CONFIG.iceServers } });
   },
 
-  hangup() { if (this.session) try { this.session.terminate(); } catch (e) {} },
+  hangup() { if (!window.Android) NQWeb.stopRing(); if (this.session) try { this.session.terminate(); } catch (e) {} },
 
   toggleMute() {
     if (!this.session) return;
@@ -823,7 +823,7 @@ const NQPhone = {
     s.on("progress", () => { if (this.direction === "out") $("cState").textContent = "بيرن…"; });
     s.on("accepted", () => {
       this.callStart = Date.now();
-      if (window.Android) Android.onCallStateChanged(true);
+      if (window.Android) Android.onCallStateChanged(true); else NQWeb.stopRing(); // وقّف الرنة أول ما المكالمة تترد
       $("cNum").textContent = this.peer; show("scrCall");
       clearInterval(this.timer);
       this.timer = setInterval(() => {
