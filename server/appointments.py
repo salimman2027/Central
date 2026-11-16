@@ -512,8 +512,13 @@ def crm_employees(q: str = ""):
             if path.endswith("employees") and not out:
                 raise
         if out:
+            src = path
             break
-    return {"items": out}
+    else:
+        src = ""
+    return {"items": out, "source": src,
+            "sourceLabel": {"/api/v1/sales-people": "شاشة مندوبي المبيعات (Sales People) في الـ CRM",
+                            "/api/v1/employees": "شاشة الموظفين في الـ CRM (المتعلّم عليهم مبيعات)"}.get(src, "")}
 
 
 @router.get("/api/crm/terms")
