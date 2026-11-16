@@ -54,7 +54,9 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .topbar .who small { display:block; color:var(--muted); font-size:12px; }
   .iconbtn { width:42px; height:42px; border-radius:50%; background:#eef2f5; font-size:20px; display:flex; align-items:center; justify-content:center; color:var(--fg); }
   .display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:6px 20px; min-height:70px; }
-  .pastebtn { margin-top:4px; border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:99px; padding:4px 12px; font:inherit; font-size:12px; cursor:pointer; }
+  .display { position:relative; }
+  .pastebtn { position:absolute; inset-inline-end:12px; top:8px; border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:99px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  #dialName:empty, #dialErr:empty { display:none; } #dialErr { min-height:0; margin-top:4px; }
   .display .num { font-size:clamp(26px, 5vh, 38px); letter-spacing:1px; direction:ltr; min-height:48px; font-weight:300; word-break:break-all; text-align:center; }
   .keypad, .dialrow, .incall-pad, .incbtns { direction:ltr; }
   .keypad { display:grid; grid-template-columns:repeat(3, var(--k)); justify-content:space-evenly; gap:1.4vh 0; padding:4px 20px 6px; max-width:420px; width:100%; margin:0 auto; --k:min(72px, 9.2vh, 22vw); }
@@ -284,7 +286,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <button class="iconbtn" onclick="showSettings()" aria-label="الإعدادات">⚙</button>
   </div>
   <div class="display"><div id="dialNum" class="num"></div><div id="dialName" class="who-name"></div><div id="dialErr" class="err"></div>
-    <button class="pastebtn" id="btnPaste" onclick="dialPaste()" aria-label="لصق رقم">📋 لصق رقم</button></div>
+    <button class="pastebtn" id="btnPaste" onclick="dialPaste()" aria-label="لصق رقم" title="لصق رقم (Ctrl+V)">📋 لصق</button></div>
   <div class="keypad" id="keypad"></div>
   <div class="dialrow">
     <button class="side app-only" onclick="pickContact()" aria-label="جهات الاتصال">👥</button>
