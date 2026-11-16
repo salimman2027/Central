@@ -987,7 +987,9 @@ const NQOwner = {
     const d = s => s ? new Date(s).toLocaleString("ar-EG", { day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "";
     $("ownInfo").innerHTML = `<div>العميل: <b>${esc(j.customer || "")}</b> <span dir="ltr">${esc(number)}</span></div>
       <div>صاحبه: <b>${esc(j.owner.name || "تحويلة " + j.owner.ext)}</b> (${esc(j.owner.ext)})</div>
-      <div>${j.owner.by === "approved" ? "اتنقل له بموافقة المشرف" : j.owner.by === "kept" ? "المشرف قرر يفضل معاه" : "أول اتصال"}: <b>${esc(d(j.owner.by === "first" ? j.owner.firstCall : j.owner.since))}</b></div>`;
+      <div>${j.owner.by === "approved" ? "اتنقل له بموافقة المشرف" : j.owner.by === "kept" ? "المشرف قرر يفضل معاه" : "أول اتصال"}: <b>${esc(d(j.owner.since))}</b></div>
+      <div>آخر تواصل منه: <b>${esc(d(j.owner.lastContact))}</b></div>
+      <div style="color:var(--muted);font-size:13px">العميل بيبقى متاح لأي حد يوم <b>${esc(d(j.owner.freeOn))}</b> لو مكلّمهوش قبلها (${j.owner.days} يوم من آخر تواصل)</div>`;
     $("ownAsk").hidden = !!j.pending; $("ownWait").hidden = !j.pending;
     $("ownReason").value = ""; $("ownSheet").classList.add("on");
   },

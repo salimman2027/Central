@@ -1,7 +1,7 @@
 """ملكية العملاء والتعارضات:
-أول مندوب كلّم العميل هو صاحبه. لو مندوب تاني حاول يتصل بيه → إنذار في التطبيق،
-ولو أصرّ يتبعت طلب للمشرف في "التعارضات". المشرف يوافق (العميل يتنقل للمندوب الجديد)
-أو يرفض (يفضل مع الأول) — واللي مش صاحب العميل ميقدرش يتصل من غير طلب جديد."""
+أول مندوب كلّم العميل هو صاحبه طول ما آخر تواصل منه أقل من المدة المتظبطة (60 يوم افتراضي).
+لو مندوب تاني حاول يتصل بيه → إنذار في التطبيق، ولو أصرّ يتبعت طلب للمشرف في "التعارضات".
+المشرف يوافق (العميل يتنقل للمندوب الجديد) أو يرفض (يفضل مع الأول)."""
 import datetime as dt
 import json
 import re
@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter()
 LOCK = threading.Lock()
-LOOKBACK_DAYS = 180
+DEFAULT_DAYS = 60       # العميل بيفضل محجوز للمندوب X يوم من آخر تواصل
 # بتتظبط من app.py
 CTX = {"dir": Path("/var/lib/nq-calls"), "calls": None, "names": lambda: {}, "auth": None,
        "notes": lambda a, b: [], "analysis": lambda rec: None}
@@ -24,6 +24,20 @@ HDR = {"Access-Control-Allow-Origin": "*"}
 
 def digits(n) -> str:
     return re.sub(r"\D", "", str(n or ""))[-9:]
+
+
+def settings() -> dict:
+    s = _jload("ownership.json", {})
+    try:
+        days = int(s.get("days", DEFAULT_DAYS))
+    except (TypeError, ValueError):
+        days = DEFAULT_DAYS
+    return {"enabled": s.get("enabled", True) is not False, "days": max(1, min(365, days))}
+
+
+def _ts(s) -> dt.datetime:
+    t = dt.datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    return t if t.tzinfo else t.replace(tzinfo=dt.timezone.utc)
 
 
 def _now() -> str:
@@ -56,7 +70,7 @@ def _history() -> dict:
     today = dt.date.today()
     by: dict = {}
     try:
-        for c in CTX["calls"](today - dt.timedelta(days=LOOKBACK_DAYS), today):
+        for c in CTX["calls"](today - dt.timedelta(days=max(180, settings()["days"] * 2 + 30)), today):
             d = digits(c.get("number"))
             if len(d) >= 7 and c.get("ext"):
                 by.setdefault(d, []).append(c)
@@ -75,14 +89,32 @@ def _contacted(c: dict) -> bool:
 
 
 def owner_of(number: str) -> dict | None:
+    """صاحب العميل دلوقتي: أول مندوب كلّمه، وبيفضل صاحبه طول ما آخر تواصل منه أقل من X يوم.
+    لو عدّت المدة من غير ما يكلّمه → العميل بيبقى متاح، واللي يكلّمه بعد كده يبقى صاحبه.
+    قرار المشرف (موافقة/رفض) بيبدأ ملكية جديدة من وقت القرار."""
+    cfg = settings()
+    if not cfg["enabled"]:
+        return None
     d = digits(number)
+    win = dt.timedelta(days=cfg["days"])
+    events = [(_ts(c["time"]), str(c["ext"]), None) for c in _history().get(d, []) if _contacted(c)]
     own = _jload("owners.json", {}).get(d)
-    if own:
-        return {"ext": str(own["ext"]), "since": own.get("since"), "by": own.get("by", "assigned")}
-    first = next((c for c in _history().get(d, []) if _contacted(c)), None)
-    if first:
-        return {"ext": str(first["ext"]), "since": first["time"], "by": "first"}
-    return None
+    if own and own.get("since"):
+        events.append((_ts(own["since"]), str(own["ext"]), own.get("by", "assigned")))
+    events.sort(key=lambda e: e[0])
+    owner = start = last = None
+    by = "first"
+    for t, ext, decided in events:
+        if decided:                                  # قرار المشرف
+            owner, start, last, by = ext, t, t, decided
+        elif owner is None or t - last > win:        # أول تواصل، أو الملكية خلصت
+            owner, start, last, by = ext, t, t, "first"
+        elif ext == owner:
+            last = t
+    if owner is None or dt.datetime.now(dt.timezone.utc) - last > win:
+        return None
+    return {"ext": owner, "since": start.isoformat(), "by": by, "lastContact": last.isoformat(),
+            "freeOn": (last + win).isoformat(), "days": cfg["days"]}
 
 
 def _first_call(number: str, ext: str) -> dict | None:
@@ -133,12 +165,11 @@ async def check(request: Request):
     if not own or own["ext"] == ext:
         return JSONResponse({"allowed": True}, headers=HDR)
     names = CTX["names"]()
-    first = _first_call(number, own["ext"])
     pend = _pending(number, ext)
     return JSONResponse({
         "allowed": False,
         "owner": {"ext": own["ext"], "name": names.get(own["ext"], ""), "since": own["since"], "by": own["by"],
-                  "firstCall": first["time"] if first else own["since"]},
+                  "firstCall": own["since"], "lastContact": own["lastContact"], "freeOn": own["freeOn"], "days": own["days"]},
         "customer": _customer_name(number),
         "pending": bool(pend), "requestedAt": pend["requestedAt"] if pend else None,
     }, headers=HDR)
@@ -169,13 +200,12 @@ async def request_transfer(request: Request):
             old["requestedAt"] = _now()
             item = old
         else:
-            first = _first_call(number, own["ext"])
             item = {
                 "id": secrets.token_urlsafe(8), "status": "pending",
                 "number": number, "numberKey": digits(number),
                 "customer": str(body.get("customer") or "").strip()[:200] or _customer_name(number),
                 "firstExt": own["ext"], "firstName": names.get(own["ext"], ""),
-                "firstCall": first["time"] if first else own["since"], "ownerBy": own["by"],
+                "firstCall": own["since"], "lastContact": own["lastContact"], "ownerBy": own["by"],
                 "newExt": ext, "newName": names.get(ext, ""),
                 "requestedAt": _now(), "reason": reason, "attempts": 1,
             }
@@ -262,3 +292,22 @@ async def _body(request: Request) -> dict:
         return await request.json()
     except Exception:  # noqa: BLE001
         return {}
+
+
+@router.get("/api/ownership/settings")
+def get_settings():
+    return settings()
+
+
+@router.put("/api/ownership/settings")
+async def put_settings(request: Request):
+    b = await _body(request)
+    try:
+        days = int(b.get("days"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "عدد الأيام لازم يبقى رقم")
+    if not 1 <= days <= 365:
+        raise HTTPException(400, "عدد الأيام من 1 لـ 365")
+    _jsave("ownership.json", {"enabled": bool(b.get("enabled", True)), "days": days})
+    _CACHE["at"] = 0
+    return settings()

@@ -556,7 +556,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
       <button data-s="rejected">↩ فضل مع الأول <span id="cfN-rejected"></span></button>
     </div>
   </div>
-  <div class="note" style="margin-bottom:14px">لما مندوب يحاول يتصل بعميل زميله كلّمه قبل كده، التطبيق بينبّهه، ولو أصرّ الطلب بيظهر هنا. <b>موافقة</b> = العميل يتنقل للمندوب الجديد ويتصل على طول، والأول ميقدرش. <b>رفض</b> = يفضل مع الأول، والجديد ميقدرش.</div>
+  <div class="note" style="margin-bottom:14px">لما مندوب يحاول يتصل بعميل زميله كلّمه خلال مدة الحماية (من ⚙️ الإعدادات)، التطبيق بينبّهه، ولو أصرّ الطلب بيظهر هنا. <b>موافقة</b> = العميل يتنقل للمندوب الجديد ويتصل على طول، والأول ميقدرش. <b>رفض</b> = يفضل مع الأول، والجديد ميقدرش.</div>
   <div id="cfList"></div>
 </div>
 <div class="page" id="p-set">
@@ -570,6 +570,11 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="card set-c"><h3>👥 الفرق والتحويلات</h3>
       <p class="muted">اعمل الفرق، اختار قائد كل فريق، واربط كل تحويلة بفريقها. التقارير والفلاتر والتقييم بتمشي على الربط ده.</p>
       <button class="btn" onclick="openTeams()">تعديل الفرق</button></div>
+    <div class="card set-c"><h3>🛡️ حماية العميل من تكرار الاتصال</h3>
+      <p class="muted">العميل بيفضل تبع أول مندوب كلّمه طول ما آخر تواصل منه أقل من المدة دي. أي مندوب تاني بيتنبّه، ولو أصرّ بيتبعت طلب في ⚔️ التعارضات. بعد المدة العميل بيبقى متاح لأي حد.</p>
+      <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="owOn" style="width:auto"> الحماية شغالة</label>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">المدة: <input id="owDays" type="number" min="1" max="365" style="width:90px" class="ap-in"> يوم من آخر تواصل
+        <button class="btn sm" onclick="owSave()">💾 حفظ</button><span id="owMsg"></span></div></div>
     <div class="card set-c"><h3>🧭 أنواع التصنيف</h3>
       <p class="muted">أنواع مشاكل العملاء، وأخطاء الموظفين، وأسباب عدم الشراء اللي الـ AI بيصنّف بيها.</p>
       <button class="btn" onclick="openTax()">تعديل الأنواع</button></div>
@@ -1298,6 +1303,16 @@ async function apScan(){
 setInterval(()=>{if(!document.querySelector('#p-appt.active input:focus,#p-appt.active select:focus,.modal.show')&&![...document.querySelectorAll('.ap-av')].some(x=>x.textContent.trim()))loadAppt()},90000);
 setTimeout(loadAppt,1500);
 
+/* ===================== حماية العميل ===================== */
+async function owLoad(){try{const j=await (await fetch(API_BASE+'/ownership/settings',{cache:'no-store'})).json();$('owDays').value=j.days;$('owOn').checked=j.enabled;}catch(e){}}
+async function owSave(){
+  try{const r=await fetch(API_BASE+'/ownership/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({days:+$('owDays').value,enabled:$('owOn').checked})});
+    const j=await r.json(); if(!r.ok)throw new Error(j.detail||r.status); $('owDays').value=j.days;
+    $('owMsg').innerHTML=`<span style="color:var(--green)">✔ اتحفظ — ${j.enabled?j.days+' يوم من آخر تواصل':'الحماية مقفولة'}</span>`;
+  }catch(e){$('owMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+}
+setTimeout(owLoad,1500);
+
 /* ===================== الفرق ===================== */
 let TM={teams:[],reps:[]};
 async function openTeams(){
@@ -1339,10 +1354,11 @@ async function loadCf(){
   $('cfCount').textContent=CF.counts.pending||''; renderCf();
 }
 function cfWhen(s){return s?new Date(s).toLocaleString('ar-EG',{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'—'}
-function cfSide(cls,title,name,ext,label,when,calls,last){
+function cfSide(cls,title,name,ext,label,when,calls,last,lastContact){
   const a=last&&last.analysis, n=last&&last.note;
   return `<div class="cf-side ${cls}"><h4>${title}: ${esc(name||('تحويلة '+ext))} <span class="muted">(${esc(ext)})</span></h4>
     <div class="k">${label}: <b>${esc(cfWhen(when))}</b> · ${calls} مكالمة مع العميل</div>
+    ${lastContact?`<div class="k">آخر تواصل: <b>${esc(cfWhen(lastContact))}</b></div>`:''}
     ${last?`<div class="k">آخر مكالمة: ${esc(cfWhen(last.time))} · ${esc(last.status||'')}${last.talkSec?` · ${fmt(last.talkSec)}`:''}</div>`:''}
     ${a?`<div class="k">🤖 الدرجة <b>${a.agent_score??'—'}</b>/100 · ${esc(a.outcome||'')}${a.close_probability!=null?` · احتمال القفل ${a.close_probability}%`:''}</div>
          <div class="sum">${esc(a.summary||'')}</div>${a.no_buy_reason?`<div class="k">سبب عدم الشراء: ${esc(typeof a.no_buy_reason==='object'?(a.no_buy_reason.type||''):a.no_buy_reason)}</div>`:''}`
@@ -1361,7 +1377,7 @@ function renderCf(){
       ${x.status==='pending'?`<div class="cf-act"><button class="btn" onclick="cfDecide('${esc(x.id)}',true)">✔ انقله لـ ${esc(x.newName||x.newExt)}</button><button class="btn o" onclick="cfDecide('${esc(x.id)}',false)">↩ يفضل مع ${esc(x.firstName||x.firstExt)}</button></div>`
         :`<div class="cf-tag" style="align-self:flex-start">${x.status==='approved'?'✔ اتنقل لـ '+esc(x.newName||x.newExt):'↩ فضل مع '+esc(x.firstName||x.firstExt)} · ${esc(cfWhen(x.decidedAt))}</div>`}
     </div>
-    ${cfSide('first','المندوب الأول',x.firstName,x.firstExt,x.ownerBy==='first'?'أول اتصال':'صاحب العميل من',x.firstCall,x.firstCalls,x.firstLast)}
+    ${cfSide('first','المندوب الأول',x.firstName,x.firstExt,x.ownerBy==='first'?'أول اتصال':'صاحب العميل من',x.firstCall,x.firstCalls,x.firstLast,x.lastContact)}
     ${cfSide('new','المندوب الجديد',x.newName,x.newExt,'طلب يتصل',x.requestedAt,x.newCalls,x.newLast)}
   </div>`).join('');
 }
