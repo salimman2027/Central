@@ -638,21 +638,22 @@ const NQPhone = {
     this.ext = ext; this.pass = password;
     if (this.ua) { try { this.ua.stop(); } catch (e) {} }
     const sockets = CONFIG.wss.map((u, i) => ({ socket: new JsSIP.WebSocketInterface(u), weight: 10 - i }));
-    this.ua = new JsSIP.UA({
+    const ua = new JsSIP.UA({
       sockets, uri: `sip:${ext}@${CONFIG.domain}`, password, display_name: ext,
       register: true, session_timers: false,
       connection_recovery_min_interval: 2, connection_recovery_max_interval: 30
     });
-    this.ua.on("registered", () => { this._err("متصل ✓"); this._reg(true); NQNotes.flush(); });
-    this.ua.on("unregistered", () => this._reg(false));
-    this.ua.on("registrationFailed", e => {
+    this.ua = ua;
+    ua.on("registered", () => { if (ua !== this.ua) return; this._err("متصل ✓"); this._reg(true); NQNotes.flush(); });
+    ua.on("unregistered", () => { if (ua === this.ua) this._reg(false); });
+    ua.on("registrationFailed", e => { if (ua !== this.ua) return;
       this._reg(false);
       const bad = e.cause === "Authentication Error" || e.cause === "Rejected";
       if (bad) { store.del("nq_login"); if (this.ua) { try { this.ua.stop(); } catch (x) {} } this.ua = null; this.ext = null; this._reg(false); }
       this._err(bad ? "رقم التحويلة أو الباسورد غلط" : "فشل الدخول: " + e.cause);
     });
-    this.ua.on("disconnected", () => { this._reg(false); this._err("مش قادر يوصل للسنترال — بيحاول تاني…"); });
-    this.ua.on("newRTCSession", e => this._onSession(e));
+    ua.on("disconnected", () => { if (ua !== this.ua) return; this._reg(false); this._err("مش قادر يوصل للسنترال — بيحاول تاني…"); });
+    ua.on("newRTCSession", e => this._onSession(e));
     this.ua.start();
   },
 
