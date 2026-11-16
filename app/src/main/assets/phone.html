@@ -628,6 +628,17 @@ function showSettings() {
   show("scrSettings");
 }
 
+/* الشريحة اللي في الجيتواي سعودي: نظبط شكل الرقم قبل ما يطلع من السنترال */
+function pbxNumber(n) {
+  n = String(n || "").replace(/^\+/, "00");
+  if (/^01[0125]\d{8}$/.test(n)) return "0020" + n.slice(1);          // موبايل مصري 01xxxxxxxxx
+  if (/^20?1[0125]\d{8}$/.test(n) && n.length === 12) return "00" + n; // 201xxxxxxxxx
+  if (/^009665\d{8}$/.test(n)) return "0" + n.slice(5);                // +9665… → 05… (محلي)
+  if (/^9665\d{8}$/.test(n)) return "0" + n.slice(3);
+  if (/^5\d{8}$/.test(n)) return "0" + n;                               // 5xxxxxxxx من غير الصفر
+  return n;
+}
+
 /* ---------- phone ---------- */
 const NQPhone = {
   ua: null, session: null, muted: false, speaker: false, callStart: null, direction: null, peer: null, timer: null, ext: null, pass: null,
@@ -684,7 +695,9 @@ const NQPhone = {
     if (!pbxReady) { $("dialErr").textContent = "السنترال مش متصل — اتصل من شريحتك"; return NQVia.open(number); }
     if (this.session) return;
     if (window.Android) Android.onCallStateChanged(true);
-    this.ua.call(`sip:${number}@${CONFIG.domain}`, { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: CONFIG.iceServers } });
+    const out = pbxNumber(number);
+    if (out !== number) toast(`📞 بيتصل على ${out} (رقم مصري من الشريحة السعودي)`);
+    this.ua.call(`sip:${out}@${CONFIG.domain}`, { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: CONFIG.iceServers } });
   },
 
   answer() {
