@@ -421,7 +421,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:14px"><span>المنجز</span><b id="tProgTxt">0 من 0</b></div>
     <div class="prog" id="tProg"><b style="width:0"></b></div>
   </div>
-  <div class="card">
+  <div class="card" hidden>
     <b>إضافة عميل للتارجت</b>
     <label class="lbl">اسم العميل</label>
     <input id="tName" placeholder="مثلًا: شركة الأفق — م. سامي">
@@ -1202,7 +1202,7 @@ const NQTargets = {
     $("tProg").className = "prog" + (pct < 50 ? " low" : pct < 80 ? " mid" : "");
     $("tProg").firstElementChild.style.width = pct + "%";
     const box = $("tList"); box.innerHTML = "";
-    if (!list.length) { box.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px">مفيش عملاء في تارجت اليوم ده. ضيف من فوق.</div>'; return; }
+    if (!list.length) { box.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px">مفيش عملاء في تارجت اليوم ده.</div>'; return; }
     list.forEach(x => {
       const row = document.createElement("div"); row.className = "tgt" + (x.done ? " done" : "");
       const info = document.createElement("div"); info.className = "info"; info.onclick = () => this.edit(x.id); info.title = "اضغط للتعديل";
