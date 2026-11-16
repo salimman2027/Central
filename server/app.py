@@ -51,6 +51,8 @@ import appointments as APPT  # noqa: E402
 
 app.include_router(files_api.router)
 app.include_router(APPT.router)
+import ownership as OWN  # noqa: E402
+app.include_router(OWN.router)
 # التطبيق (WebView) بيكلّم /app/* من origin تاني
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
                    allow_headers=["*"], expose_headers=["Content-Disposition"])
@@ -706,3 +708,17 @@ def index():
 @app.exception_handler(pymysql.MySQLError)
 def db_error(_, exc):
     return JSONResponse({"detail": f"خطأ في قاعدة بيانات السنترال: {exc}"}, status_code=500)
+
+
+def _analysis_of(rec: str):
+    if not rec:
+        return None
+    try:
+        return json.loads((ANALYSIS_DIR / (rec + ".json")).read_text(encoding="utf-8")).get("analysis")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+OWN.CTX.update(dir=DATA_DIR, calls=lambda a, b: calls(a, b), auth=lambda e, p: check_ext_password(e, p),
+               names=lambda: {str(r.get("id")): r.get("name", "") for r in config().get("reps", [])},
+               analysis=_analysis_of)

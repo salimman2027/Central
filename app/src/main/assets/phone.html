@@ -223,8 +223,12 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   html[data-theme=light] .key { background:#fff; border-color:rgba(20,50,90,.1); box-shadow:0 4px 14px -8px rgba(20,50,90,.4); }
   html[data-theme=light] .iconbtn { background:#fff; }
   html[data-theme=light] .btn, html[data-theme=light] .chip.sel, html[data-theme=light] .seg button.sel, html[data-theme=light] .mini.call { color:#fff; }
+  html[data-theme=light] .btn.light { background:#fff; color:var(--fg); border:1px solid rgba(20,50,90,.16); }
   html[data-theme=light] .round.green svg { fill:#fff; }
   html[data-theme=light] .sheet { background:rgba(255,255,255,.97); }
+  .own-info { background:rgba(255,170,60,.12); border:1px solid rgba(255,170,60,.35); border-radius:14px; padding:12px 14px; margin:8px 0 12px; line-height:1.8; font-size:14px; }
+  .own-info b { color:var(--fg); } .own-wait { background:rgba(25,230,193,.1); border-radius:14px; padding:12px 14px; line-height:1.7; }
+  #ownReason { width:100%; box-sizing:border-box; }
   html[data-theme=light] .sheet-bg { background:rgba(20,30,50,.35); }
   html[data-theme=light] .kgrid .v { background:linear-gradient(180deg,#0c1626,#0aa58c); -webkit-background-clip:text; background-clip:text; }
   html[data-theme=light] .card { box-shadow:0 10px 30px -18px rgba(20,50,90,.4); }
@@ -499,6 +503,25 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   </div>
 </div>
 
+<div class="sheet-bg" id="ownSheet" onclick="if(event.target===this)NQOwner.close()">
+  <div class="sheet">
+    <h3>⚠️ العميل ده تبع زميل</h3>
+    <div class="own-info" id="ownInfo"></div>
+    <div id="ownAsk">
+      <label class="lbl">لو لازم تكلّمه، اكتب السبب وهيتبعت للمشرف</label>
+      <textarea id="ownReason" rows="3" placeholder="مثلًا: العميل هو اللي كلّمني وطلبني بالاسم"></textarea>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="btn" style="flex:1" id="ownSend" onclick="NQOwner.send()">ابعت للمشرف</button>
+        <button class="btn light" style="flex:1" onclick="NQOwner.close()">إلغاء</button>
+      </div>
+    </div>
+    <div id="ownWait" hidden>
+      <div class="own-wait">⏳ طلبك مستني موافقة المشرف — أول ما يوافق تقدر تتصل على طول.</div>
+      <button class="btn light" style="width:100%;margin-top:12px" onclick="NQOwner.close()">تمام</button>
+    </div>
+  </div>
+</div>
+
 <div class="sheet-bg" id="fmtSheet" onclick="if(event.target===this)this.classList.remove('on')">
   <div class="sheet">
     <h3>تنزيل التقرير</h3>
@@ -687,6 +710,10 @@ const NQPhone = {
       const last = NQHistory.all().filter(h => h.direction === "out").pop();
       if (last) { $("dialNum").textContent = last.number; $("dialErr").textContent = ""; }
       return;
+    }
+    // العميل ده تبع مندوب تاني؟ (بنسأل السيرفر مرة واحدة قبل الاتصال)
+    if (!(this._ownOk && this._ownOk.n === number && Date.now() - this._ownOk.t < 120000)) {
+      return NQOwner.guard(number, () => { this._ownOk = { n: number, t: Date.now() }; this.call(number, forceVia); });
     }
     const pbxReady = !!(this.ua && this.ua.isRegistered());
     let via = IS_APP ? (forceVia || NQPrefs.get("callVia", "ask")) : "pbx"; // اللابتوب: السنترال بس
@@ -896,6 +923,46 @@ setInterval(() => NQNotes.flush(), 5 * 60 * 1000);
 
 /* ---------- call from: PBX or my SIM ---------- */
 const VIA_LABEL = { ask: "❔ اسألني", pbx: "☎️ السنترال", sim: "📱 شريحتي" };
+const NQOwner = {
+  num: "", info: null,
+  creds() {
+    if (NQPhone.ext && NQPhone.pass) return { ext: NQPhone.ext, password: NQPhone.pass };
+    const l = store.get("nq_login", null); return l && l.ext ? { ext: l.ext, password: l.password } : null;
+  },
+  async post(path, body) {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 5000);
+    try {
+      const r = await fetch(CONFIG.api + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctl.signal });
+      const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || r.status); return j;
+    } finally { clearTimeout(t); }
+  },
+  async guard(number, go) {
+    const c = this.creds();
+    if (!c || String(number).replace(/\D/g, "").length < 7) return go();
+    let j;
+    try { j = await this.post("/owner/check", { ...c, number }); } catch (e) { return go(); } // السيرفر مش متاح: منعطّلش الشغل
+    if (j.allowed) return go();
+    this.num = number; this.info = j;
+    const d = s => s ? new Date(s).toLocaleString("ar-EG", { day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "";
+    $("ownInfo").innerHTML = `<div>العميل: <b>${esc(j.customer || "")}</b> <span dir="ltr">${esc(number)}</span></div>
+      <div>صاحبه: <b>${esc(j.owner.name || "تحويلة " + j.owner.ext)}</b> (${esc(j.owner.ext)})</div>
+      <div>${j.owner.by === "approved" ? "اتنقل له بموافقة المشرف" : j.owner.by === "kept" ? "المشرف قرر يفضل معاه" : "أول اتصال"}: <b>${esc(d(j.owner.by === "first" ? j.owner.firstCall : j.owner.since))}</b></div>`;
+    $("ownAsk").hidden = !!j.pending; $("ownWait").hidden = !j.pending;
+    $("ownReason").value = ""; $("ownSheet").classList.add("on");
+  },
+  async send() {
+    const reason = $("ownReason").value.trim();
+    if (reason.length < 3) { toast("اكتب السبب الأول"); return; }
+    const b = $("ownSend"); b.disabled = true;
+    try {
+      await this.post("/owner/request", { ...this.creds(), number: this.num, reason, customer: (this.info && this.info.customer) || window._pickedName || "" });
+      this.close(); toast("اتبعت للمشرف ✓ — أول ما يوافق تقدر تتصل");
+    } catch (e) { toast("✖ " + e.message); }
+    b.disabled = false;
+  },
+  close() { $("ownSheet").classList.remove("on"); }
+};
+
 const NQVia = {
   num: "",
   chip() { $("viaChip").textContent = VIA_LABEL[NQPrefs.get("callVia", "ask")] || VIA_LABEL.ask; },

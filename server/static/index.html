@@ -330,6 +330,14 @@ html[data-theme=light] .tax-ta{background:#fff}
 .crm-f input,.crm-sales input,.ap-when select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit}
 html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html[data-theme=light] .ap-when select{background:#fff}
 .crm-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.crm-row .crm-f{min-width:0}.crm-row input,.crm-row select{width:100%;box-sizing:border-box}@media(max-width:700px){.crm-row{grid-template-columns:1fr 1fr}}
+.cf-card{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
+@media(max-width:900px){.cf-card{grid-template-columns:1fr}}
+.cf-h{display:flex;flex-direction:column;gap:6px}.cf-h .num{direction:ltr;text-align:right;font-variant-numeric:tabular-nums;color:var(--grey)}
+.cf-side{border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.cf-side.first{border-color:rgba(90,168,255,.4)}.cf-side.new{border-color:rgba(255,170,60,.45)}
+.cf-side h4{margin:0;font-size:14px}.cf-side .k{font-size:12px;color:var(--grey)}.cf-side .sum{font-size:13px;line-height:1.7}
+.cf-reason{background:rgba(255,170,60,.1);border-radius:10px;padding:8px 10px;font-size:13px;line-height:1.7}
+.cf-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.cf-tag{font-size:12px;border-radius:99px;padding:2px 9px;background:var(--glass);border:1px solid var(--border)}
 .set-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}.set-c{display:flex;flex-direction:column;gap:8px}.set-c h3{margin:0}.set-c p{margin:0;flex:1;line-height:1.7}.set-c .btn{align-self:flex-start}
 .crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .crm-n{font-size:11px;margin-top:3px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
 .crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
@@ -372,6 +380,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div class="tab" data-p="eval">⭐ تقييم الموظفين</div>
   <div class="tab" data-p="ins">🧭 المشاكل وأسباب عدم الشراء</div>
   <div class="tab" data-p="appt">📅 طلبات تحديد موعد <span class="tcount" id="apCount"></span></div>
+  <div class="tab" data-p="cf">⚔️ التعارضات <span class="tcount" id="cfCount"></span></div>
   <div class="tab" data-p="set">⚙️ الإعدادات</div>
 </div>
 
@@ -528,6 +537,17 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
   <div class="note" id="apNote" style="margin-bottom:14px">لما المندوب يكتب أو يسجّل بصوته ملاحظة بعد المكالمة فيها ميعاد مع العميل، الطلب بيظهر هنا لوحده. راجع الموعد وعدّله لو محتاج، وبعدين دوس ✔ تأكيد.</div>
   <div class="card"><div class="tw"><table id="apTbl"></table></div></div>
+</div>
+<div class="page" id="p-cf">
+  <div class="filters">
+    <div class="seg2" id="cfSeg">
+      <button data-s="pending" class="on">⏳ مستنية قرار <span id="cfN-pending"></span></button>
+      <button data-s="approved">✔ اتنقل للمندوب الجديد <span id="cfN-approved"></span></button>
+      <button data-s="rejected">↩ فضل مع الأول <span id="cfN-rejected"></span></button>
+    </div>
+  </div>
+  <div class="note" style="margin-bottom:14px">لما مندوب يحاول يتصل بعميل زميله كلّمه قبل كده، التطبيق بينبّهه، ولو أصرّ الطلب بيظهر هنا. <b>موافقة</b> = العميل يتنقل للمندوب الجديد ويتصل على طول، والأول ميقدرش. <b>رفض</b> = يفضل مع الأول، والجديد ميقدرش.</div>
+  <div id="cfList"></div>
 </div>
 <div class="page" id="p-set">
   <div class="set-grid">
@@ -919,6 +939,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.p==='ai')loadAI();
   if(t.dataset.p==='eval')loadEval();
   if(t.dataset.p==='appt')loadAppt();
+  if(t.dataset.p==='cf')loadCf();
   if(t.dataset.p==='ins')loadIns();
 });
 loadConfig().then(()=>{fillSelects();refresh();initAI();}).catch(e=>{$('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل الإعدادات</div><div class="s">${e.message}</div></div>`});
@@ -1263,6 +1284,47 @@ async function apScan(){
 }
 setInterval(()=>{if(!document.querySelector('#p-appt.active input:focus,#p-appt.active select:focus,.modal.show')&&![...document.querySelectorAll('.ap-av')].some(x=>x.textContent.trim()))loadAppt()},90000);
 setTimeout(loadAppt,1500);
+
+/* ===================== التعارضات ===================== */
+let CF={items:[],counts:{}}, CF_S='pending';
+document.querySelectorAll('#cfSeg button').forEach(b=>b.onclick=()=>{CF_S=b.dataset.s;document.querySelectorAll('#cfSeg button').forEach(x=>x.classList.toggle('on',x===b));renderCf();});
+async function loadCf(){
+  try{CF=await (await fetch(API_BASE+'/conflicts',{cache:'no-store'})).json();}catch(e){$('cfList').innerHTML=`<div class="card">تعذّر التحميل: ${esc(e.message)}</div>`;return}
+  ['pending','approved','rejected'].forEach(k=>$('cfN-'+k).textContent=CF.counts[k]?`(${CF.counts[k]})`:'');
+  $('cfCount').textContent=CF.counts.pending||''; renderCf();
+}
+function cfWhen(s){return s?new Date(s).toLocaleString('ar-EG',{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'—'}
+function cfSide(cls,title,name,ext,label,when,calls,last){
+  const a=last&&last.analysis, n=last&&last.note;
+  return `<div class="cf-side ${cls}"><h4>${title}: ${esc(name||('تحويلة '+ext))} <span class="muted">(${esc(ext)})</span></h4>
+    <div class="k">${label}: <b>${esc(cfWhen(when))}</b> · ${calls} مكالمة مع العميل</div>
+    ${last?`<div class="k">آخر مكالمة: ${esc(cfWhen(last.time))} · ${esc(last.status||'')}${last.talkSec?` · ${fmt(last.talkSec)}`:''}</div>`:''}
+    ${a?`<div class="k">🤖 الدرجة <b>${a.agent_score??'—'}</b>/100 · ${esc(a.outcome||'')}${a.close_probability!=null?` · احتمال القفل ${a.close_probability}%`:''}</div>
+         <div class="sum">${esc(a.summary||'')}</div>${a.no_buy_reason?`<div class="k">سبب عدم الشراء: ${esc(typeof a.no_buy_reason==='object'?(a.no_buy_reason.type||''):a.no_buy_reason)}</div>`:''}`
+      :n&&(n.summary||n.outcome)?`<div class="sum">📝 ${esc(n.outcome||'')}${n.summary?' — '+esc(n.summary):''}</div>`
+      :`<div class="k">${last&&last.hasRecording?'المكالمة متسجّلة ولسه متحلّلتش':'مفيش تحليل للمكالمة'}</div>`}
+    ${last&&last.hasRecording?`<button class="btn o sm" style="align-self:flex-start" onclick="cfPlay('${esc(last.id)}',this)">▶ اسمع آخر مكالمة</button>`:''}</div>`;
+}
+function cfPlay(id,b){const a=new Audio(API_BASE+'/recording/'+encodeURIComponent(id));a.play().catch(e=>alert(e.message));b.disabled=true;b.textContent='🔊 شغال…';a.onended=()=>{b.disabled=false;b.textContent='▶ اسمع آخر مكالمة'};}
+function renderCf(){
+  const L=CF.items.filter(x=>x.status===CF_S);
+  if(!L.length){$('cfList').innerHTML=`<div class="card c muted" style="padding:30px">${CF_S==='pending'?'مفيش تعارضات مستنية — أول ما مندوب يصرّ يكلّم عميل زميله هيظهر هنا':'مفيش'}</div>`;return}
+  $('cfList').innerHTML=L.map(x=>`<div class="card cf-card">
+    <div class="cf-h"><h3 style="margin:0">${esc(x.customer||'عميل من غير اسم')}</h3><div class="num">${esc(x.number)}</div>
+      <div class="cf-reason">💬 <b>سبب الإصرار:</b> ${esc(x.reason)}${x.attempts>1?` <span class="cf-tag">طلب ${x.attempts} مرات</span>`:''}</div>
+      <div class="muted" style="font-size:12px">تاريخ الطلب: ${esc(cfWhen(x.requestedAt))}</div>
+      ${x.status==='pending'?`<div class="cf-act"><button class="btn" onclick="cfDecide('${esc(x.id)}',true)">✔ انقله لـ ${esc(x.newName||x.newExt)}</button><button class="btn o" onclick="cfDecide('${esc(x.id)}',false)">↩ يفضل مع ${esc(x.firstName||x.firstExt)}</button></div>`
+        :`<div class="cf-tag" style="align-self:flex-start">${x.status==='approved'?'✔ اتنقل لـ '+esc(x.newName||x.newExt):'↩ فضل مع '+esc(x.firstName||x.firstExt)} · ${esc(cfWhen(x.decidedAt))}</div>`}
+    </div>
+    ${cfSide('first','المندوب الأول',x.firstName,x.firstExt,x.ownerBy==='first'?'أول اتصال':'صاحب العميل من',x.firstCall,x.firstCalls,x.firstLast)}
+    ${cfSide('new','المندوب الجديد',x.newName,x.newExt,'طلب يتصل',x.requestedAt,x.newCalls,x.newLast)}
+  </div>`).join('');
+}
+async function cfDecide(id,ok){
+  try{const r=await fetch(`${API_BASE}/conflicts/${id}/${ok?'approve':'reject'}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    loadCf();}catch(e){alert('✖ '+e.message)}
+}
+setTimeout(loadCf,2000); setInterval(()=>{if(!document.querySelector('.modal.show'))loadCf()},60000);
 
 /* ===================== المشاكل وأسباب عدم الشراء والدروس ===================== */
 let INS=null, TAX=null;
