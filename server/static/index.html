@@ -518,6 +518,18 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div id="crmMsg" class="muted"></div>
   </div>
 </div>
+<div class="modal" id="teamModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="mbox" style="max-width:720px;width:96vw;max-height:90vh;overflow:auto">
+    <h3 style="margin-top:0">👥 الفرق والتحويلات</h3>
+    <h4 style="margin:10px 0 4px">الفرق</h4>
+    <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم الفريق</th><th>قائد الفريق</th><th>عدد التحويلات</th><th></th></tr></thead><tbody id="tmTeams"></tbody></table></div>
+    <button class="btn o sm" onclick="tmAddTeam()">＋ فريق جديد</button>
+    <h4 style="margin:18px 0 4px">التحويلات</h4>
+    <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>التحويلة</th><th>الموظف</th><th>الفريق</th></tr></thead><tbody id="tmReps"></tbody></table></div>
+    <div class="muted" style="font-size:12px">تحويلة جديدة؟ ضيفها الأول من الربط مع الـ CRM، وهتظهر هنا.</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" onclick="tmSave()">💾 حفظ</button><span id="tmMsg"></span></div>
+  </div>
+</div>
 <div class="modal" id="cusModal" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="mbox" style="max-width:520px;width:94vw;max-height:85vh;overflow:auto">
     <h3 style="margin-top:0">🔎 اختار العميل من الـ CRM</h3>
@@ -557,6 +569,9 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="card set-c"><h3>🔗 الربط مع الـ CRM</h3>
       <p class="muted">رابط حجز الاجتماعات، مدة الاجتماع، الشروط، والموظف في الـ CRM قصاد كل تحويلة.</p>
       <button class="btn" onclick="openCrm()">إعدادات الـ CRM والموظفين</button></div>
+    <div class="card set-c"><h3>👥 الفرق والتحويلات</h3>
+      <p class="muted">اعمل الفرق، اختار قائد كل فريق، واربط كل تحويلة بفريقها. التقارير والفلاتر والتقييم بتمشي على الربط ده.</p>
+      <button class="btn" onclick="openTeams()">تعديل الفرق</button></div>
     <div class="card set-c"><h3>🧭 أنواع التصنيف</h3>
       <p class="muted">أنواع مشاكل العملاء، وأخطاء الموظفين، وأسباب عدم الشراء اللي الـ AI بيصنّف بيها.</p>
       <button class="btn" onclick="openTax()">تعديل الأنواع</button></div>
@@ -667,8 +682,8 @@ const ms=s=>{s=Math.round(s);return String(Math.floor(s/60)).padStart(2,'0')+':'
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const dmy=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
 const tm=d=>d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-const repOf=id=>REPS.find(r=>r.id===id);
-const teamOf=id=>TEAMS.find(t=>t.id===id);
+const repOf=id=>REPS.find(r=>r.id===id)||{id,name:String(id??''),team:''};
+const teamOf=id=>TEAMS.find(t=>t.id===id)||{id:'',name:id?'—':'من غير فريق'};
 const num=n=>n.toLocaleString('en-US');
 const dash=v=>v?v:'—';
 function stBadge(s){return {'تم الرد':'b-ans','لم يرد':'b-no','فائتة':'b-miss','مرفوضة':'b-rej'}[s]}
@@ -1285,6 +1300,39 @@ async function apScan(){
 setInterval(()=>{if(!document.querySelector('#p-appt.active input:focus,#p-appt.active select:focus,.modal.show')&&![...document.querySelectorAll('.ap-av')].some(x=>x.textContent.trim()))loadAppt()},90000);
 setTimeout(loadAppt,1500);
 
+/* ===================== الفرق ===================== */
+let TM={teams:[],reps:[]};
+async function openTeams(){
+  try{TM=await (await fetch(API_BASE+'/teams',{cache:'no-store'})).json();}catch(e){alert(e.message);return}
+  $('tmMsg').textContent=''; tmRender(); $('teamModal').classList.add('show');
+}
+function tmRead(){
+  TM.teams=[...document.querySelectorAll('#tmTeams tr')].map(tr=>({id:tr.dataset.id,name:tr.querySelector('.tm-n').value.trim(),leaderExt:tr.querySelector('.tm-l').value}));
+  document.querySelectorAll('#tmReps tr').forEach(tr=>{const r=TM.reps.find(x=>x.ext===tr.dataset.ext);if(r)r.team=tr.querySelector('.tm-t').value});
+}
+function tmRender(){
+  const cnt=id=>TM.reps.filter(r=>r.team===id).length;
+  $('tmTeams').innerHTML=TM.teams.map(t=>`<tr data-id="${esc(t.id)}"><td><input class="tm-n" value="${esc(t.name)}" placeholder="مثلًا فريق الرياض" oninput="tmSync()"></td>
+    <td><select class="tm-l"><option value="">— من غير —</option>${TM.reps.filter(r=>r.team===t.id).map(r=>`<option value="${esc(r.ext)}" ${r.ext===t.leaderExt?'selected':''}>${esc(r.name||r.ext)} (${esc(r.ext)})</option>`).join('')}</select></td>
+    <td class="c">${cnt(t.id)}</td><td><button class="x" title="امسح الفريق" onclick="tmDel('${esc(t.id)}')">✕</button></td></tr>`).join('')
+    ||'<tr><td colspan="4" class="muted">مفيش فرق — دوس ＋ فريق جديد</td></tr>';
+  const opts=v=>'<option value="">— من غير فريق —</option>'+TM.teams.map(t=>`<option value="${esc(t.id)}" ${t.id===v?'selected':''}>${esc(t.name||'فريق جديد')}</option>`).join('');
+  $('tmReps').innerHTML=TM.reps.slice().sort((a,b)=>+a.ext-+b.ext).map(r=>`<tr data-ext="${esc(r.ext)}"><td class="c">${esc(r.ext)}</td><td>${esc(r.name||'—')}</td><td><select class="tm-t" onchange="tmRead();tmRender()">${opts(r.team)}</select></td></tr>`).join('');
+}
+function tmSync(){tmRead(); document.querySelectorAll('#tmReps .tm-t').forEach(sel=>{const v=sel.value;sel.innerHTML='<option value="">— من غير فريق —</option>'+TM.teams.map(t=>`<option value="${esc(t.id)}" ${t.id===v?'selected':''}>${esc(t.name||'فريق جديد')}</option>`).join('')})}
+function tmAddTeam(){tmRead(); TM.teams.push({id:'t'+Date.now().toString(36),name:'',leaderExt:''}); tmRender(); const ins=document.querySelectorAll('#tmTeams .tm-n'); ins[ins.length-1]?.focus();}
+function tmDel(id){tmRead(); const n=TM.reps.filter(r=>r.team===id).length;
+  TM.teams=TM.teams.filter(t=>t.id!==id); TM.reps.forEach(r=>{if(r.team===id)r.team=''}); tmRender();
+  $('tmMsg').innerHTML=`<span class="muted">${n?n+' تحويلة بقت من غير فريق — ':''}دوس حفظ عشان المسح يتسجّل</span>`;}
+async function tmSave(){
+  tmRead();
+  if(TM.teams.some(t=>!t.name)){$('tmMsg').innerHTML='<span style="color:var(--red)">✖ اكتب اسم كل فريق</span>';return}
+  const assign={}; TM.reps.forEach(r=>{if(r.team)assign[r.ext]=r.team});
+  try{const r=await fetch(API_BASE+'/teams',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({teams:TM.teams,assign})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    TM=j; tmRender(); $('tmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; await loadConfig(); try{fillSelects();renderAll()}catch(e){}
+  }catch(e){$('tmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+}
+
 /* ===================== التعارضات ===================== */
 let CF={items:[],counts:{}}, CF_S='pending';
 document.querySelectorAll('#cfSeg button').forEach(b=>b.onclick=()=>{CF_S=b.dataset.s;document.querySelectorAll('#cfSeg button').forEach(x=>x.classList.toggle('on',x===b));renderCf();});
@@ -1433,7 +1481,7 @@ async function saveCrm(){
   const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
     termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds,repNames,removed:[...CRM_REMOVED].filter(e=>!salesIds[e])};
   try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
-    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — وأسماء الموظفين بقت زي الـ CRM</span>'; await loadConfig(); try{fillSelects();}catch(e){} loadAppt();
+    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — وأسماء الموظفين بقت زي الـ CRM</span>'; await loadConfig(); try{fillSelects();renderAll();}catch(e){} loadAppt();
     document.querySelectorAll('#crmSales tr').forEach(tr=>{const n=crmRepName(tr.querySelector('.crm-e').value);tr.querySelector('.crm-n').innerHTML=n?'عندنا دلوقتي: '+esc(n):''});}
   catch(e){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }

@@ -123,6 +123,20 @@ def config():
     for ext, name in over.items():
         if ext not in have and name and ext.isdigit():
             reps.setdefault("reps", []).append({"id": int(ext), "name": name, "team": ""})
+    try:   # الفرق وربطها بالتحويلات من شاشة الإعدادات
+        tm = json.loads((DATA_DIR / "teams.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        tm = None
+    if tm:
+        byid = {str(r.get("id")): r for r in reps.get("reps", [])}
+        reps["teams"] = [{"id": t["id"], "name": t["name"],
+                          "leader": (byid.get(str(t.get("leaderExt"))) or {}).get("name", "")} for t in tm.get("teams", [])]
+        leaders = {str(t.get("leaderExt")) for t in tm.get("teams", []) if t.get("leaderExt")}
+        for r in reps.get("reps", []):
+            r["team"] = tm.get("assign", {}).get(str(r.get("id")), "")
+            r.pop("lead", None)
+            if str(r.get("id")) in leaders:
+                r["lead"] = 1
     try:   # تحويلات اتمسحت من شاشة الإعدادات
         hidden = set(json.loads((DATA_DIR / "rep_hidden.json").read_text(encoding="utf-8")))
     except Exception:  # noqa: BLE001
@@ -708,6 +722,34 @@ def index():
 @app.exception_handler(pymysql.MySQLError)
 def db_error(_, exc):
     return JSONResponse({"detail": f"خطأ في قاعدة بيانات السنترال: {exc}"}, status_code=500)
+
+
+@app.get("/api/teams")
+def get_teams():
+    c = config()
+    return {"teams": [{"id": t["id"], "name": t["name"],
+                       "leaderExt": next((str(r["id"]) for r in c["reps"] if r.get("team") == t["id"] and r.get("lead")), "")}
+                      for t in c.get("teams", [])],
+            "reps": [{"ext": str(r["id"]), "name": r.get("name", ""), "team": r.get("team", "")} for r in c.get("reps", [])]}
+
+
+@app.put("/api/teams")
+async def put_teams(request: Request):
+    b = await request.json()
+    teams, seen = [], set()
+    for t in b.get("teams") or []:
+        name = str(t.get("name") or "").strip()[:60]
+        if not name:
+            raise HTTPException(400, "في فريق من غير اسم")
+        tid = re.sub(r"[^\w-]", "", str(t.get("id") or "")) or ("t" + str(len(teams) + 1))
+        while tid in seen:
+            tid += "_"
+        seen.add(tid)
+        teams.append({"id": tid, "name": name, "leaderExt": str(t.get("leaderExt") or "")})
+    assign = {str(k): str(v) for k, v in (b.get("assign") or {}).items() if str(k).isdigit() and str(v) in seen}
+    f = DATA_DIR / "teams.json"
+    f.write_text(json.dumps({"teams": teams, "assign": assign}, ensure_ascii=False, indent=1), encoding="utf-8")
+    return get_teams()
 
 
 def _analysis_of(rec: str):
