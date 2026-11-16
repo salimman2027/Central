@@ -51,6 +51,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .topbar .who small { display:block; color:var(--muted); font-size:12px; }
   .iconbtn { width:42px; height:42px; border-radius:50%; background:#eef2f5; font-size:20px; display:flex; align-items:center; justify-content:center; color:var(--fg); }
   .display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:6px 20px; min-height:70px; }
+  .pastebtn { margin-top:4px; border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:99px; padding:4px 12px; font:inherit; font-size:12px; cursor:pointer; }
   .display .num { font-size:clamp(26px, 5vh, 38px); letter-spacing:1px; direction:ltr; min-height:48px; font-weight:300; word-break:break-all; text-align:center; }
   .keypad, .dialrow, .incall-pad, .incbtns { direction:ltr; }
   .keypad { display:grid; grid-template-columns:repeat(3, var(--k)); justify-content:space-evenly; gap:1.4vh 0; padding:4px 20px 6px; max-width:420px; width:100%; margin:0 auto; --k:min(72px, 9.2vh, 22vw); }
@@ -277,7 +278,8 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <span class="ver" id="appVer"></span>
     <button class="iconbtn" onclick="showSettings()" aria-label="الإعدادات">⚙</button>
   </div>
-  <div class="display"><div id="dialNum" class="num"></div><div id="dialErr" class="err"></div></div>
+  <div class="display"><div id="dialNum" class="num"></div><div id="dialErr" class="err"></div>
+    <button class="pastebtn" id="btnPaste" onclick="dialPaste()" aria-label="لصق رقم">📋 لصق رقم</button></div>
   <div class="keypad" id="keypad"></div>
   <div class="dialrow">
     <button class="side app-only" onclick="pickContact()" aria-label="جهات الاتصال">👥</button>
@@ -622,6 +624,45 @@ function dialKey(d) {
   n.textContent = n.textContent + d; window._pickedName = "";
   $("dialErr").textContent = "";
 }
+/* لصق رقم: من الزرار، أو ضغطة طويلة على الرقم، أو Ctrl+V على اللاب */
+function cleanPhone(t) {
+  t = String(t || "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
+  const m = t.match(/\+?\d[\d\s\-().\u200e\u200f]{4,}\d/);
+  if (!m) return "";
+  const lead = m[0].trim().startsWith("+") ? "+" : "";
+  return lead + m[0].replace(/\D/g, "");
+}
+function dialSet(t, src) {
+  const n = cleanPhone(t);
+  if (!n) { toast(src === "key" ? "" : "مفيش رقم في الحاجة اللي اتنسخت"); return false; }
+  $("dialNum").textContent = n; $("dialErr").textContent = ""; window._pickedName = "";
+  if (src !== "key") toast("📋 اتلصق " + n);
+  return true;
+}
+async function dialPaste() {
+  let t = "";
+  try { t = IS_APP && Android.clipboardText ? Android.clipboardText() : await navigator.clipboard.readText(); }
+  catch (e) { toast("المتصفح منع اللصق — دوس Ctrl+V"); return; }
+  dialSet(t);
+}
+document.addEventListener("paste", e => {
+  const a = document.activeElement; if (a && (/INPUT|TEXTAREA/.test(a.tagName) || a.isContentEditable)) return;
+  const dial = document.getElementById("scrDial"); if (!dial || dial.offsetParent === null) return;
+  const t = (e.clipboardData || window.clipboardData).getData("text");
+  if (cleanPhone(t)) { e.preventDefault(); dialSet(t); }
+});
+document.addEventListener("keydown", e => { // كتابة الرقم من كيبورد اللاب
+  const a = document.activeElement; if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const dial = document.getElementById("scrDial"); if (!dial || dial.offsetParent === null) return;
+  if (/^[0-9*#+]$/.test(e.key)) { dialKey(e.key); e.preventDefault(); }
+  else if (e.key === "Backspace") { dialDel(); e.preventDefault(); }
+  else if (e.key === "Enter" && $("dialNum").textContent) { NQPhone.call($("dialNum").textContent); e.preventDefault(); }
+});
+(function () { // ضغطة طويلة على الرقم = لصق
+  const d = document.getElementById("dialNum"); let t = null;
+  d.parentNode.onpointerdown = e => { if (e.target.id === "btnPaste") return; t = setTimeout(dialPaste, 600); };
+  d.parentNode.onpointerup = d.parentNode.onpointerleave = () => clearTimeout(t);
+})();
 function dialDel() { const n = $("dialNum"); n.textContent = n.textContent.slice(0, -1); $("dialErr").textContent = ""; window._pickedName = ""; }
 (function () { // ضغطة = يمسح رقم، ضغطة طويلة = يمسح الكل
   const b = document.getElementById("btnDel"); let t = null, long = false;
