@@ -561,6 +561,8 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 const $ = id => document.getElementById(id);
 const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrFiles"];
 function show(id) {
+  // خانة كتابة في شاشة اتقفلت (زي الباسورد) متفضلش واخدة الكيبورد
+  const ae = document.activeElement; if (ae && ae !== document.body && ae.closest && !ae.closest("#" + id)) try { ae.blur(); } catch (e) {}
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
   const tabs = TAB_SCREENS.includes(id);
   $("tabbar").classList.toggle("on", tabs); document.body.classList.toggle("tabs", tabs);
@@ -695,16 +697,9 @@ async function dialPaste() {
 }
 document.addEventListener("paste", e => {
   const a = document.activeElement; if (a && (/INPUT|TEXTAREA/.test(a.tagName) || a.isContentEditable)) return;
-  const dial = document.getElementById("scrDial"); if (!dial || dial.offsetParent === null) return;
+  const dial = document.getElementById("scrDial"); if (!dial || !dial.classList.contains("on")) return;
   const t = (e.clipboardData || window.clipboardData).getData("text");
   if (cleanPhone(t)) { e.preventDefault(); dialSet(t); }
-});
-document.addEventListener("keydown", e => { // كتابة الرقم من كيبورد اللاب
-  const a = document.activeElement; if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
-  const dial = document.getElementById("scrDial"); if (!dial || dial.offsetParent === null) return;
-  if (/^[0-9*#+]$/.test(e.key)) { dialKey(e.key); e.preventDefault(); }
-  else if (e.key === "Backspace") { dialDel(); e.preventDefault(); }
-  else if (e.key === "Enter" && $("dialNum").textContent) { NQPhone.call($("dialNum").textContent); e.preventDefault(); }
 });
 (function () { // ضغطة طويلة على الرقم = لصق
   const d = document.getElementById("dialNum"); let t = null;
@@ -1147,7 +1142,9 @@ const NQWeb = {
 if (!IS_APP) {
   // الكيبورد: اكتب الرقم واضغط Enter
   document.addEventListener("keydown", e => {
-    if (!$("scrDial").classList.contains("on") || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    const ae = document.activeElement;
+    if (!$("scrDial").classList.contains("on") || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && ae.closest(".screen.on, .sheet-bg.on")) return; // بيكتب في خانة ظاهرة
     if (/^[0-9*#+]$/.test(e.key)) { dialKey(e.key); e.preventDefault(); }
     else if (e.key === "Backspace") { dialDel(); e.preventDefault(); }
     else if (e.key === "Enter") { $("callBtn") && $("callBtn").click(); e.preventDefault(); }
