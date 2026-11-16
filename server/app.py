@@ -675,6 +675,42 @@ LESSONS_PROMPT = """إنت مدير مبيعات خبير لشركة "الجود
 }}"""
 
 
+LESSONS_TOOL = {
+    "name": "save_lessons",
+    "description": "احفظ الدروس المستفادة من تحليل المكالمات",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "overall": {"type": "array", "items": {"type": "string"}, "description": "أهم 5 دروس للفريق كله"},
+            "by_reason": {"type": "array", "items": {"type": "object", "properties": {
+                "type": {"type": "string"}, "insight": {"type": "string"},
+                "what_to_do": {"type": "string"}, "script": {"type": "string"}},
+                "required": ["type", "insight", "what_to_do", "script"]}},
+            "by_rep": {"type": "array", "items": {"type": "object", "properties": {
+                "ext": {"type": "integer"}, "focus": {"type": "string"}, "training": {"type": "string"}},
+                "required": ["ext", "focus", "training"]}},
+            "opportunities": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["overall", "by_reason", "by_rep", "opportunities"],
+    },
+}
+
+
+def _loose_json(raw: str):
+    """يحاول يقرا JSON حتى لو جواه ```json أو فواصل زيادة"""
+    raw = re.sub(r"```(?:json)?", "", raw or "")
+    a, b = raw.find("{"), raw.rfind("}")
+    if a < 0 or b <= a:
+        return None
+    txt = raw[a:b + 1]
+    for t in (txt, re.sub(r",\s*([}\]])", r"\1", txt)):
+        try:
+            return json.loads(t)
+        except ValueError:
+            pass
+    return None
+
+
 def _lessons_cache() -> dict:
     try:
         return json.loads(LESSONS_FILE.read_text(encoding="utf-8"))
@@ -696,15 +732,24 @@ def make_lessons(date_from: dt.date = Query(alias="from"), date_to: dt.date = Qu
         "call_lessons": [e["lesson"] for v in ins["no_buy"] for e in v["examples"] if e.get("lesson")][:40],
     }
     import anthropic
-    msg = anthropic.Anthropic().messages.create(
-        model=os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5"), max_tokens=6000,
-        messages=[{"role": "user", "content": LESSONS_PROMPT.format(
-            d1=date_from, d2=date_to, data=json.dumps(slim, ensure_ascii=False, indent=1))}])
-    raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
-    try:
-        res = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
-    except ValueError:
-        raise HTTPException(502, "رد Claude مش مفهوم — جرّب تاني")
+    client = anthropic.Anthropic()
+    prompt = LESSONS_PROMPT.format(d1=date_from, d2=date_to, data=json.dumps(slim, ensure_ascii=False, indent=1))
+    prompt += "\n\nرجّع النتيجة عن طريق أداة save_lessons."
+    kw = dict(model=os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5"), max_tokens=16000,
+              messages=[{"role": "user", "content": prompt}], tools=[LESSONS_TOOL])
+    try:   # الأداة بتضمن إن الرد JSON سليم
+        msg = client.messages.create(tool_choice={"type": "tool", "name": "save_lessons"}, **kw)
+    except anthropic.BadRequestError:
+        msg = client.messages.create(tool_choice={"type": "auto"}, **kw)
+    res = next((b.input for b in msg.content if getattr(b, "type", "") == "tool_use"), None)
+    if not isinstance(res, dict):
+        raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
+        res = _loose_json(raw)
+    if not isinstance(res, dict):
+        why = " (الرد اتقطع لأنه طويل)" if getattr(msg, "stop_reason", "") == "max_tokens" else ""
+        raise HTTPException(502, "رد Claude مش مفهوم" + why + " — جرّب تاني")
+    for k in ("overall", "by_reason", "by_rep", "opportunities"):
+        res.setdefault(k, [])
     res["generated"] = dt.datetime.now(TZ).isoformat()
     res["calls"] = ins["classified"]
     cache = _lessons_cache()
