@@ -329,7 +329,9 @@ html[data-theme=light] .tax-ta{background:#fff}
 .crm-f{display:grid;gap:4px;margin-bottom:8px}.crm-f label{font-size:13px;color:var(--grey)}
 .crm-f input,.crm-sales input,.ap-when select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit}
 html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html[data-theme=light] .ap-when select{background:#fff}
-.crm-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}@media(max-width:700px){.crm-row{grid-template-columns:1fr 1fr}}
+.crm-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.crm-row .crm-f{min-width:0}.crm-row input,.crm-row select{width:100%;box-sizing:border-box}@media(max-width:700px){.crm-row{grid-template-columns:1fr 1fr}}
+.crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
+.crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
 .crm-sales label{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:6px 10px}
 .crm-sales input{width:90px}
@@ -498,7 +500,10 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div id="crmTok" class="muted" style="margin:8px 0"></div>
     <b>رقم كل موظف في الـ CRM (salesId)</b>
     <div class="muted" style="font-size:13px">عشان الاجتماع يتسجّل باسم المندوب الصح — اختار اسمه في الـ CRM جنب تحويلته (بنحاول نطابق بالاسم لوحدنا 🤖).</div>
-    <div id="crmSales" class="crm-sales"></div>
+    <div class="crm-tw"><table class="crm-tbl">
+      <thead><tr><th>التحويلة</th><th>الموظف عندنا</th><th>الموظف في الـ CRM</th><th></th></tr></thead>
+      <tbody id="crmSales"></tbody></table></div>
+    <button class="btn o sm" style="margin-top:6px" onclick="crmAddRow()">＋ إضافة تحويلة</button>
     <div class="rub-foot"><span class="sp" style="flex:1"></span><button class="btn" onclick="saveCrm()">💾 حفظ</button></div>
     <div id="crmMsg" class="muted"></div>
   </div>
@@ -1308,30 +1313,46 @@ async function openCrm(){
   $('crmDur').value=c.duration||60; $('crmTerms').value=c.termsManagementId||0; $('crmClient').value=c.defaultClientId||''; $('crmMail').checked=!!c.sendEmail;
   $('crmTok').innerHTML=c.hasToken?'🔑 التوكن متسجّل على السيرفر ✔':'🔑 التوكن لسه مش متسجّل — على السيرفر اكتب: <code dir="ltr">sudo nq-setkey crm</code> (لو الـ API محتاجه)';
   $('crmTok').innerHTML+=c.hasLogin?'<br>👤 اليوزر متسجّل — التوكن بيتجدد لوحده ✔':'<br>👤 عشان التوكن يتجدد لوحده من غير ما يخلص: <code dir="ltr">sudo nq-setkey crm-login</code>';
-  $('crmSales').innerHTML=REPS.map(r=>`<label><span>${esc(r.name)} <small class="muted">${r.id}</small></span><input type="number" min="0" data-ext="${r.id}" value="${esc(c.salesIds[String(r.id)]||'')}" placeholder="ID"></label>`).join('');
+  CRM_EMP=null; $('crmSales').innerHTML=''; const ids=new Set([...REPS.map(r=>String(r.id)),...Object.keys(c.salesIds||{})]);
+  [...ids].sort((x,y)=>(+x)-(+y)).forEach(e=>crmAddRow(e,c.salesIds[e]||''));
   $('crmMsg').textContent=''; $('crmModal').classList.add('show');
   crmLists(c);
 }
 const nrm=s=>String(s||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[^\p{L}\p{N} ]/gu,'').replace(/\s+/g,' ').trim().toLowerCase();
+let CRM_EMP=null;
+function crmEmpField(val){
+  if(!CRM_EMP) return `<input class="crm-v" type="number" min="0" value="${esc(val||'')}" placeholder="رقم الموظف في الـ CRM">`;
+  return `<select class="crm-v"><option value="">— اختار —</option>${CRM_EMP.map(e=>`<option value="${esc(e.id)}" ${String(e.id)===String(val)?'selected':''}>${esc(e.name)} (#${esc(e.id)})</option>`).join('')}</select>`;
+}
+function crmRepName(ext){return (REPS.find(r=>String(r.id)===String(ext))||{}).name||''}
+function crmAddRow(ext,val){
+  const tr=document.createElement('tr'); const isNew=ext===undefined;
+  tr.innerHTML=`<td><input class="crm-e" inputmode="numeric" value="${esc(ext||'')}" placeholder="مثلًا 108" ${isNew?'':'readonly'}></td>
+    <td class="crm-n">${esc(crmRepName(ext))||'<span class="muted">—</span>'}</td><td>${crmEmpField(val)}</td>
+    <td><button class="x" title="شيل" onclick="this.closest('tr').remove()">✕</button></td>`;
+  const ei=tr.querySelector('.crm-e'); ei.oninput=()=>{ei.value=ei.value.replace(/\D/g,'').slice(0,6); tr.querySelector('.crm-n').innerHTML=esc(crmRepName(ei.value))||'<span class="muted">—</span>'};
+  $('crmSales').appendChild(tr); if(isNew) ei.focus();
+}
 async function crmLists(c){
   const get=async p=>{const r=await fetch(API_BASE+p,{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);return j.items};
   try{const T=await get('/crm/terms'); if(T.length){const s=$('crmTermsSel');s.innerHTML='<option value="0">— من غير —</option>'+T.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (#${esc(t.id)})</option>`).join('');
       s.value=String(c.termsManagementId||0); s.style.display=''; $('crmTerms').style.display='none';}}catch(e){}
-  try{const E=await get('/crm/employees'); if(!E.length)return;
-    const opts='<option value="">— اختار —</option>'+E.map(e=>`<option value="${esc(e.id)}">${esc(e.name)} (#${esc(e.id)})</option>`).join('');
+  try{const E=await get('/crm/employees'); if(!E.length)return; CRM_EMP=E;
     let auto=0;
-    document.querySelectorAll('#crmSales input').forEach(i=>{
-      const rep=(REPS.find(r=>String(r.id)===i.dataset.ext)||{}).name||'';
-      const sel=document.createElement('select'); sel.dataset.ext=i.dataset.ext; sel.innerHTML=opts; sel.value=i.value;
-      if(!i.value&&nrm(rep)){const n=nrm(rep),f=n.split(' ')[0];
+    document.querySelectorAll('#crmSales tr').forEach(tr=>{
+      const old=tr.querySelector('.crm-v'), val=old.value, ext=tr.querySelector('.crm-e').value;
+      old.outerHTML=crmEmpField(val); const sel=tr.querySelector('.crm-v'); const rep=crmRepName(ext);
+      if(!val&&nrm(rep)){const n=nrm(rep),f=n.split(' ')[0];
         const m=E.find(e=>nrm(e.name)===n)||E.find(e=>nrm(e.name).includes(n)||n.includes(nrm(e.name)))||(f.length>2?E.filter(e=>nrm(e.name).split(' ')[0]===f):[]).find((e,_,a)=>a.length===1);
-        if(m){sel.value=String(m.id);sel.classList.add('auto');auto++}}
-      i.replaceWith(sel);});
+        if(m){sel.value=String(m.id);sel.classList.add('auto');auto++}}});
     if(auto)$('crmMsg').innerHTML=`🤖 طابقت ${auto} موظف بالاسم — راجعهم ودوس حفظ`;
   }catch(e){$('crmMsg').innerHTML=`<span class="muted">مقدرتش أجيب الموظفين من الـ CRM (${esc(e.message)}) — اكتب الأرقام بإيدك</span>`}
 }
 async function saveCrm(){
-  const salesIds={}; document.querySelectorAll('#crmSales input,#crmSales select').forEach(i=>{if(i.value)salesIds[i.dataset.ext]=i.value});
+  const salesIds={}; let dup='';
+  document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(), v=tr.querySelector('.crm-v').value;
+    if(e&&v){ if(salesIds[e]) dup=e; salesIds[e]=v; }});
+  if(dup){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ التحويلة ${esc(dup)} متكررة — سيب سطر واحد بس</span>`;return}
   const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
     termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds};
   try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
