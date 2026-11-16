@@ -18,7 +18,8 @@ LOCK = threading.Lock()
 DEFAULT_DAYS = 60       # العميل بيفضل محجوز للمندوب X يوم من آخر تواصل
 # بتتظبط من app.py
 CTX = {"dir": Path("/var/lib/nq-calls"), "calls": None, "names": lambda: {}, "auth": None,
-       "notes": lambda a, b: [], "analysis": lambda rec: None}
+       "notes": lambda a, b: [], "analysis": lambda rec: None, "crm": lambda n: None}
+_CRM_CACHE: dict = {}
 HDR = {"Access-Control-Allow-Origin": "*"}
 
 
@@ -311,3 +312,37 @@ async def put_settings(request: Request):
     _jsave("ownership.json", {"enabled": bool(b.get("enabled", True)), "days": days})
     _CACHE["at"] = 0
     return settings()
+
+
+@router.post("/app/lookup")
+async def lookup(request: Request):
+    """اسم صاحب الرقم: من مكالماتنا القديمة، ولو مفيش من الـ CRM"""
+    body = await request.json()
+    _auth(body)
+    number = str(body.get("number") or "")
+    d = digits(number)
+    if len(d) < 7:
+        return JSONResponse({}, headers=HDR)
+    out = {"name": _customer_name(number), "source": "calls"}
+    hit = _CRM_CACHE.get(d)
+    if not hit or time.time() - hit[0] > 600:
+        try:
+            c = CTX["crm"](number)
+        except Exception:  # noqa: BLE001
+            c = None
+        hit = (time.time(), c)
+        _CRM_CACHE[d] = hit
+        if len(_CRM_CACHE) > 2000:
+            _CRM_CACHE.clear()
+    if hit[1]:
+        out["crm"] = {"id": hit[1].get("id"), "name": hit[1].get("name"), "potential": hit[1].get("potential")}
+        if not out["name"]:
+            out.update(name=hit[1].get("name") or "", source="crm")
+    own = owner_of(number)
+    if own:
+        out["owner"] = {"ext": own["ext"], "name": CTX["names"]().get(own["ext"], "")}
+    calls = [c for c in _history().get(d, []) if _contacted(c)]
+    out["calls"] = len(calls)
+    if calls:
+        out["lastCall"] = calls[-1]["time"]
+    return JSONResponse(out, headers=HDR)

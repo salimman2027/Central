@@ -160,6 +160,8 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/insight http://127.0.0.1:8090/app/insight
   ProxyPass        /calls-app/owner http://127.0.0.1:8090/app/owner
   ProxyPassReverse /calls-app/owner http://127.0.0.1:8090/app/owner
+  ProxyPass        /calls-app/lookup http://127.0.0.1:8090/app/lookup
+  ProxyPassReverse /calls-app/lookup http://127.0.0.1:8090/app/lookup
 
   # التليفون من اللابتوب
   RedirectMatch ^/phone\$ /phone/

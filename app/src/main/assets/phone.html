@@ -23,6 +23,9 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .btn { padding:14px; border-radius:12px; font-size:16px; color:#fff; background:var(--pri); width:100%; }
   .btn.gray { background:#9aa5b1; } .btn.light { background:#eef2f5; color:var(--fg); }
   .lbl { display:block; font-size:13px; color:var(--muted); margin:12px 4px 6px; }
+  .who-name { min-height:18px; font-size:14px; color:var(--accent,#19e6c1); text-align:center; font-weight:600; }
+  .who-name small { color:var(--muted); font-weight:400; margin-inline-start:6px; }
+  .who-name.big { font-size:17px; color:#fff; margin-top:4px; } .who-name.big small { color:rgba(255,255,255,.65); }
   .err { color:var(--bad); font-size:14px; min-height:20px; margin-top:8px; text-align:center; }
 
   /* ---------- login ---------- */
@@ -280,7 +283,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <span class="ver" id="appVer"></span>
     <button class="iconbtn" onclick="showSettings()" aria-label="الإعدادات">⚙</button>
   </div>
-  <div class="display"><div id="dialNum" class="num"></div><div id="dialErr" class="err"></div>
+  <div class="display"><div id="dialNum" class="num"></div><div id="dialName" class="who-name"></div><div id="dialErr" class="err"></div>
     <button class="pastebtn" id="btnPaste" onclick="dialPaste()" aria-label="لصق رقم">📋 لصق رقم</button></div>
   <div class="keypad" id="keypad"></div>
   <div class="dialrow">
@@ -361,7 +364,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 <!-- ================= incoming ================= -->
 <section id="scrIncoming" class="screen callscr">
   <div class="avatar">👤</div>
-  <div id="inNum" class="num"></div>
+  <div id="inNum" class="num"></div><div id="inName" class="who-name big"></div>
   <div class="sub">مكالمة واردة…</div>
   <div class="spacer"></div>
   <div class="incbtns">
@@ -373,7 +376,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 <!-- ================= in call ================= -->
 <section id="scrCall" class="screen callscr">
   <div class="avatar">👤</div>
-  <div id="cNum" class="num"></div>
+  <div id="cNum" class="num"></div><div id="cName" class="who-name big"></div>
   <div id="cState" class="sub">جاري الاتصال…</div>
   <div class="spacer"></div>
   <div class="incall-pad" id="callPad"></div>
@@ -626,6 +629,49 @@ function dialKey(d) {
   n.textContent = n.textContent + d; window._pickedName = "";
   $("dialErr").textContent = "";
 }
+/* اسم صاحب الرقم: من مكالماتنا والـ CRM (السيرفر) ومن جهات الاتصال (التطبيق) */
+const NQWho = {
+  cache: {}, t: null,
+  key(n) { return String(n || "").replace(/\D/g, "").slice(-9); },
+  async get(number) {
+    const k = this.key(number); if (k.length < 9) return null;
+    if (this.cache[k] && Date.now() - this.cache[k].at < 300000) return this.cache[k].v;
+    let v = null;
+    const c = NQOwner.creds();
+    if (c) {
+      try {
+        const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 4000);
+        const r = await fetch(CONFIG.api + "/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, number }), signal: ctl.signal });
+        clearTimeout(tm); if (r.ok) v = await r.json();
+      } catch (e) {}
+    }
+    if ((!v || !v.name) && IS_APP && window.Android && Android.contactName) {
+      try { const n = Android.contactName(String(number)); if (n) v = { ...(v || {}), name: n, source: "contacts" }; } catch (e) {}
+    }
+    this.cache[k] = { at: Date.now(), v };
+    return v;
+  },
+  html(v, me) {
+    if (!v) return "";
+    const bits = [];
+    if (v.crm && v.name !== v.crm.name && v.crm.name) bits.push("CRM: " + esc(v.crm.name));
+    if (v.owner && v.owner.ext && v.owner.ext !== String(me || "")) bits.push("تبع " + esc(v.owner.name || v.owner.ext));
+    else if (v.calls) bits.push(v.calls + " مكالمة قبل كده");
+    if (!v.name && !bits.length) return "";
+    return (v.name ? "👤 " + esc(v.name) : "") + (bits.length ? `<small>${bits.join(" · ")}</small>` : "");
+  },
+  async show(number, el) {
+    const box = $(el); if (!box) return; box.dataset.n = number; box.innerHTML = "";
+    const v = await this.get(number);
+    if (box.dataset.n === number) box.innerHTML = this.html(v, NQPhone.ext);
+    return v;
+  },
+  watchDial() { clearTimeout(this.t); const n = $("dialNum").textContent; $("dialName").innerHTML = "";
+    if (window._pickedName) { $("dialName").textContent = "👤 " + window._pickedName; return; }
+    this.t = setTimeout(() => this.show(n, "dialName"), 400); }
+};
+new MutationObserver(() => NQWho.watchDial()).observe(document.getElementById("dialNum"), { childList: true, characterData: true, subtree: true });
+
 /* لصق رقم: من الزرار، أو ضغطة طويلة على الرقم، أو Ctrl+V على اللاب */
 function cleanPhone(t) {
   t = String(t || "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
@@ -806,11 +852,14 @@ const NQPhone = {
     $("callPad").classList.remove("on"); $("cPad").classList.remove("on");
 
     if (this.direction === "in") {
-      $("inNum").textContent = this.peer;
+      $("inNum").textContent = this.peer; $("cName").innerHTML = "";
+      NQWho.show(this.peer, "inName").then(v => { if (v && v.name) { this.callName = v.name; $("cName").innerHTML = NQWho.html(v, this.ext); } });
       show("scrIncoming");
       if (window.Android) Android.onIncoming(this.peer); else NQWeb.ring(this.peer);
     } else {
       $("cNum").textContent = this.peer; $("cState").textContent = "جاري الاتصال…";
+      $("cName").innerHTML = this.callName ? "👤 " + esc(this.callName) : "";
+      NQWho.show(this.peer, "cName").then(v => { if (v && v.name && !this.callName) this.callName = v.name; });
       show("scrCall");
     }
 
@@ -836,7 +885,7 @@ const NQPhone = {
       const info = {
         number: this.peer, direction: this.direction, started: this.started.toISOString(),
         answered: !!this.callStart, duration: this.callStart ? Math.round((Date.now() - this.callStart) / 1000) : 0,
-        cause: ev && ev.cause, name: this.direction === "out" ? (this.callName || "") : ""
+        cause: ev && ev.cause, name: this.callName || ""
       };
       this.callName = "";
       this.session = null; this.muted = false; this.speaker = false;

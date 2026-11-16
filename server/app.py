@@ -808,4 +808,5 @@ def _analysis_of(rec: str):
 
 OWN.CTX.update(dir=DATA_DIR, calls=lambda a, b: calls(a, b), auth=lambda e, p: check_ext_password(e, p),
                names=lambda: {str(r.get("id")): r.get("name", "") for r in config().get("reps", [])},
-               analysis=_analysis_of)
+               analysis=_analysis_of,
+               crm=lambda n: APPT.match_client(n) if APPT.crm_configured() else None)
