@@ -511,7 +511,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <b>رقم كل موظف في الـ CRM (salesId)</b>
     <div class="muted" style="font-size:13px">عشان الاجتماع يتسجّل باسم المندوب الصح — اختار اسمه في الـ CRM جنب تحويلته (بنحاول نطابق بالاسم لوحدنا 🤖).</div>
     <div class="crm-tw"><table class="crm-tbl">
-      <thead><tr><th>التحويلة</th><th>الموظف (من الـ CRM)</th><th></th></tr></thead>
+      <thead><tr><th>التحويلة</th><th>الموظف (من الـ CRM)</th><th>الفريق</th><th></th></tr></thead>
       <tbody id="crmSales"></tbody></table></div>
     <button class="btn o sm" style="margin-top:6px" onclick="crmAddRow()">＋ إضافة تحويلة</button>
     <div class="rub-foot"><span class="sp" style="flex:1"></span><button class="btn" onclick="saveCrm()">💾 حفظ</button></div>
@@ -524,9 +524,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <h4 style="margin:10px 0 4px">الفرق</h4>
     <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم الفريق</th><th>قائد الفريق</th><th>عدد التحويلات</th><th></th></tr></thead><tbody id="tmTeams"></tbody></table></div>
     <button class="btn o sm" onclick="tmAddTeam()">＋ فريق جديد</button>
-    <h4 style="margin:18px 0 4px">التحويلات</h4>
-    <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>التحويلة</th><th>الموظف</th><th>الفريق</th></tr></thead><tbody id="tmReps"></tbody></table></div>
-    <div class="muted" style="font-size:12px">تحويلة جديدة؟ ضيفها الأول من الربط مع الـ CRM، وهتظهر هنا.</div>
+    <div class="muted" style="font-size:12px;margin-top:10px">ربط كل موظف بفريقه بقى في شاشة <b>الموظفين</b> (الربط مع الـ CRM) جنب اسمه.</div>
     <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" onclick="tmSave()">💾 حفظ</button><span id="tmMsg"></span></div>
   </div>
 </div>
@@ -1308,7 +1306,7 @@ async function openTeams(){
 }
 function tmRead(){
   TM.teams=[...document.querySelectorAll('#tmTeams tr')].map(tr=>({id:tr.dataset.id,name:tr.querySelector('.tm-n').value.trim(),leaderExt:tr.querySelector('.tm-l').value}));
-  document.querySelectorAll('#tmReps tr').forEach(tr=>{const r=TM.reps.find(x=>x.ext===tr.dataset.ext);if(r)r.team=tr.querySelector('.tm-t').value});
+
 }
 function tmRender(){
   const cnt=id=>TM.reps.filter(r=>r.team===id).length;
@@ -1316,10 +1314,9 @@ function tmRender(){
     <td><select class="tm-l"><option value="">— من غير —</option>${TM.reps.filter(r=>r.team===t.id).map(r=>`<option value="${esc(r.ext)}" ${r.ext===t.leaderExt?'selected':''}>${esc(r.name||r.ext)} (${esc(r.ext)})</option>`).join('')}</select></td>
     <td class="c">${cnt(t.id)}</td><td><button class="x" title="امسح الفريق" onclick="tmDel('${esc(t.id)}')">✕</button></td></tr>`).join('')
     ||'<tr><td colspan="4" class="muted">مفيش فرق — دوس ＋ فريق جديد</td></tr>';
-  const opts=v=>'<option value="">— من غير فريق —</option>'+TM.teams.map(t=>`<option value="${esc(t.id)}" ${t.id===v?'selected':''}>${esc(t.name||'فريق جديد')}</option>`).join('');
-  $('tmReps').innerHTML=TM.reps.slice().sort((a,b)=>+a.ext-+b.ext).map(r=>`<tr data-ext="${esc(r.ext)}"><td class="c">${esc(r.ext)}</td><td>${esc(r.name||'—')}</td><td><select class="tm-t" onchange="tmRead();tmRender()">${opts(r.team)}</select></td></tr>`).join('');
+
 }
-function tmSync(){tmRead(); document.querySelectorAll('#tmReps .tm-t').forEach(sel=>{const v=sel.value;sel.innerHTML='<option value="">— من غير فريق —</option>'+TM.teams.map(t=>`<option value="${esc(t.id)}" ${t.id===v?'selected':''}>${esc(t.name||'فريق جديد')}</option>`).join('')})}
+function tmSync(){tmRead()}
 function tmAddTeam(){tmRead(); TM.teams.push({id:'t'+Date.now().toString(36),name:'',leaderExt:''}); tmRender(); const ins=document.querySelectorAll('#tmTeams .tm-n'); ins[ins.length-1]?.focus();}
 function tmDel(id){tmRead(); const n=TM.reps.filter(r=>r.team===id).length;
   TM.teams=TM.teams.filter(t=>t.id!==id); TM.reps.forEach(r=>{if(r.team===id)r.team=''}); tmRender();
@@ -1434,6 +1431,7 @@ async function openCrm(){
   $('crmDur').value=c.duration||60; $('crmTerms').value=c.termsManagementId||0; $('crmClient').value=c.defaultClientId||''; $('crmMail').checked=!!c.sendEmail;
   $('crmTok').innerHTML=c.hasToken?'🔑 التوكن متسجّل على السيرفر ✔':'🔑 التوكن لسه مش متسجّل — على السيرفر اكتب: <code dir="ltr">sudo nq-setkey crm</code> (لو الـ API محتاجه)';
   $('crmTok').innerHTML+=c.hasLogin?'<br>👤 اليوزر متسجّل — التوكن بيتجدد لوحده ✔':'<br>👤 عشان التوكن يتجدد لوحده من غير ما يخلص: <code dir="ltr">sudo nq-setkey crm-login</code>';
+  try{TM=await (await fetch(API_BASE+'/teams',{cache:'no-store'})).json();}catch(e){TM={teams:[],reps:[]}}
   CRM_EMP=null; CRM_REMOVED=new Set(); $('crmSales').innerHTML=''; const ids=new Set([...REPS.map(r=>String(r.id)),...Object.keys(c.salesIds||{})]);
   [...ids].sort((x,y)=>(+x)-(+y)).forEach(e=>crmAddRow(e,c.salesIds[e]||''));
   $('crmMsg').textContent=''; $('crmModal').classList.add('show');
@@ -1445,6 +1443,7 @@ function crmEmpField(val){
   if(!CRM_EMP) return `<input class="crm-v" type="number" min="0" value="${esc(val||'')}" placeholder="رقم الموظف في الـ CRM">`;
   return `<select class="crm-v"><option value="">— اختار —</option>${CRM_EMP.map(e=>`<option value="${esc(e.id)}" ${String(e.id)===String(val)?'selected':''}>${esc(e.name)} (#${esc(e.id)})</option>`).join('')}</select>`;
 }
+function crmTeamOpts(v){return '<option value="">— من غير فريق —</option>'+(TM.teams||[]).map(t=>`<option value="${esc(t.id)}" ${t.id===v?'selected':''}>${esc(t.name)}</option>`).join('')}
 function crmRepName(ext){return (REPS.find(r=>String(r.id)===String(ext))||{}).name||''}
 let CRM_REMOVED=new Set();
 function crmDelRow(b){const tr=b.closest('tr'), e=tr.querySelector('.crm-e').value.trim(); if(e)CRM_REMOVED.add(e); tr.remove();
@@ -1453,6 +1452,7 @@ function crmAddRow(ext,val){
   const tr=document.createElement('tr'); const isNew=ext===undefined;
   tr.innerHTML=`<td><input class="crm-e" inputmode="numeric" value="${esc(ext||'')}" placeholder="مثلًا 108" ${isNew?'':'readonly'}></td>
     <td>${crmEmpField(val)}<div class="crm-n muted">${crmRepName(ext)?'عندنا دلوقتي: '+esc(crmRepName(ext)):''}</div></td>
+    <td><select class="crm-t">${crmTeamOpts((TM.reps.find(r=>r.ext===String(ext))||{}).team||'')}</select></td>
     <td><button class="x" title="امسح التحويلة دي" onclick="crmDelRow(this)">✕</button></td>`;
   const ei=tr.querySelector('.crm-e'); ei.oninput=()=>{ei.value=ei.value.replace(/\D/g,'').slice(0,6); tr.querySelector('.crm-n').innerHTML=crmRepName(ei.value)?'عندنا دلوقتي: '+esc(crmRepName(ei.value)):''};
   $('crmSales').appendChild(tr); if(isNew) ei.focus();
@@ -1481,7 +1481,9 @@ async function saveCrm(){
   const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
     termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds,repNames,removed:[...CRM_REMOVED].filter(e=>!salesIds[e])};
   try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
-    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — وأسماء الموظفين بقت زي الـ CRM</span>'; await loadConfig(); try{fillSelects();}catch(e){} loadedRange=''; refresh(); loadAppt();
+    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration;
+    const assign={}; document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(),t=tr.querySelector('.crm-t').value; if(e&&t)assign[e]=t});
+    const r2=await fetch(API_BASE+'/teams',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({teams:TM.teams,assign})}); const j2=await r2.json(); if(!r2.ok)throw new Error(j2.detail||r2.status); TM=j2; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — وأسماء الموظفين بقت زي الـ CRM</span>'; await loadConfig(); try{fillSelects();}catch(e){} loadedRange=''; refresh(); loadAppt();
     document.querySelectorAll('#crmSales tr').forEach(tr=>{const n=crmRepName(tr.querySelector('.crm-e').value);tr.querySelector('.crm-n').innerHTML=n?'عندنا دلوقتي: '+esc(n):''});}
   catch(e){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
