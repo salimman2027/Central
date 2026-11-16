@@ -287,8 +287,18 @@ def save_crm_settings(c: dict) -> dict:
         cur["sendEmail"] = bool(c["sendEmail"])
     if "salesIds" in c:
         cur["salesIds"] = {str(k): int(v) for k, v in (c["salesIds"] or {}).items() if str(v).strip().isdigit()}
+    if isinstance(c.get("repNames"), dict):     # اسم الموظف عندنا = اسمه في الـ CRM
+        names = {str(k): str(v).strip()[:80] for k, v in c["repNames"].items() if str(k).isdigit() and str(v).strip()}
+        f = CTX["dir"] / "rep_names.json"
+        try:
+            old = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            old = {}
+        old.update(names)
+        f.write_text(json.dumps(old, ensure_ascii=False, indent=1), encoding="utf-8")
     if cur["url"] and not cur["url"].startswith("https://"):
         raise ValueError("رابط الـ CRM لازم يبدأ بـ https://")
+    cur.pop("repNames", None)
     (CTX["dir"] / "crm.json").write_text(json.dumps(cur, ensure_ascii=False, indent=1), encoding="utf-8")
     return cur
 

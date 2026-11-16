@@ -109,6 +109,18 @@ def stem(recordingfile: str) -> str:
 def config():
     f = CONF_DIR / "reps.json"
     reps = json.loads(f.read_text()) if f.exists() else {"teams": [], "reps": []}
+    # أسماء الموظفين المتظبطة من شاشة الـ CRM (بتغلب على reps.json)
+    try:
+        over = json.loads((DATA_DIR / "rep_names.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        over = {}
+    have = {str(r.get("id")) for r in reps.get("reps", [])}
+    for r in reps.get("reps", []):
+        if over.get(str(r.get("id"))):
+            r["name"] = over[str(r.get("id"))]
+    for ext, name in over.items():
+        if ext not in have and name and ext.isdigit():
+            reps.setdefault("reps", []).append({"id": int(ext), "name": name, "team": ""})
     reps["aiEnabled"] = bool(os.environ.get("ANTHROPIC_API_KEY"))
     return reps
 

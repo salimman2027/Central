@@ -331,7 +331,7 @@ html[data-theme=light] .tax-ta{background:#fff}
 html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html[data-theme=light] .ap-when select{background:#fff}
 .crm-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.crm-row .crm-f{min-width:0}.crm-row input,.crm-row select{width:100%;box-sizing:border-box}@media(max-width:700px){.crm-row{grid-template-columns:1fr 1fr}}
 .set-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}.set-c{display:flex;flex-direction:column;gap:8px}.set-c h3{margin:0}.set-c p{margin:0;flex:1;line-height:1.7}.set-c .btn{align-self:flex-start}
-.crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
+.crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .crm-n{font-size:11px;margin-top:3px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
 .crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
 .crm-sales label{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:6px 10px}
@@ -502,7 +502,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <b>رقم كل موظف في الـ CRM (salesId)</b>
     <div class="muted" style="font-size:13px">عشان الاجتماع يتسجّل باسم المندوب الصح — اختار اسمه في الـ CRM جنب تحويلته (بنحاول نطابق بالاسم لوحدنا 🤖).</div>
     <div class="crm-tw"><table class="crm-tbl">
-      <thead><tr><th>التحويلة</th><th>الموظف عندنا</th><th>الموظف في الـ CRM</th><th></th></tr></thead>
+      <thead><tr><th>التحويلة</th><th>الموظف (من الـ CRM)</th><th></th></tr></thead>
       <tbody id="crmSales"></tbody></table></div>
     <button class="btn o sm" style="margin-top:6px" onclick="crmAddRow()">＋ إضافة تحويلة</button>
     <div class="rub-foot"><span class="sp" style="flex:1"></span><button class="btn" onclick="saveCrm()">💾 حفظ</button></div>
@@ -1339,9 +1339,9 @@ function crmRepName(ext){return (REPS.find(r=>String(r.id)===String(ext))||{}).n
 function crmAddRow(ext,val){
   const tr=document.createElement('tr'); const isNew=ext===undefined;
   tr.innerHTML=`<td><input class="crm-e" inputmode="numeric" value="${esc(ext||'')}" placeholder="مثلًا 108" ${isNew?'':'readonly'}></td>
-    <td class="crm-n">${esc(crmRepName(ext))||'<span class="muted">—</span>'}</td><td>${crmEmpField(val)}</td>
+    <td>${crmEmpField(val)}<div class="crm-n muted">${crmRepName(ext)?'عندنا دلوقتي: '+esc(crmRepName(ext)):''}</div></td>
     <td><button class="x" title="شيل" onclick="this.closest('tr').remove()">✕</button></td>`;
-  const ei=tr.querySelector('.crm-e'); ei.oninput=()=>{ei.value=ei.value.replace(/\D/g,'').slice(0,6); tr.querySelector('.crm-n').innerHTML=esc(crmRepName(ei.value))||'<span class="muted">—</span>'};
+  const ei=tr.querySelector('.crm-e'); ei.oninput=()=>{ei.value=ei.value.replace(/\D/g,'').slice(0,6); tr.querySelector('.crm-n').innerHTML=crmRepName(ei.value)?'عندنا دلوقتي: '+esc(crmRepName(ei.value)):''};
   $('crmSales').appendChild(tr); if(isNew) ei.focus();
 }
 async function crmLists(c){
@@ -1360,14 +1360,16 @@ async function crmLists(c){
   }catch(e){$('crmMsg').innerHTML=`<span class="muted">مقدرتش أجيب الموظفين من الـ CRM (${esc(e.message)}) — اكتب الأرقام بإيدك</span>`}
 }
 async function saveCrm(){
-  const salesIds={}; let dup='';
-  document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(), v=tr.querySelector('.crm-v').value;
-    if(e&&v){ if(salesIds[e]) dup=e; salesIds[e]=v; }});
+  const salesIds={}, repNames={}; let dup='';
+  document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(), el=tr.querySelector('.crm-v'), v=el.value;
+    if(e&&v){ if(salesIds[e]) dup=e; salesIds[e]=v;
+      const emp=(CRM_EMP||[]).find(x=>String(x.id)===String(v)); if(emp&&emp.name) repNames[e]=emp.name; }});
   if(dup){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ التحويلة ${esc(dup)} متكررة — سيب سطر واحد بس</span>`;return}
   const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
-    termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds};
+    termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds,repNames};
   try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
-    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; loadAppt();}
+    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — وأسماء الموظفين بقت زي الـ CRM</span>'; await loadConfig(); try{fillSelects();}catch(e){} loadAppt();
+    document.querySelectorAll('#crmSales tr').forEach(tr=>{const n=crmRepName(tr.querySelector('.crm-e').value);tr.querySelector('.crm-n').innerHTML=n?'عندنا دلوقتي: '+esc(n):''});}
   catch(e){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
 </script>
