@@ -296,9 +296,19 @@ def save_crm_settings(c: dict) -> dict:
             old = {}
         old.update(names)
         f.write_text(json.dumps(old, ensure_ascii=False, indent=1), encoding="utf-8")
+    if isinstance(c.get("removed"), list):      # التحويلات اللي اتمسحت من الجدول متظهرش تاني
+        rem = {str(x) for x in c["removed"] if str(x).isdigit()}
+        keep = set(cur["salesIds"]) | {str(k) for k in (c.get("repNames") or {})}
+        f = CTX["dir"] / "rep_hidden.json"
+        try:
+            hid = set(json.loads(f.read_text(encoding="utf-8")))
+        except Exception:  # noqa: BLE001
+            hid = set()
+        hid = (hid | rem) - keep
+        f.write_text(json.dumps(sorted(hid)), encoding="utf-8")
     if cur["url"] and not cur["url"].startswith("https://"):
         raise ValueError("رابط الـ CRM لازم يبدأ بـ https://")
-    cur.pop("repNames", None)
+    cur.pop("repNames", None); cur.pop("removed", None)
     (CTX["dir"] / "crm.json").write_text(json.dumps(cur, ensure_ascii=False, indent=1), encoding="utf-8")
     return cur
 

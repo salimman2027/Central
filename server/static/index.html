@@ -1324,7 +1324,7 @@ async function openCrm(){
   $('crmDur').value=c.duration||60; $('crmTerms').value=c.termsManagementId||0; $('crmClient').value=c.defaultClientId||''; $('crmMail').checked=!!c.sendEmail;
   $('crmTok').innerHTML=c.hasToken?'🔑 التوكن متسجّل على السيرفر ✔':'🔑 التوكن لسه مش متسجّل — على السيرفر اكتب: <code dir="ltr">sudo nq-setkey crm</code> (لو الـ API محتاجه)';
   $('crmTok').innerHTML+=c.hasLogin?'<br>👤 اليوزر متسجّل — التوكن بيتجدد لوحده ✔':'<br>👤 عشان التوكن يتجدد لوحده من غير ما يخلص: <code dir="ltr">sudo nq-setkey crm-login</code>';
-  CRM_EMP=null; $('crmSales').innerHTML=''; const ids=new Set([...REPS.map(r=>String(r.id)),...Object.keys(c.salesIds||{})]);
+  CRM_EMP=null; CRM_REMOVED=new Set(); $('crmSales').innerHTML=''; const ids=new Set([...REPS.map(r=>String(r.id)),...Object.keys(c.salesIds||{})]);
   [...ids].sort((x,y)=>(+x)-(+y)).forEach(e=>crmAddRow(e,c.salesIds[e]||''));
   $('crmMsg').textContent=''; $('crmModal').classList.add('show');
   crmLists(c);
@@ -1336,11 +1336,14 @@ function crmEmpField(val){
   return `<select class="crm-v"><option value="">— اختار —</option>${CRM_EMP.map(e=>`<option value="${esc(e.id)}" ${String(e.id)===String(val)?'selected':''}>${esc(e.name)} (#${esc(e.id)})</option>`).join('')}</select>`;
 }
 function crmRepName(ext){return (REPS.find(r=>String(r.id)===String(ext))||{}).name||''}
+let CRM_REMOVED=new Set();
+function crmDelRow(b){const tr=b.closest('tr'), e=tr.querySelector('.crm-e').value.trim(); if(e)CRM_REMOVED.add(e); tr.remove();
+  $('crmMsg').innerHTML='<span class="muted">دوس 💾 حفظ عشان المسح يتسجّل</span>';}
 function crmAddRow(ext,val){
   const tr=document.createElement('tr'); const isNew=ext===undefined;
   tr.innerHTML=`<td><input class="crm-e" inputmode="numeric" value="${esc(ext||'')}" placeholder="مثلًا 108" ${isNew?'':'readonly'}></td>
     <td>${crmEmpField(val)}<div class="crm-n muted">${crmRepName(ext)?'عندنا دلوقتي: '+esc(crmRepName(ext)):''}</div></td>
-    <td><button class="x" title="شيل" onclick="this.closest('tr').remove()">✕</button></td>`;
+    <td><button class="x" title="امسح التحويلة دي" onclick="crmDelRow(this)">✕</button></td>`;
   const ei=tr.querySelector('.crm-e'); ei.oninput=()=>{ei.value=ei.value.replace(/\D/g,'').slice(0,6); tr.querySelector('.crm-n').innerHTML=crmRepName(ei.value)?'عندنا دلوقتي: '+esc(crmRepName(ei.value)):''};
   $('crmSales').appendChild(tr); if(isNew) ei.focus();
 }
@@ -1366,7 +1369,7 @@ async function saveCrm(){
       const emp=(CRM_EMP||[]).find(x=>String(x.id)===String(v)); if(emp&&emp.name) repNames[e]=emp.name; }});
   if(dup){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ التحويلة ${esc(dup)} متكررة — سيب سطر واحد بس</span>`;return}
   const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
-    termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds,repNames};
+    termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds,repNames,removed:[...CRM_REMOVED].filter(e=>!salesIds[e])};
   try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
     if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — وأسماء الموظفين بقت زي الـ CRM</span>'; await loadConfig(); try{fillSelects();}catch(e){} loadAppt();
     document.querySelectorAll('#crmSales tr').forEach(tr=>{const n=crmRepName(tr.querySelector('.crm-e').value);tr.querySelector('.crm-n').innerHTML=n?'عندنا دلوقتي: '+esc(n):''});}

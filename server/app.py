@@ -121,6 +121,12 @@ def config():
     for ext, name in over.items():
         if ext not in have and name and ext.isdigit():
             reps.setdefault("reps", []).append({"id": int(ext), "name": name, "team": ""})
+    try:   # تحويلات اتمسحت من شاشة الإعدادات
+        hidden = set(json.loads((DATA_DIR / "rep_hidden.json").read_text(encoding="utf-8")))
+    except Exception:  # noqa: BLE001
+        hidden = set()
+    if hidden:
+        reps["reps"] = [r for r in reps.get("reps", []) if str(r.get("id")) not in hidden]
     reps["aiEnabled"] = bool(os.environ.get("ANTHROPIC_API_KEY"))
     return reps
 
