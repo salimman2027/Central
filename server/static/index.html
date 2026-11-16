@@ -1329,7 +1329,7 @@ async function tmSave(){
   if(TM.teams.some(t=>!t.name)){$('tmMsg').innerHTML='<span style="color:var(--red)">✖ اكتب اسم كل فريق</span>';return}
   const assign={}; TM.reps.forEach(r=>{if(r.team)assign[r.ext]=r.team});
   try{const r=await fetch(API_BASE+'/teams',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({teams:TM.teams,assign})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
-    TM=j; tmRender(); $('tmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; await loadConfig(); try{fillSelects();renderAll()}catch(e){}
+    TM=j; tmRender(); $('tmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; await loadConfig(); try{fillSelects()}catch(e){} loadedRange=''; refresh(); try{loadEval&&$('p-eval').classList.contains('active')&&loadEval()}catch(e){}
   }catch(e){$('tmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
 
@@ -1481,7 +1481,7 @@ async function saveCrm(){
   const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
     termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds,repNames,removed:[...CRM_REMOVED].filter(e=>!salesIds[e])};
   try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
-    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — وأسماء الموظفين بقت زي الـ CRM</span>'; await loadConfig(); try{fillSelects();renderAll();}catch(e){} loadAppt();
+    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — وأسماء الموظفين بقت زي الـ CRM</span>'; await loadConfig(); try{fillSelects();}catch(e){} loadedRange=''; refresh(); loadAppt();
     document.querySelectorAll('#crmSales tr').forEach(tr=>{const n=crmRepName(tr.querySelector('.crm-e').value);tr.querySelector('.crm-n').innerHTML=n?'عندنا دلوقتي: '+esc(n):''});}
   catch(e){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
