@@ -3,6 +3,7 @@
 import asyncio
 import datetime as dt
 import json
+import re
 import os
 import secrets
 import threading
@@ -296,6 +297,10 @@ def save_crm_settings(c: dict) -> dict:
             old = {}
         old.update(names)
         f.write_text(json.dumps(old, ensure_ascii=False, indent=1), encoding="utf-8")
+    if isinstance(c.get("lines"), dict):        # رقم الخط (الشريحة) اللي كل تحويلة بتطلع عليه
+        f = CTX["dir"] / "rep_lines.json"
+        clean = {str(k): re.sub(r"[^\d+]", "", str(v))[:20] for k, v in c["lines"].items() if str(k).isdigit()}
+        f.write_text(json.dumps({k: v for k, v in clean.items() if v}, ensure_ascii=False, indent=1), encoding="utf-8")
     if isinstance(c.get("removed"), list):      # التحويلات اللي اتمسحت من الجدول متظهرش تاني
         rem = {str(x) for x in c["removed"] if str(x).isdigit()}
         keep = set(cur["salesIds"]) | {str(k) for k in (c.get("repNames") or {})}
@@ -308,7 +313,7 @@ def save_crm_settings(c: dict) -> dict:
         f.write_text(json.dumps(sorted(hid)), encoding="utf-8")
     if cur["url"] and not cur["url"].startswith("https://"):
         raise ValueError("رابط الـ CRM لازم يبدأ بـ https://")
-    cur.pop("repNames", None); cur.pop("removed", None)
+    cur.pop("repNames", None); cur.pop("removed", None); cur.pop("lines", None)
     (CTX["dir"] / "crm.json").write_text(json.dumps(cur, ensure_ascii=False, indent=1), encoding="utf-8")
     return cur
 

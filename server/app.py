@@ -123,6 +123,13 @@ def config():
     for ext, name in over.items():
         if ext not in have and name and ext.isdigit():
             reps.setdefault("reps", []).append({"id": int(ext), "name": name, "team": ""})
+    try:   # رقم الخط لكل تحويلة
+        lines = json.loads((DATA_DIR / "rep_lines.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        lines = {}
+    for r in reps.get("reps", []):
+        if lines.get(str(r.get("id"))):
+            r["line"] = lines[str(r.get("id"))]
     try:   # الفرق وربطها بالتحويلات من شاشة الإعدادات
         tm = json.loads((DATA_DIR / "teams.json").read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
