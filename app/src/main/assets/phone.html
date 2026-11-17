@@ -363,7 +363,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
       <label class="lbl">عنوان السيرفر</label>
       <input id="srvHost" class="ltr" placeholder="3.89.245.93.sslip.io">
       <label class="lbl">البورت</label>
-      <input id="srvPort" class="ltr" inputmode="numeric" placeholder="8089">
+      <input id="srvPort" class="ltr" inputmode="numeric" placeholder="443">
       <label class="lbl">المسار</label>
       <input id="srvPath" class="ltr" placeholder="/ws">
       <div class="row2">
@@ -602,7 +602,7 @@ const store = {
 };
 
 /* ---------- server settings ---------- */
-const DEFAULT_SERVER = { host: "3.89.245.93.sslip.io", port: "8089", path: "/ws" };
+const DEFAULT_SERVER = { host: "3.89.245.93.sslip.io", port: "443", path: "/ws" };
 const IS_APP = !!window.Android;
 const APP_VER = (() => { try { return IS_APP && Android.appVersion ? "v" + Android.appVersion() : "web __VER__"; } catch (e) { return ""; } })();
 document.addEventListener("DOMContentLoaded", () => { const v = document.getElementById("appVer"); if (v) v.textContent = APP_VER; });
@@ -613,8 +613,9 @@ const NQSettings = {
   apply(s) {
     const path = s.path.startsWith("/") ? s.path : "/" + s.path;
     CONFIG.domain = s.host;
-    CONFIG.wss = [`wss://${s.host}${s.port && s.port !== "443" ? ":" + s.port : ""}${path}`];
-    if (s.port !== "443") CONFIG.wss.push(`wss://${s.host}${path}`);
+    // 443 الأول: شبكات الموبايل كتير بتقفل البورتات الغريبة زي 8089، و443 بيعدّي في أي حتة
+    CONFIG.wss = [`wss://${s.host}${path}`];
+    if (s.port && s.port !== "443") CONFIG.wss.push(`wss://${s.host}:${s.port}${path}`);
     CONFIG.api = `https://${s.host}/calls-app`;
     $("srvHost").value = s.host; $("srvPort").value = s.port; $("srvPath").value = path;
   },
