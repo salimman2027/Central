@@ -356,10 +356,17 @@ html[data-theme=light] .lw-box input{background:#fff}html[data-theme=light] .lw-
 html[data-theme=light] .pw-form input{background:#fff}
 .tm-exts{display:flex;flex-wrap:wrap;gap:4px;max-width:230px;align-items:center}
 .tm-x{border:0;background:none;color:var(--red);cursor:pointer;font-size:11px;padding:0 0 0 2px;margin-inline-start:3px}
-#teamModal .tm-add{width:auto;min-width:0;font-size:12px;padding:3px 6px;border-radius:99px}
-#teamModal .crm-tbl select,#teamModal .crm-tbl .tm-l{min-width:0;width:150px}
-#teamModal .tm-n{width:140px}#teamModal .tm-u,#teamModal .mg-u{width:110px}#teamModal .tm-p,#teamModal .mg-p{width:150px}#teamModal .mg-n{width:140px}
-#teamModal .crm-tbl td,#teamModal .crm-tbl th{padding:6px 5px}.tm-ext{font-size:12px;border:1px solid var(--border);border-radius:99px;padding:1px 8px;white-space:nowrap}
+#orgModal .tm-add{width:auto;min-width:0;font-size:12px;padding:3px 6px;border-radius:99px}
+#orgModal .crm-tbl select,#orgModal .crm-tbl .tm-l{min-width:0;width:150px}
+#orgModal .tm-n{width:140px}#orgModal .tm-u,#orgModal .mg-u{width:110px}#orgModal .tm-p,#orgModal .mg-p{width:150px}#orgModal .mg-n{width:140px}
+#orgModal .crm-tbl td,#orgModal .crm-tbl th{padding:6px 5px}.tm-ext{font-size:12px;border:1px solid var(--border);border-radius:99px;padding:1px 8px;white-space:nowrap}
+.org-box{max-width:1180px;width:97vw;max-height:92vh;overflow:auto;padding-top:0!important;padding-bottom:0!important}
+.org-head{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 0 10px;background:inherit;border-bottom:1px solid var(--border)}
+.org-nav{display:flex;gap:6px;flex-wrap:wrap}.org-nav a{font-size:13px;text-decoration:none;color:var(--text);border:1px solid var(--border);border-radius:99px;padding:4px 12px}
+.org-nav a:hover{border-color:var(--teal,#19e6c1)}
+.org-sec{padding:14px 0 6px;border-bottom:1px dashed var(--border);scroll-margin-top:70px}.org-sec h4{margin:0 0 6px;font-size:16px}
+.org-foot{position:sticky;bottom:0;z-index:3;display:flex;gap:12px;align-items:center;padding:12px 0 16px;background:inherit;border-top:1px solid var(--border)}
+#orgModal .mbox{background:#0f182b}html[data-theme=light] #orgModal .mbox{background:#fff}
 #crmSales tr.crm-new td{background:rgba(25,230,193,.10)}
 .crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl .crm-line{width:130px;font-variant-numeric:tabular-nums}.crm-tbl .crm-u{width:130px}.crm-tbl .crm-p{width:170px}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .crm-n{font-size:11px;margin-top:3px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
 .crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
@@ -532,33 +539,36 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     </div>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="crmMail" style="width:auto"> الـ CRM يبعت إيميل للعميل (sendEmail)</label>
     <div id="crmTok" class="muted" style="margin:8px 0"></div>
-    <b>رقم كل موظف في الـ CRM (salesId)</b>
-    <div class="muted" style="font-size:13px">عشان الاجتماع يتسجّل باسم المندوب الصح — اختار اسمه في الـ CRM جنب تحويلته (بنحاول نطابق بالاسم لوحدنا 🤖).</div>
+    <div class="muted" style="font-size:13px;margin:6px 0">👥 الموظفين وأرقامهم في الـ CRM وفرقهم بقوا في شاشة <a href="#" onclick="$('crmModal').classList.remove('show');openOrg('emp');return false">الموظفين والفرق والمديرين</a>.</div>
+    <div class="rub-foot"><span class="sp" style="flex:1"></span><button class="btn" onclick="saveCrmConn()">💾 حفظ</button></div>
+    <div id="crmConnMsg" class="muted"></div>
+  </div>
+</div>
+<div class="modal" id="orgModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="mbox org-box">
+    <div class="org-head"><h3 style="margin:0">👥 الموظفين والفرق والمديرين</h3>
+      <nav class="org-nav"><a href="#" onclick="orgGo('emp');return false">👤 الموظفين</a><a href="#" onclick="orgGo('teams');return false">👥 الفرق</a><a href="#" onclick="orgGo('mgrs');return false">🧑‍💼 المديرين</a></nav></div>
+    <section id="org-emp" class="org-sec"><h4>👤 الموظفين والتحويلات</h4>
+    <div class="muted" style="font-size:12px">اختار اسم الموظف في الـ CRM جنب تحويلته عشان الاجتماعات تتسجّل باسمه (بنحاول نطابق بالاسم لوحدنا 🤖).</div>
     <div class="muted" id="crmSrc" style="font-size:12px;margin-top:4px"></div>
     <div class="muted" style="font-size:12px;margin-top:2px">🔐 <b>اسم الدخول وكلمة السر</b>: الموظف بيدخل التطبيق بيهم بدل رقم التحويلة وباسوردها. لو التحويلة ليها اسم دخول، محدش يقدر يدخل برقمها. سيب كلمة السر فاضية عشان تفضل زي ما هي.</div>
     <div class="crm-tw"><table class="crm-tbl">
       <thead><tr><th>التحويلة</th><th>رقم الخط</th><th>الموظف (من الـ CRM)</th><th>الفريق</th><th>اسم الدخول</th><th>كلمة السر</th><th></th></tr></thead>
       <tbody id="crmSales"></tbody></table></div>
-    <button class="btn o sm" style="margin-top:6px" onclick="crmAddRow()">＋ إضافة تحويلة</button>
-    <div class="rub-foot"><span class="sp" style="flex:1"></span><button class="btn" onclick="saveCrm()">💾 حفظ</button></div>
-    <div id="crmMsg" class="muted"></div>
-  </div>
-</div>
-<div class="modal" id="teamModal" onclick="if(event.target===this)this.classList.remove('show')">
-  <div class="mbox" style="max-width:1150px;width:96vw;max-height:90vh;overflow:auto">
-    <h3 style="margin-top:0">👥 الفرق والتحويلات</h3>
-    <h4 style="margin:10px 0 4px">الفرق</h4>
+    <button class="btn o sm" style="margin-top:6px" onclick="crmAddRow(undefined,'',true)">＋ تحويلة جديدة</button>
+    </section>
+    <section id="org-teams" class="org-sec"><h4>👥 الفرق</h4>
+      <div class="muted" style="font-size:12px">الفريق بيتختار لكل موظف في جدول الموظفين فوق، أو من <b>＋ ضيف تحويلة</b> هنا. قائد الفريق بيدخل اللوحة بيوزره ويشوف فريقه بس.</div>
     <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم الفريق</th><th>التحويلات</th><th>قائد الفريق</th><th>يوزر القائد للوحة</th><th>باسورد القائد</th><th></th></tr></thead><tbody id="tmTeams"></tbody></table></div>
     <div id="tmFree" class="muted" style="font-size:12px;margin:6px 0"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn o sm" onclick="tmAddTeam()">＋ فريق جديد</button>
-      <button class="btn o sm" onclick="$('teamModal').classList.remove('show');openEmployees(true)">＋ تحويلة جديدة</button></div>
-    <h4 style="margin:18px 0 4px">المديرين (فوق قادة الفرق)</h4>
+    <button class="btn o sm" onclick="tmAddTeam()">＋ فريق جديد</button>
+    </section>
+    <section id="org-mgrs" class="org-sec"><h4>🧑‍💼 المديرين (فوق قادة الفرق)</h4>
     <div class="muted" style="font-size:12px">كل مدير بيدخل اللوحة بيوزره ويشوف الفرق اللي تحددها له بس — من غير الإعدادات.</div>
     <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم المدير</th><th>اليوزر</th><th>الباسورد</th><th>الفرق اللي يشوفها</th><th></th></tr></thead><tbody id="tmMgrs"></tbody></table></div>
     <button class="btn o sm" onclick="tmAddMgr()">＋ مدير جديد</button>
-    <div class="muted" style="font-size:12px;margin-top:10px">ضيف التحويلة للفريق من <b>＋ ضيف تحويلة</b> وشيلها بـ ✕. التحويلة الجديدة خالص بتتضاف الأول من شاشة <b>الموظفين</b> (الربط مع الـ CRM).</div>
-    <div class="muted" style="font-size:12px;margin-top:4px">🔐 <b>يوزر وباسورد القائد</b>: القائد بيدخل اللوحة بيهم ويشوف فريقه بس (المكالمات، التقييم، المواعيد، التعارضات) من غير الإعدادات. شيل اليوزر عشان تقفل دخوله.</div>
-    <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" onclick="tmSave()">💾 حفظ</button><span id="tmMsg"></span></div>
+    </section>
+    <div class="org-foot"><button class="btn" onclick="orgSave()">💾 حفظ الكل</button><span id="orgMsg"></span></div>
   </div>
 </div>
 <div class="modal" id="cusModal" onclick="if(event.target===this)this.classList.remove('show')">
@@ -594,18 +604,18 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
 </div>
 <div class="page" id="p-set">
   <div class="set-grid">
+    <div class="card set-c"><h3>👥 الموظفين والفرق والمديرين</h3>
+      <p class="muted">في شاشة واحدة: كل تحويلة ورقم خطها واسمها في الـ CRM وفريقها ودخولها للتطبيق، والفرق وقادتها، والمديرين والفرق اللي يشوفوها.</p>
+      <button class="btn" onclick="openOrg('emp')">تعديل التحويلات</button></div>
+    <div class="card set-c"><h3>🧭 أنواع التصنيف</h3>
+      <p class="muted">أنواع مشاكل العملاء، وأخطاء الموظفين، وأسباب عدم الشراء اللي الـ AI بيصنّف بيها.</p>
+      <button class="btn" onclick="openTax()">تعديل الأنواع</button></div>
     <div class="card set-c"><h3>⭐ بنود التقييم والأوزان</h3>
       <p class="muted">البنود اللي الـ AI بيقيّم بيها كل مكالمة، ووزن كل بند من 100. التعديل بيتطبّق على المكالمات اللي هتتحلّل بعد كده.</p>
       <button class="btn" onclick="openRubric()">تعديل البنود</button></div>
-    <div class="card set-c"><h3>👤 الموظفين والتحويلات</h3>
-      <p class="muted">ضيف تحويلة جديدة، واكتب لكل موظف: رقم الخط، اسمه في الـ CRM، فريقه، واسم الدخول وكلمة السر بتوع التطبيق.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="openEmployees(true)">＋ تحويلة جديدة</button><button class="btn o" onclick="openEmployees(false)">كل الموظفين</button></div></div>
     <div class="card set-c"><h3>🔗 الربط مع الـ CRM</h3>
-      <p class="muted">رابط حجز الاجتماعات، مدة الاجتماع، الشروط، والموظف في الـ CRM قصاد كل تحويلة.</p>
-      <button class="btn" onclick="openCrm()">إعدادات الـ CRM والموظفين</button></div>
-    <div class="card set-c"><h3>👥 الفرق والتحويلات</h3>
-      <p class="muted">اعمل الفرق، اختار قائد كل فريق، واربط كل تحويلة بفريقها. التقارير والفلاتر والتقييم بتمشي على الربط ده.</p>
-      <button class="btn" onclick="openTeams()">تعديل الفرق</button></div>
+      <p class="muted">رابط حجز الاجتماعات، التوكن، مدة الاجتماع، الشروط، والعميل الافتراضي.</p>
+      <button class="btn" onclick="openCrm()">إعدادات الربط</button></div>
     <div class="card set-c"><h3>🛡️ حماية العميل من تكرار الاتصال</h3>
       <p class="muted">العميل بيفضل تبع أول مندوب كلّمه طول ما آخر تواصل منه أقل من المدة دي. أي مندوب تاني بيتنبّه، ولو أصرّ بيتبعت طلب في ⚔️ التعارضات. بعد المدة العميل بيبقى متاح لأي حد.</p>
       <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="owOn" style="width:auto"> الحماية شغالة</label>
@@ -613,9 +623,6 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
       <div style="font-size:13px;margin-top:4px"><b>مسموح لهم يتخطوا التعارض:</b> <span class="muted">(يتصلوا بأي عميل من غير تنبيه، ومكالماتهم مبتحجزش العميل لهم)</span></div>
       <div id="owExempt" class="mg-teams"></div>
       <div style="display:flex;align-items:center;gap:8px"><button class="btn sm" onclick="owSave()">💾 حفظ</button><span id="owMsg"></span></div></div>
-    <div class="card set-c"><h3>🧭 أنواع التصنيف</h3>
-      <p class="muted">أنواع مشاكل العملاء، وأخطاء الموظفين، وأسباب عدم الشراء اللي الـ AI بيصنّف بيها.</p>
-      <button class="btn" onclick="openTax()">تعديل الأنواع</button></div>
   </div>
 </div>
 <div class="page" id="p-eval">
@@ -1409,10 +1416,25 @@ let ROLE='admin';
 
 /* ===================== الفرق ===================== */
 let TM={teams:[],reps:[]};
-async function openTeams(){
-  try{TM=await (await fetch(API_BASE+'/teams',{cache:'no-store'})).json();}catch(e){alert(e.message);return}
-  $('tmMsg').textContent=''; tmRender(); $('teamModal').classList.add('show');
+async function openTeams(){ return openOrg('teams'); }
+/* ===== شاشة واحدة: الموظفين + الفرق + المديرين ===== */
+let ORG_LOADED=false;
+document.addEventListener('DOMContentLoaded',()=>document.querySelectorAll('.modal').forEach(m=>document.body.appendChild(m)));
+async function openOrg(sec){
+  let c;
+  try{c=await (await fetch(API_BASE+'/crm/settings',{cache:'no-store'})).json();
+    TM=await (await fetch(API_BASE+'/teams',{cache:'no-store'})).json();}catch(e){alert(e.message);return}
+  try{LOGINS=await (await fetch(API_BASE+'/logins',{cache:'no-store'})).json();}catch(e){LOGINS={}}
+  CRM_EMP=null; CRM_REMOVED=new Set(); $('crmSales').innerHTML='';
+  const ids=new Set([...REPS.map(r=>String(r.id)),...Object.keys(c.salesIds||{}),...TM.reps.map(r=>r.ext)]);
+  [...ids].sort((x,y)=>(+x)-(+y)).forEach(e=>crmAddRow(e,(c.salesIds||{})[e]||''));
+  ORG_LOADED=true; $('orgMsg').textContent=''; tmRender(); $('orgModal').classList.add('show');
+  crmLists(c); if(sec)setTimeout(()=>orgGo(sec),60);
 }
+function orgGo(sec){document.getElementById('org-'+sec)?.scrollIntoView({block:'start',behavior:'smooth'})}
+/* اختيار الفريق في جدول الموظفين ↔ الفرق */
+function orgTeamChanged(sel){tmRead();tmReadMgrs();const e=sel.closest('tr').querySelector('.crm-e').value.trim();let r=TM.reps.find(x=>x.ext===e);
+  if(!r&&e){r={ext:e,name:'',team:''};TM.reps.push(r)} if(r)r.team=sel.value; tmRender();}
 function tmReadMgrs(){
   TM.managers=[...document.querySelectorAll('#tmMgrs tr[data-i]')].map(tr=>{const old=(TM.managers||[])[+tr.dataset.i]||{};
     return {...old,name:tr.querySelector('.mg-n').value.trim(),user:tr.querySelector('.mg-u').value.trim(),password:tr.querySelector('.mg-p').value,
@@ -1428,7 +1450,7 @@ function tmRenderMgrs(){
     ||'<tr><td colspan="5" class="muted">مفيش مديرين — دوس ＋ مدير جديد</td></tr>';
 }
 function tmAddMgr(){tmRead();tmReadMgrs();(TM.managers=TM.managers||[]).push({name:'',user:'',teams:[]});tmRender();const n=document.querySelectorAll('#tmMgrs .mg-n');n[n.length-1]?.focus();}
-function tmDelMgr(i){tmRead();tmReadMgrs();TM.managers.splice(i,1);tmRender();$('tmMsg').innerHTML='<span class="muted">دوس حفظ عشان المسح يتسجّل</span>';}
+function tmDelMgr(i){tmRead();tmReadMgrs();TM.managers.splice(i,1);tmRender();$('orgMsg').innerHTML='<span class="muted">دوس حفظ عشان المسح يتسجّل</span>';}
 function tmRead(){
   TM.teams=[...document.querySelectorAll('#tmTeams tr[data-id]')].map(tr=>{const old=TM.teams.find(t=>t.id===tr.dataset.id)||{};
     return {...old,id:tr.dataset.id,name:tr.querySelector('.tm-n').value.trim(),leaderExt:tr.querySelector('.tm-l').value,
@@ -1453,20 +1475,13 @@ function tmRender(){ setTimeout(tmRenderMgrs,0);
 }
 function tmSync(){tmRead();tmReadMgrs();tmRenderMgrs()}
 function tmMove(ext,teamId){tmRead();tmReadMgrs();const r=TM.reps.find(x=>x.ext===String(ext));if(!r)return;r.team=teamId;
+  document.querySelectorAll('#crmSales tr').forEach(tr=>{if(tr.querySelector('.crm-e').value.trim()===String(ext))tr.querySelector('.crm-t').value=teamId});
   TM.teams.forEach(t=>{if(t.leaderExt===String(ext)&&t.id!==teamId)t.leaderExt=''});tmRender();
-  $('tmMsg').innerHTML='<span class="muted">دوس 💾 حفظ عشان التغيير يتسجّل</span>';}
+  $('orgMsg').innerHTML='<span class="muted">دوس 💾 حفظ عشان التغيير يتسجّل</span>';}
 function tmAddTeam(){tmRead(); TM.teams.push({id:'t'+Date.now().toString(36),name:'',leaderExt:''}); tmRender(); const ins=document.querySelectorAll('#tmTeams .tm-n'); ins[ins.length-1]?.focus();}
 function tmDel(id){tmRead(); const n=TM.reps.filter(r=>r.team===id).length;
   TM.teams=TM.teams.filter(t=>t.id!==id); TM.reps.forEach(r=>{if(r.team===id)r.team=''}); tmRender();
-  $('tmMsg').innerHTML=`<span class="muted">${n?n+' تحويلة بقت من غير فريق — ':''}دوس حفظ عشان المسح يتسجّل</span>`;}
-async function tmSave(){
-  tmRead(); tmReadMgrs();
-  if(TM.teams.some(t=>!t.name)){$('tmMsg').innerHTML='<span style="color:var(--red)">✖ اكتب اسم كل فريق</span>';return}
-  const assign={}; TM.reps.forEach(r=>{if(r.team)assign[r.ext]=r.team});
-  try{const r=await fetch(API_BASE+'/teams',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({teams:TM.teams,assign,managers:TM.managers||[]})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
-    TM=j; TM.teams.forEach(t=>delete t.leaderPassword); (TM.managers||[]).forEach(m=>delete m.password); tmRender(); $('tmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; await loadConfig(); try{fillSelects()}catch(e){} loadedRange=''; refresh(); try{loadEval&&$('p-eval').classList.contains('active')&&loadEval()}catch(e){}
-  }catch(e){$('tmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
-}
+  $('orgMsg').innerHTML=`<span class="muted">${n?n+' تحويلة بقت من غير فريق — ':''}دوس حفظ عشان المسح يتسجّل</span>`;}
 
 /* ===================== التعارضات ===================== */
 let CF={items:[],counts:{}}, CF_S='pending';
@@ -1565,11 +1580,8 @@ async function taxSave(){
 
 let AP_DUR=60;
 async function openEmployees(addNew){
-  await openCrm();
-  const tw=document.querySelector('#crmModal .crm-tw'); if(!tw)return;
-  if(addNew){crmAddRow(); const rows=document.querySelectorAll('#crmSales tr'); const last=rows[rows.length-1];
-    last?.scrollIntoView({block:'center',behavior:'smooth'}); last?.classList.add('crm-new'); setTimeout(()=>last?.querySelector('.crm-e')?.focus(),300);}
-  else tw.scrollIntoView({block:'start',behavior:'smooth'});
+  await openOrg(addNew?null:'emp');
+  if(addNew)crmAddRow(undefined,'',true);
 }
 async function openCrm(){
   const c=await (await fetch(API_BASE+'/crm/settings',{cache:'no-store'})).json();
@@ -1577,12 +1589,8 @@ async function openCrm(){
   $('crmDur').value=c.duration||60; $('crmTerms').value=c.termsManagementId||0; $('crmClient').value=c.defaultClientId||''; $('crmMail').checked=!!c.sendEmail;
   $('crmTok').innerHTML=c.hasToken?'🔑 التوكن متسجّل على السيرفر ✔':'🔑 التوكن لسه مش متسجّل — على السيرفر اكتب: <code dir="ltr">sudo nq-setkey crm</code> (لو الـ API محتاجه)';
   $('crmTok').innerHTML+=c.hasLogin?'<br>👤 اليوزر متسجّل — التوكن بيتجدد لوحده ✔':'<br>👤 عشان التوكن يتجدد لوحده من غير ما يخلص: <code dir="ltr">sudo nq-setkey crm-login</code>';
-  try{TM=await (await fetch(API_BASE+'/teams',{cache:'no-store'})).json();}catch(e){TM={teams:[],reps:[]}}
-  try{LOGINS=await (await fetch(API_BASE+'/logins',{cache:'no-store'})).json();}catch(e){LOGINS={}}
-  CRM_EMP=null; CRM_REMOVED=new Set(); $('crmSales').innerHTML=''; const ids=new Set([...REPS.map(r=>String(r.id)),...Object.keys(c.salesIds||{})]);
-  [...ids].sort((x,y)=>(+x)-(+y)).forEach(e=>crmAddRow(e,c.salesIds[e]||''));
-  $('crmMsg').textContent=''; $('crmModal').classList.add('show');
-  crmLists(c);
+  $('crmConnMsg').textContent=''; $('crmModal').classList.add('show');
+  crmTerms(c);
 }
 const nrm=s=>String(s||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[^\p{L}\p{N} ]/gu,'').replace(/\s+/g,' ').trim().toLowerCase();
 let CRM_EMP=null;
@@ -1595,24 +1603,27 @@ function crmTeamOpts(v){return '<option value="">— من غير فريق —</o
 function crmRepName(ext){return (REPS.find(r=>String(r.id)===String(ext))||{}).name||''}
 let CRM_REMOVED=new Set();
 function crmDelRow(b){const tr=b.closest('tr'), e=tr.querySelector('.crm-e').value.trim(); if(e)CRM_REMOVED.add(e); tr.remove();
-  $('crmMsg').innerHTML='<span class="muted">دوس 💾 حفظ عشان المسح يتسجّل</span>';}
-function crmAddRow(ext,val){
+  $('orgMsg').innerHTML='<span class="muted">دوس 💾 حفظ عشان المسح يتسجّل</span>';}
+function crmAddRow(ext,val,focusNew){
   const tr=document.createElement('tr'); const isNew=ext===undefined;
   const line=(REPS.find(r=>String(r.id)===String(ext))||{}).line||'';
   tr.innerHTML=`<td><input class="crm-e" inputmode="numeric" value="${esc(ext||'')}" placeholder="مثلًا 108" ${isNew?'':'readonly'}></td>
     <td><input class="crm-line" inputmode="tel" dir="ltr" value="${esc(line)}" placeholder="05xxxxxxxx"></td>
     <td>${crmEmpField(val)}<div class="crm-n muted">${crmRepName(ext)?'عندنا دلوقتي: '+esc(crmRepName(ext)):''}</div></td>
-    <td><select class="crm-t">${crmTeamOpts((TM.reps.find(r=>r.ext===String(ext))||{}).team||'')}</select></td>
+    <td><select class="crm-t" onchange="orgTeamChanged(this)">${crmTeamOpts((TM.reps.find(r=>r.ext===String(ext))||{}).team||'')}</select></td>
     <td><input class="crm-u" dir="ltr" autocomplete="off" value="${esc((LOGINS[String(ext)]||{}).username||'')}" placeholder="مثلًا hadeer"></td>
     <td><input class="crm-p" dir="ltr" type="password" autocomplete="new-password" placeholder="${(LOGINS[String(ext)]||{}).hasPassword?'متسجّلة ✓ (اكتب لتغييرها)':'6 حروف على الأقل'}"></td>
     <td><button class="x" title="امسح التحويلة دي" onclick="crmDelRow(this)">✕</button></td>`;
   const ei=tr.querySelector('.crm-e'); ei.oninput=()=>{ei.value=ei.value.replace(/\D/g,'').slice(0,6); tr.querySelector('.crm-n').innerHTML=crmRepName(ei.value)?'عندنا دلوقتي: '+esc(crmRepName(ei.value)):''};
-  $('crmSales').appendChild(tr); if(isNew) ei.focus();
+  $('crmSales').appendChild(tr);
+  if(isNew&&focusNew){tr.classList.add('crm-new');setTimeout(()=>{tr.scrollIntoView({block:'center',behavior:'smooth'});ei.focus()},120)} else if(isNew) ei.focus();
+}
+async function crmTerms(c){
+  try{const r=await fetch(API_BASE+'/crm/terms',{cache:'no-store'});const j=await r.json();if(!r.ok)throw 0;const T=j.items||[];
+    if(T.length){const s=$('crmTermsSel');s.innerHTML='<option value="0">— من غير —</option>'+T.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (#${esc(t.id)})</option>`).join('');
+      s.value=String(c.termsManagementId||0); s.style.display=''; $('crmTerms').style.display='none';}}catch(e){}
 }
 async function crmLists(c){
-  const get=async p=>{const r=await fetch(API_BASE+p,{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);return j.items};
-  try{const T=await get('/crm/terms'); if(T.length){const s=$('crmTermsSel');s.innerHTML='<option value="0">— من غير —</option>'+T.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (#${esc(t.id)})</option>`).join('');
-      s.value=String(c.termsManagementId||0); s.style.display=''; $('crmTerms').style.display='none';}}catch(e){}
   try{const rj=await fetch(API_BASE+'/crm/employees',{cache:'no-store'}); const jj=await rj.json(); if(!rj.ok)throw new Error(jj.detail||rj.status);
     const E=jj.items||[]; if(jj.sourceLabel)$('crmSrc').innerHTML=`📋 قايمة الموظفين جاية من: <b>${esc(jj.sourceLabel)}</b> — ${E.length} اسم. لو في اسم ناقص أو زيادة عدّله هناك.`;
     if(!E.length)return; CRM_EMP=E;
@@ -1623,30 +1634,46 @@ async function crmLists(c){
       if(!val&&nrm(rep)){const n=nrm(rep),f=n.split(' ')[0];
         const m=E.find(e=>nrm(e.name)===n)||E.find(e=>nrm(e.name).includes(n)||n.includes(nrm(e.name)))||(f.length>2?E.filter(e=>nrm(e.name).split(' ')[0]===f):[]).find((e,_,a)=>a.length===1);
         if(m){sel.value=String(m.id);sel.classList.add('auto');auto++}}});
-    if(auto)$('crmMsg').innerHTML=`🤖 طابقت ${auto} موظف بالاسم — راجعهم ودوس حفظ`;
-  }catch(e){$('crmMsg').innerHTML=`<span class="muted">مقدرتش أجيب الموظفين من الـ CRM (${esc(e.message)}) — اكتب الأرقام بإيدك</span>`}
+    if(auto)$('orgMsg').innerHTML=`🤖 طابقت ${auto} موظف بالاسم — راجعهم ودوس حفظ`;
+  }catch(e){$('orgMsg').innerHTML=`<span class="muted">مقدرتش أجيب الموظفين من الـ CRM (${esc(e.message)}) — اكتب الأرقام بإيدك</span>`}
 }
-async function saveCrm(){
-  const salesIds={}, repNames={}, lines={}; let dup='';
-  document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(); if(e)lines[e]=tr.querySelector('.crm-line').value.trim();});
-  document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(), el=tr.querySelector('.crm-v'), v=el.value;
-    if(e&&v){ if(salesIds[e]) dup=e; salesIds[e]=v;
-      const emp=(CRM_EMP||[]).find(x=>String(x.id)===String(v)); if(emp&&emp.name) repNames[e]=emp.name; }});
-  if(dup){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ التحويلة ${esc(dup)} متكررة — سيب سطر واحد بس</span>`;return}
+async function saveCrmConn(){
   const body={url:$('crmUrl').value.trim(),authHeader:$('crmHdr').value.trim(),authPrefix:$('crmPfx').value,duration:+$('crmDur').value||60,
-    termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked,salesIds,repNames,lines,removed:[...CRM_REMOVED].filter(e=>!salesIds[e])};
+    termsManagementId:+$('crmTerms').value||0,defaultClientId:+$('crmClient').value||0,sendEmail:$('crmMail').checked};
   try{const r=await fetch(API_BASE+'/crm/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
-    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration;
-    const logins={}; document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(); if(!e)return;
-      const u=tr.querySelector('.crm-u').value.trim(), p=tr.querySelector('.crm-p').value; if(u||LOGINS[e])logins[e]={username:u,password:p};});
-    CRM_REMOVED.forEach(e=>{if(LOGINS[e])logins[e]={username:'',password:''}});
-    const rl=await fetch(API_BASE+'/logins',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(logins)}); const jl=await rl.json(); if(!rl.ok)throw new Error(jl.detail||rl.status); LOGINS=jl;
-    document.querySelectorAll('#crmSales .crm-p').forEach(i=>{const e=i.closest('tr').querySelector('.crm-e').value.trim(); i.value=''; i.placeholder=(LOGINS[e]||{}).hasPassword?'متسجّلة ✓ (اكتب لتغييرها)':'6 حروف على الأقل'});
-    const assign={}; document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(),t=tr.querySelector('.crm-t').value; if(e&&t)assign[e]=t});
-    const r2=await fetch(API_BASE+'/teams',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({teams:TM.teams.map(({leaderPassword,...t})=>t),assign})}); const j2=await r2.json(); if(!r2.ok)throw new Error(j2.detail||r2.status); TM=j2; $('crmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — وأسماء الموظفين بقت زي الـ CRM</span>'; await loadConfig(); try{fillSelects();}catch(e){} loadedRange=''; refresh(); loadAppt();
-    document.querySelectorAll('#crmSales tr').forEach(tr=>{const n=crmRepName(tr.querySelector('.crm-e').value);tr.querySelector('.crm-n').innerHTML=n?'عندنا دلوقتي: '+esc(n):''});}
-  catch(e){$('crmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+    if(!r.ok)throw new Error(j.detail||r.status); AP_DUR=j.duration; $('crmConnMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; loadAppt();}
+  catch(e){$('crmConnMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
+/* حفظ الكل: الموظفين (الـ CRM + الخطوط + الدخول) والفرق والمديرين — مرة واحدة */
+async function orgSave(){
+  const msg=h=>$('orgMsg').innerHTML=h;
+  tmRead(); tmReadMgrs();
+  const salesIds={}, repNames={}, lines={}, exts=[]; let dup='', seen=new Set();
+  document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(); if(!e)return;
+    if(seen.has(e))dup=e; seen.add(e); exts.push(e); lines[e]=tr.querySelector('.crm-line').value.trim();
+    const v=tr.querySelector('.crm-v').value; if(v){salesIds[e]=v; const emp=(CRM_EMP||[]).find(x=>String(x.id)===String(v)); if(emp&&emp.name)repNames[e]=emp.name;}});
+  if(dup)return msg(`<span style="color:var(--red)">✖ التحويلة ${esc(dup)} متكررة — سيب سطر واحد بس</span>`);
+  if(TM.teams.some(t=>!t.name))return msg('<span style="color:var(--red)">✖ اكتب اسم كل فريق</span>');
+  const assign={}; document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(),t=tr.querySelector('.crm-t').value; if(e&&t)assign[e]=t});
+  const logins={}; document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(); if(!e)return;
+    const u=tr.querySelector('.crm-u').value.trim(), p=tr.querySelector('.crm-p').value; if(u||LOGINS[e])logins[e]={username:u,password:p};});
+  CRM_REMOVED.forEach(e=>{if(LOGINS[e]&&!seen.has(e))logins[e]={username:'',password:''}});
+  const put=async(path,body)=>{const r=await fetch(API_BASE+path,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);return j};
+  msg('<span class="muted">بيحفظ…</span>');
+  try{
+    LOGINS=await put('/logins',logins);                       // الأول: لو في اسم دخول غلط مايتحفظش حاجة تانية
+    TM=await put('/teams',{teams:TM.teams,assign,managers:TM.managers||[]});
+    await put('/crm/settings',{salesIds,repNames,lines,exts,removed:[...CRM_REMOVED].filter(e=>!seen.has(e))});
+    TM.teams.forEach(t=>delete t.leaderPassword); (TM.managers||[]).forEach(m=>delete m.password);
+    msg('<span style="color:var(--green)">✔ اتحفظ كله</span>');
+    await loadConfig(); try{fillSelects()}catch(e){} loadedRange=''; refresh(); loadAppt();
+    document.querySelectorAll('#crmSales .crm-p').forEach(i=>{const e=i.closest('tr').querySelector('.crm-e').value.trim(); i.value=''; i.placeholder=(LOGINS[e]||{}).hasPassword?'متسجّلة ✓ (اكتب لتغييرها)':'6 حروف على الأقل'});
+    document.querySelectorAll('#crmSales tr').forEach(tr=>{tr.classList.remove('crm-new');tr.querySelector('.crm-e').readOnly=true;const n=crmRepName(tr.querySelector('.crm-e').value);tr.querySelector('.crm-n').innerHTML=n?'عندنا دلوقتي: '+esc(n):''});
+    tmRender();
+  }catch(e){msg(`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`)}
+}
+async function saveCrm(){return orgSave()}
+async function tmSave(){return orgSave()}
 </script>
 </body>
 </html>

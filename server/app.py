@@ -373,6 +373,14 @@ def config():
         lines = json.loads((DATA_DIR / "rep_lines.json").read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         lines = {}
+    try:   # تحويلات اتضافت من شاشة الموظفين (حتى من غير اسم في الـ CRM)
+        extra = set(json.loads((DATA_DIR / "rep_extra.json").read_text(encoding="utf-8")))
+    except Exception:  # noqa: BLE001
+        extra = set()
+    have = {str(r.get("id")) for r in reps.get("reps", [])}
+    for ext in sorted((extra | set(lines)) - have, key=lambda x: int(x) if x.isdigit() else 0):
+        if ext.isdigit():
+            reps.setdefault("reps", []).append({"id": int(ext), "name": over.get(ext) or ext, "team": ""})
     for r in reps.get("reps", []):
         if lines.get(str(r.get("id"))):
             r["line"] = lines[str(r.get("id"))]
