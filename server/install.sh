@@ -243,11 +243,14 @@ KEY
 chmod 755 /usr/local/bin/nq-setkey
 
 echo "== check"
+# اللوحة محتاجة تسجيل دخول دلوقتي — بنتأكد إن السيرفر شغال من الصفحة الرئيسية (مش محمية)
 for i in 1 2 3 4 5 6 7 8 9 10; do
-  if curl -fsS http://127.0.0.1:8090/api/config >/dev/null; then break; fi; sleep 2
+  if curl -fsS -o /dev/null http://127.0.0.1:8090/; then break; fi; sleep 2
 done
-curl -fsS http://127.0.0.1:8090/api/config >/dev/null && echo "service OK"
-D=$(date +%F)
-curl -sS "http://127.0.0.1:8090/api/calls?from=$D&to=$D" | head -c 400; echo
+if curl -fsS -o /dev/null http://127.0.0.1:8090/ && [[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/api/config)" == 401 ]]; then
+  echo "service OK (اللوحة محمية بتسجيل دخول ✔)"
+else
+  echo "✖ السيرفر مش بيرد — journalctl -u nq-calls -n 30"
+fi
 journalctl -u nq-calls -n 8 --no-pager 2>/dev/null | grep -iE "error|exception" | tail -3 || true
 echo "DONE  ->  https://$HOST/calls/   (user: admin)"
