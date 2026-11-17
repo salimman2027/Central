@@ -33,7 +33,8 @@ def settings() -> dict:
         days = int(s.get("days", DEFAULT_DAYS))
     except (TypeError, ValueError):
         days = DEFAULT_DAYS
-    return {"enabled": s.get("enabled", True) is not False, "days": max(1, min(365, days))}
+    return {"enabled": s.get("enabled", True) is not False, "days": max(1, min(365, days)),
+            "exempt": [str(e) for e in s.get("exempt", []) if str(e).isdigit()]}
 
 
 def _ts(s) -> dt.datetime:
@@ -98,7 +99,9 @@ def owner_of(number: str) -> dict | None:
         return None
     d = digits(number)
     win = dt.timedelta(days=cfg["days"])
-    events = [(_ts(c["time"]), str(c["ext"]), None) for c in _history().get(d, []) if _contacted(c)]
+    exempt = set(cfg["exempt"])   # اللي بيتخطوا التعارض مكالماتهم مبتحجزش العميل
+    events = [(_ts(c["time"]), str(c["ext"]), None) for c in _history().get(d, [])
+              if _contacted(c) and str(c["ext"]) not in exempt]
     own = _jload("owners.json", {}).get(d)
     if own and own.get("since"):
         events.append((_ts(own["since"]), str(own["ext"]), own.get("by", "assigned")))
@@ -163,7 +166,7 @@ async def check(request: Request):
     if len(digits(number)) < 7:
         return JSONResponse({"allowed": True}, headers=HDR)
     own = owner_of(number)
-    if not own or own["ext"] == ext:
+    if not own or own["ext"] == ext or ext in settings()["exempt"]:
         return JSONResponse({"allowed": True}, headers=HDR)
     names = CTX["names"]()
     pend = _pending(number, ext)
@@ -315,7 +318,10 @@ async def put_settings(request: Request):
         raise HTTPException(400, "عدد الأيام لازم يبقى رقم")
     if not 1 <= days <= 365:
         raise HTTPException(400, "عدد الأيام من 1 لـ 365")
-    _jsave("ownership.json", {"enabled": bool(b.get("enabled", True)), "days": days})
+    old = settings()
+    exempt = b.get("exempt", old["exempt"])
+    exempt = sorted({str(e) for e in (exempt or []) if str(e).isdigit()}, key=int)
+    _jsave("ownership.json", {"enabled": bool(b.get("enabled", True)), "days": days, "exempt": exempt})
     _CACHE["at"] = 0
     return settings()
 

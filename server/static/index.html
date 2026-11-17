@@ -609,8 +609,10 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="card set-c"><h3>🛡️ حماية العميل من تكرار الاتصال</h3>
       <p class="muted">العميل بيفضل تبع أول مندوب كلّمه طول ما آخر تواصل منه أقل من المدة دي. أي مندوب تاني بيتنبّه، ولو أصرّ بيتبعت طلب في ⚔️ التعارضات. بعد المدة العميل بيبقى متاح لأي حد.</p>
       <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="owOn" style="width:auto"> الحماية شغالة</label>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">المدة: <input id="owDays" type="number" min="1" max="365" style="width:90px" class="ap-in"> يوم من آخر تواصل
-        <button class="btn sm" onclick="owSave()">💾 حفظ</button><span id="owMsg"></span></div></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">المدة: <input id="owDays" type="number" min="1" max="365" style="width:90px" class="ap-in"> يوم من آخر تواصل</div>
+      <div style="font-size:13px;margin-top:4px"><b>مسموح لهم يتخطوا التعارض:</b> <span class="muted">(يتصلوا بأي عميل من غير تنبيه، ومكالماتهم مبتحجزش العميل لهم)</span></div>
+      <div id="owExempt" class="mg-teams"></div>
+      <div style="display:flex;align-items:center;gap:8px"><button class="btn sm" onclick="owSave()">💾 حفظ</button><span id="owMsg"></span></div></div>
     <div class="card set-c"><h3>🧭 أنواع التصنيف</h3>
       <p class="muted">أنواع مشاكل العملاء، وأخطاء الموظفين، وأسباب عدم الشراء اللي الـ AI بيصنّف بيها.</p>
       <button class="btn" onclick="openTax()">تعديل الأنواع</button></div>
@@ -1037,6 +1039,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.p==='eval')loadEval();
   if(t.dataset.p==='appt')loadAppt();
   if(t.dataset.p==='cf')loadCf();
+  if(t.dataset.p==='set')owLoad();
   if(t.dataset.p==='ins')loadIns();
 });
 loadConfig().then(()=>{fillSelects();refresh();initAI();}).catch(e=>{$('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل الإعدادات</div><div class="s">${e.message}</div></div>`});
@@ -1383,11 +1386,13 @@ setInterval(()=>{if(!document.querySelector('#p-appt.active input:focus,#p-appt.
 setTimeout(loadAppt,1500);
 
 /* ===================== حماية العميل ===================== */
-async function owLoad(){try{const j=await (await fetch(API_BASE+'/ownership/settings',{cache:'no-store'})).json();$('owDays').value=j.days;$('owOn').checked=j.enabled;}catch(e){}}
+async function owLoad(){try{const j=await (await fetch(API_BASE+'/ownership/settings',{cache:'no-store'})).json();$('owDays').value=j.days;$('owOn').checked=j.enabled;owRenderExempt(j.exempt||[]);}catch(e){}}
+function owRenderExempt(ex){const R=(typeof REPS!=='undefined'?REPS:[]).slice().sort((a,b)=>a.id-b.id);
+  $('owExempt').innerHTML=R.map(r=>`<label><input type="checkbox" class="ow-ex" value="${r.id}" ${ex.includes(String(r.id))?'checked':''}> ${r.id} ${esc(r.name||'')}</label>`).join('')||'<span class="muted">مفيش موظفين</span>';}
 async function owSave(){
-  try{const r=await fetch(API_BASE+'/ownership/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({days:+$('owDays').value,enabled:$('owOn').checked})});
+  try{const r=await fetch(API_BASE+'/ownership/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({days:+$('owDays').value,enabled:$('owOn').checked,exempt:[...document.querySelectorAll('.ow-ex:checked')].map(c=>c.value)})});
     const j=await r.json(); if(!r.ok)throw new Error(j.detail||r.status); $('owDays').value=j.days;
-    $('owMsg').innerHTML=`<span style="color:var(--green)">✔ اتحفظ — ${j.enabled?j.days+' يوم من آخر تواصل':'الحماية مقفولة'}</span>`;
+    owRenderExempt(j.exempt||[]); $('owMsg').innerHTML=`<span style="color:var(--green)">✔ اتحفظ — ${j.enabled?j.days+' يوم من آخر تواصل':'الحماية مقفولة'}${(j.exempt||[]).length?' · '+j.exempt.length+' مستثنى':''}</span>`;
   }catch(e){$('owMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
 setTimeout(owLoad,1500);
