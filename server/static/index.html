@@ -354,7 +354,9 @@ html[data-theme=light] .lw-box input{background:#fff}html[data-theme=light] .lw-
 .pw-form{display:flex;flex-direction:column;gap:4px}.pw-form label{font-size:13px;color:var(--grey);margin-top:8px}
 .pw-form input{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font:inherit}
 html[data-theme=light] .pw-form input{background:#fff}
-.tm-exts{display:flex;flex-wrap:wrap;gap:4px;max-width:200px}
+.tm-exts{display:flex;flex-wrap:wrap;gap:4px;max-width:230px;align-items:center}
+.tm-x{border:0;background:none;color:var(--red);cursor:pointer;font-size:11px;padding:0 0 0 2px;margin-inline-start:3px}
+#teamModal .tm-add{width:auto;min-width:0;font-size:12px;padding:3px 6px;border-radius:99px}
 #teamModal .crm-tbl select,#teamModal .crm-tbl .tm-l{min-width:0;width:150px}
 #teamModal .tm-n{width:140px}#teamModal .tm-u,#teamModal .mg-u{width:110px}#teamModal .tm-p,#teamModal .mg-p{width:150px}#teamModal .mg-n{width:140px}
 #teamModal .crm-tbl td,#teamModal .crm-tbl th{padding:6px 5px}.tm-ext{font-size:12px;border:1px solid var(--border);border-radius:99px;padding:1px 8px;white-space:nowrap}
@@ -552,7 +554,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="muted" style="font-size:12px">كل مدير بيدخل اللوحة بيوزره ويشوف الفرق اللي تحددها له بس — من غير الإعدادات.</div>
     <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم المدير</th><th>اليوزر</th><th>الباسورد</th><th>الفرق اللي يشوفها</th><th></th></tr></thead><tbody id="tmMgrs"></tbody></table></div>
     <button class="btn o sm" onclick="tmAddMgr()">＋ مدير جديد</button>
-    <div class="muted" style="font-size:12px;margin-top:10px">ربط كل موظف بفريقه بقى في شاشة <b>الموظفين</b> (الربط مع الـ CRM) جنب اسمه.</div>
+    <div class="muted" style="font-size:12px;margin-top:10px">ضيف التحويلة للفريق من <b>＋ ضيف تحويلة</b> وشيلها بـ ✕. التحويلة الجديدة خالص بتتضاف الأول من شاشة <b>الموظفين</b> (الربط مع الـ CRM).</div>
     <div class="muted" style="font-size:12px;margin-top:4px">🔐 <b>يوزر وباسورد القائد</b>: القائد بيدخل اللوحة بيهم ويشوف فريقه بس (المكالمات، التقييم، المواعيد، التعارضات) من غير الإعدادات. شيل اليوزر عشان تقفل دخوله.</div>
     <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" onclick="tmSave()">💾 حفظ</button><span id="tmMsg"></span></div>
   </div>
@@ -1426,9 +1428,11 @@ function tmRender(){ setTimeout(tmRenderMgrs,0);
   const cnt=id=>TM.reps.filter(r=>r.team===id).length;
   const exts=id=>TM.reps.filter(r=>r.team===id).sort((a,b)=>+a.ext-+b.ext);
   const free=TM.reps.filter(r=>!r.team||!TM.teams.some(t=>t.id===r.team)).sort((a,b)=>+a.ext-+b.ext);
-  $('tmFree').innerHTML=free.length?`⚠️ تحويلات من غير فريق: ${free.map(r=>`<span class="tm-ext"><b>${esc(r.ext)}</b> ${esc(r.name||'')}</span>`).join(' ')} — اربطها من شاشة الموظفين`:'';
+  $('tmFree').innerHTML=free.length?`⚠️ تحويلات من غير فريق: ${free.map(r=>`<span class="tm-ext"><b>${esc(r.ext)}</b> ${esc(r.name||'')}</span>`).join(' ')} — ضيفها لفريق من ＋ ضيف تحويلة`:'';
   $('tmTeams').innerHTML=TM.teams.map(t=>`<tr data-id="${esc(t.id)}"><td><input class="tm-n" value="${esc(t.name)}" placeholder="مثلًا فريق الرياض" oninput="tmSync()"></td>
-    <td><div class="tm-exts">${exts(t.id).map(r=>`<span class="tm-ext"><b>${esc(r.ext)}</b> ${esc(r.name||'')}</span>`).join('')||'<span class="muted" style="font-size:12px">مفيش — اربطهم من شاشة الموظفين</span>'}</div></td>
+    <td><div class="tm-exts">${exts(t.id).map(r=>`<span class="tm-ext"><b>${esc(r.ext)}</b> ${esc(r.name||'')}<button class="tm-x" title="شيلها من الفريق" onclick="tmMove('${esc(r.ext)}','')">✕</button></span>`).join('')}
+      <select class="tm-add" onchange="if(this.value)tmMove(this.value,'${esc(t.id)}')"><option value="">＋ ضيف تحويلة</option>
+        ${TM.reps.filter(r=>r.team!==t.id).sort((a,b)=>+a.ext-+b.ext).map(r=>{const o=TM.teams.find(x=>x.id===r.team);return `<option value="${esc(r.ext)}">${esc(r.ext)} ${esc(r.name||'')}${o?' (من '+esc(o.name)+')':''}</option>`}).join('')}</select></div></td>
     <td><select class="tm-l"><option value="">— من غير —</option>${TM.reps.filter(r=>r.team===t.id).map(r=>`<option value="${esc(r.ext)}" ${r.ext===t.leaderExt?'selected':''}>${esc(r.name||r.ext)} (${esc(r.ext)})</option>`).join('')}</select></td>
     <td><input class="tm-u" dir="ltr" autocomplete="off" value="${esc(t.leaderUser||'')}" placeholder="مثلًا sahar"></td>
     <td><input class="tm-p" dir="ltr" type="password" autocomplete="new-password" value="${esc(t.leaderPassword||'')}" placeholder="${t.hasPassword?'متسجّل ✓':'8 حروف على الأقل'}"></td>
@@ -1437,6 +1441,9 @@ function tmRender(){ setTimeout(tmRenderMgrs,0);
 
 }
 function tmSync(){tmRead();tmReadMgrs();tmRenderMgrs()}
+function tmMove(ext,teamId){tmRead();tmReadMgrs();const r=TM.reps.find(x=>x.ext===String(ext));if(!r)return;r.team=teamId;
+  TM.teams.forEach(t=>{if(t.leaderExt===String(ext)&&t.id!==teamId)t.leaderExt=''});tmRender();
+  $('tmMsg').innerHTML='<span class="muted">دوس 💾 حفظ عشان التغيير يتسجّل</span>';}
 function tmAddTeam(){tmRead(); TM.teams.push({id:'t'+Date.now().toString(36),name:'',leaderExt:''}); tmRender(); const ins=document.querySelectorAll('#tmTeams .tm-n'); ins[ins.length-1]?.focus();}
 function tmDel(id){tmRead(); const n=TM.reps.filter(r=>r.team===id).length;
   TM.teams=TM.teams.filter(t=>t.id!==id); TM.reps.forEach(r=>{if(r.team===id)r.team=''}); tmRender();
