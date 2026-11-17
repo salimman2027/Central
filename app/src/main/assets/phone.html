@@ -24,6 +24,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .btn.gray { background:#9aa5b1; } .btn.light { background:#eef2f5; color:var(--fg); }
   .lbl { display:block; font-size:13px; color:var(--muted); margin:12px 4px 6px; }
   html[data-theme=light] .themebtn .i-dark, html:not([data-theme=light]) .themebtn .i-light { display:none; }
+  .chpw { margin-top:12px; border-top:1px solid var(--line); padding-top:10px; } .chpw summary { cursor:pointer; color:var(--muted); font-size:13px; }
   .who-name { min-height:18px; font-size:14px; color:var(--accent,#19e6c1); text-align:center; font-weight:600; }
   .who-name small { color:var(--muted); font-weight:400; margin-inline-start:6px; }
   .who-name.big { font-size:17px; color:#fff; margin-top:4px; } .who-name.big small { color:rgba(255,255,255,.65); }
@@ -359,6 +360,14 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
       <button class="btn light" onclick="NQPhone.logout()">خروج</button>
       <button class="btn" onclick="NQAuth.signIn(ext.value.trim(), pwd.value)">دخول</button>
     </div>
+    <details class="chpw" id="chpwBox">
+      <summary>🔑 غيّر كلمة السر</summary>
+      <label class="lbl">كلمة السر الحالية</label><input id="cpOld" class="ltr" type="password" autocomplete="current-password">
+      <label class="lbl">كلمة السر الجديدة (6 حروف على الأقل)</label><input id="cpNew" class="ltr" type="password" autocomplete="new-password">
+      <label class="lbl">أكّدها</label><input id="cpNew2" class="ltr" type="password" autocomplete="new-password">
+      <button class="btn" style="width:100%;margin-top:10px" onclick="NQAuth.changePw()">حفظ كلمة السر</button>
+      <div id="cpMsg" class="pf-sub" style="margin-top:6px"></div>
+    </details>
     <div id="err" class="err"></div>
     <details id="srvBox" style="margin-top:8px;border:0;padding:0">
       <summary>⚙ إعدادات السيرفر</summary>
@@ -795,6 +804,17 @@ const NQAuth = {
     // سيرفر قديم أو مش متاح: الدخول برقم التحويلة وباسوردها زي الأول
     if ((!r || r.status === 404) && /^\d{2,6}$/.test(user)) return NQPhone.login(user, pass);
     NQPhone._err(!r ? "مش قادر يوصل للسيرفر — اتأكد من النت" : (j.detail || "فشل الدخول"));
+  },
+  async changePw() {
+    const c = NQOwner.creds(), m = $("cpMsg");
+    if (!c) { m.textContent = "ادخل بحسابك الأول"; return; }
+    if ($("cpNew").value !== $("cpNew2").value) { m.textContent = "✖ كلمتين السر الجديدة مش زي بعض"; return; }
+    try {
+      const r = await fetch(CONFIG.api + "/password", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...c, old: $("cpOld").value, new: $("cpNew").value }) });
+      const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || r.status);
+      ["cpOld", "cpNew", "cpNew2"].forEach(i => $(i).value = ""); m.textContent = "✔ اتغيّرت — استخدمها المرة الجاية"; $("chpwBox").open = false; toast("✔ كلمة السر اتغيّرت");
+    } catch (e) { m.textContent = "✖ " + e.message; }
   }
 };
 

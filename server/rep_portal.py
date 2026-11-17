@@ -143,6 +143,30 @@ async def app_login(request: Request):
                          "name": CTX["names"]().get(ext, "")}, headers=HDR)
 
 
+@router.post("/app/password")
+async def app_password(request: Request):
+    """المندوب يغيّر كلمة سر حسابه من التطبيق"""
+    body = await request.json()
+    ext, sip = str(body.get("ext") or ""), str(body.get("password") or "")
+    if not CTX["check_ext"](ext, sip):
+        raise HTTPException(401, "سجّل دخول تاني")
+    old, new = str(body.get("old") or ""), str(body.get("new") or "")
+    with LOCK:
+        users = _users()
+        rec = users.get(ext)
+        if not rec:
+            raise HTTPException(400, "حسابك لسه مالوش اسم مستخدم — اطلب من المدير يعمله")
+        if not hmac.compare_digest(_hash(old, rec["salt"]), rec["hash"]):
+            raise HTTPException(400, "كلمة السر الحالية غلط")
+        if len(new) < 6:
+            raise HTTPException(400, "كلمة السر الجديدة لازم 6 حروف على الأقل")
+        rec["salt"] = secrets.token_hex(16)
+        rec["hash"] = _hash(new, rec["salt"])
+        rec["changed"] = dt.datetime.now(dt.timezone.utc).isoformat()
+        _save(users)
+    return JSONResponse({"ok": True}, headers=HDR)
+
+
 # ------------------------------------------------------------------ شاشة "أدائي"
 def _range(period: str):
     tz = CTX["tz"]

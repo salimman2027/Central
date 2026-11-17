@@ -166,6 +166,8 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/login http://127.0.0.1:8090/app/login
   ProxyPass        /calls-app/me http://127.0.0.1:8090/app/me
   ProxyPassReverse /calls-app/me http://127.0.0.1:8090/app/me
+  ProxyPass        /calls-app/password http://127.0.0.1:8090/app/password
+  ProxyPassReverse /calls-app/password http://127.0.0.1:8090/app/password
 
   # التليفون من اللابتوب
   RedirectMatch ^/phone\$ /phone/

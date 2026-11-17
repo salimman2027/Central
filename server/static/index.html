@@ -346,10 +346,15 @@ html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html
 .lw-box input{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:11px 12px;font:inherit}
 html[data-theme=light] .lw-box input{background:#fff}html[data-theme=light] .lw-box{background:#fff}
 .lw-logo{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-weight:800;color:#04101a;background:linear-gradient(135deg,#19e6c1,#5aa8ff)}
+.lw-rem{display:flex!important;align-items:center;gap:8px;font-size:13px;margin-top:12px!important;color:var(--text)!important;cursor:pointer}.lw-rem input{width:auto}
 .lw-msg{color:var(--red);min-height:20px;font-size:13px;margin-top:6px}
 .logoutbtn{border:1px solid var(--border);background:transparent;color:var(--text);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
 .logoutbtn:hover{border-color:var(--red);color:var(--red)}
 .mg-teams{display:flex;flex-wrap:wrap;gap:6px 12px}.mg-teams label{display:flex;align-items:center;gap:4px;font-size:13px;white-space:nowrap}.mg-teams input{width:auto}
+.pw-form{display:flex;flex-direction:column;gap:4px}.pw-form label{font-size:13px;color:var(--grey);margin-top:8px}
+.pw-form input{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font:inherit}
+html[data-theme=light] .pw-form input{background:#fff}
+.tm-exts{display:flex;flex-wrap:wrap;gap:4px;max-width:260px}.tm-ext{font-size:12px;border:1px solid var(--border);border-radius:99px;padding:1px 8px;white-space:nowrap}
 .crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl .crm-line{width:130px;font-variant-numeric:tabular-nums}.crm-tbl .crm-u{width:130px}.crm-tbl .crm-p{width:170px}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .crm-n{font-size:11px;margin-top:3px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
 .crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
@@ -380,6 +385,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div><span class="live-dot"></span> مباشر — آخر تحديث <b id="lastUpd"></b></div>
   <div id="whoBox">👤 المدير: <b>NQS AI</b></div>
   <button class="themebtn" onclick="toggleTheme()" title="فاتح / غامق"><span class="i-dark">🌙</span><span class="i-light">☀️</span></button>
+  <button class="logoutbtn" onclick="pwOpen()" title="غيّر كلمة السر">🔑</button>
   <button class="logoutbtn" onclick="nqLogout()" title="تسجيل خروج">🚪 خروج</button>
   <div class="ver">⚡ إصدار <b>__VER__</b></div>
 </div>
@@ -536,7 +542,8 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div class="mbox" style="max-width:1000px;width:96vw;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">👥 الفرق والتحويلات</h3>
     <h4 style="margin:10px 0 4px">الفرق</h4>
-    <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم الفريق</th><th>قائد الفريق</th><th>يوزر القائد للوحة</th><th>باسورد القائد</th><th>التحويلات</th><th></th></tr></thead><tbody id="tmTeams"></tbody></table></div>
+    <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم الفريق</th><th>التحويلات</th><th>قائد الفريق</th><th>يوزر القائد للوحة</th><th>باسورد القائد</th><th></th></tr></thead><tbody id="tmTeams"></tbody></table></div>
+    <div id="tmFree" class="muted" style="font-size:12px;margin:6px 0"></div>
     <button class="btn o sm" onclick="tmAddTeam()">＋ فريق جديد</button>
     <h4 style="margin:18px 0 4px">المديرين (فوق قادة الفرق)</h4>
     <div class="muted" style="font-size:12px">كل مدير بيدخل اللوحة بيوزره ويشوف الفرق اللي تحددها له بس — من غير الإعدادات.</div>
@@ -661,6 +668,17 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
 </div>
 
+<div class="modal" id="pwModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="mbox" style="max-width:400px;width:94vw">
+    <h3 style="margin-top:0">🔑 غيّر كلمة السر</h3>
+    <form id="pwForm" class="pw-form">
+      <label for="pwOld">كلمة السر الحالية</label><input id="pwOld" type="password" autocomplete="current-password" dir="ltr" required>
+      <label for="pwNew">كلمة السر الجديدة (8 حروف على الأقل)</label><input id="pwNew" type="password" autocomplete="new-password" dir="ltr" minlength="8" required>
+      <label for="pwNew2">أكّد كلمة السر الجديدة</label><input id="pwNew2" type="password" autocomplete="new-password" dir="ltr" required>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" type="submit">💾 حفظ</button><span id="pwMsg"></span></div>
+    </form>
+  </div>
+</div>
 <div id="loginWall" hidden>
   <form class="lw-box" id="lwForm" autocomplete="on">
     <div class="lw-logo">NQ</div>
@@ -670,7 +688,8 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <input id="lwUser" name="username" autocomplete="username" dir="ltr" required>
     <label for="lwPass">كلمة السر</label>
     <input id="lwPass" name="password" type="password" autocomplete="current-password" dir="ltr" required>
-    <button class="btn" type="submit" id="lwBtn" style="width:100%;margin-top:14px">دخول</button>
+    <label class="lw-rem"><input type="checkbox" id="lwRem"> تذكرني على الجهاز ده (شهر)</label>
+    <button class="btn" type="submit" id="lwBtn" style="width:100%;margin-top:10px">دخول</button>
     <div id="lwMsg" class="lw-msg"></div>
   </form>
 </div>
@@ -680,9 +699,16 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   try{const u=String(a[0]&&a[0].url||a[0]);if(r.status===401&&!u.includes('auth/')&&(u.startsWith('api')||u.includes('/api/')))showLogin();}catch(e){}return r;};})();
 function showLogin(){const w=document.getElementById('loginWall');if(!w.hidden)return;w.hidden=false;document.body.classList.add('locked');setTimeout(()=>document.getElementById('lwUser').focus(),50);}
 document.getElementById('lwForm').addEventListener('submit',async e=>{e.preventDefault();const b=document.getElementById('lwBtn'),m=document.getElementById('lwMsg');b.disabled=true;m.textContent='';
-  try{const r=await fetch('api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:lwUser.value.trim(),password:lwPass.value})});
+  try{const r=await fetch('api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:lwUser.value.trim(),password:lwPass.value,remember:lwRem.checked})});
     const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);location.reload();}
   catch(err){m.textContent='✖ '+err.message;b.disabled=false;}});
+function pwOpen(){['pwOld','pwNew','pwNew2'].forEach(i=>document.getElementById(i).value='');document.getElementById('pwMsg').textContent='';document.getElementById('pwModal').classList.add('show');setTimeout(()=>pwOld.focus(),50);}
+document.getElementById('pwForm').addEventListener('submit',async e=>{e.preventDefault();const m=document.getElementById('pwMsg');
+  if(pwNew.value!==pwNew2.value){m.innerHTML='<span style="color:var(--red)">✖ كلمتين السر الجديدة مش زي بعض</span>';return}
+  try{const r=await fetch('api/auth/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old:pwOld.value,new:pwNew.value})});
+    const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);
+    m.innerHTML='<span style="color:var(--green)">✔ اتغيّرت — استخدمها المرة الجاية</span>';setTimeout(()=>document.getElementById('pwModal').classList.remove('show'),1500);}
+  catch(err){m.innerHTML='<span style="color:var(--red)">✖ '+err.message.replace(/</g,'&lt;')+'</span>'}});
 async function nqLogout(){try{await fetch('api/auth/logout',{method:'POST'});}catch(e){}location.reload();}
 </script>
 <script>
@@ -1395,11 +1421,15 @@ function tmRead(){
 }
 function tmRender(){ setTimeout(tmRenderMgrs,0);
   const cnt=id=>TM.reps.filter(r=>r.team===id).length;
+  const exts=id=>TM.reps.filter(r=>r.team===id).sort((a,b)=>+a.ext-+b.ext);
+  const free=TM.reps.filter(r=>!r.team||!TM.teams.some(t=>t.id===r.team)).sort((a,b)=>+a.ext-+b.ext);
+  $('tmFree').innerHTML=free.length?`⚠️ تحويلات من غير فريق: ${free.map(r=>`<span class="tm-ext"><b>${esc(r.ext)}</b> ${esc(r.name||'')}</span>`).join(' ')} — اربطها من شاشة الموظفين`:'';
   $('tmTeams').innerHTML=TM.teams.map(t=>`<tr data-id="${esc(t.id)}"><td><input class="tm-n" value="${esc(t.name)}" placeholder="مثلًا فريق الرياض" oninput="tmSync()"></td>
+    <td><div class="tm-exts">${exts(t.id).map(r=>`<span class="tm-ext"><b>${esc(r.ext)}</b> ${esc(r.name||'')}</span>`).join('')||'<span class="muted" style="font-size:12px">مفيش — اربطهم من شاشة الموظفين</span>'}</div></td>
     <td><select class="tm-l"><option value="">— من غير —</option>${TM.reps.filter(r=>r.team===t.id).map(r=>`<option value="${esc(r.ext)}" ${r.ext===t.leaderExt?'selected':''}>${esc(r.name||r.ext)} (${esc(r.ext)})</option>`).join('')}</select></td>
     <td><input class="tm-u" dir="ltr" autocomplete="off" value="${esc(t.leaderUser||'')}" placeholder="مثلًا sahar"></td>
     <td><input class="tm-p" dir="ltr" type="password" autocomplete="new-password" value="${esc(t.leaderPassword||'')}" placeholder="${t.hasPassword?'متسجّل ✓ (اكتب لتغييره)':'8 حروف على الأقل'}"></td>
-    <td class="c">${cnt(t.id)}</td><td><button class="x" title="امسح الفريق" onclick="tmDel('${esc(t.id)}')">✕</button></td></tr>`).join('')
+    <td><button class="x" title="امسح الفريق" onclick="tmDel('${esc(t.id)}')">✕</button></td></tr>`).join('')
     ||'<tr><td colspan="6" class="muted">مفيش فرق — دوس ＋ فريق جديد</td></tr>';
 
 }
