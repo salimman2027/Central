@@ -354,7 +354,10 @@ html[data-theme=light] .lw-box input{background:#fff}html[data-theme=light] .lw-
 .pw-form{display:flex;flex-direction:column;gap:4px}.pw-form label{font-size:13px;color:var(--grey);margin-top:8px}
 .pw-form input{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font:inherit}
 html[data-theme=light] .pw-form input{background:#fff}
-.tm-exts{display:flex;flex-wrap:wrap;gap:4px;max-width:260px}.tm-ext{font-size:12px;border:1px solid var(--border);border-radius:99px;padding:1px 8px;white-space:nowrap}
+.tm-exts{display:flex;flex-wrap:wrap;gap:4px;max-width:200px}
+#teamModal .crm-tbl select,#teamModal .crm-tbl .tm-l{min-width:0;width:150px}
+#teamModal .tm-n{width:140px}#teamModal .tm-u,#teamModal .mg-u{width:110px}#teamModal .tm-p,#teamModal .mg-p{width:150px}#teamModal .mg-n{width:140px}
+#teamModal .crm-tbl td,#teamModal .crm-tbl th{padding:6px 5px}.tm-ext{font-size:12px;border:1px solid var(--border);border-radius:99px;padding:1px 8px;white-space:nowrap}
 .crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl .crm-line{width:130px;font-variant-numeric:tabular-nums}.crm-tbl .crm-u{width:130px}.crm-tbl .crm-p{width:170px}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .crm-n{font-size:11px;margin-top:3px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
 .crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
@@ -539,7 +542,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
 </div>
 <div class="modal" id="teamModal" onclick="if(event.target===this)this.classList.remove('show')">
-  <div class="mbox" style="max-width:1000px;width:96vw;max-height:90vh;overflow:auto">
+  <div class="mbox" style="max-width:1150px;width:96vw;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">👥 الفرق والتحويلات</h3>
     <h4 style="margin:10px 0 4px">الفرق</h4>
     <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم الفريق</th><th>التحويلات</th><th>قائد الفريق</th><th>يوزر القائد للوحة</th><th>باسورد القائد</th><th></th></tr></thead><tbody id="tmTeams"></tbody></table></div>
@@ -1406,7 +1409,7 @@ function tmRenderMgrs(){
   const M=TM.managers||[];
   $('tmMgrs').innerHTML=M.map((m,i)=>`<tr data-i="${i}"><td><input class="mg-n" value="${esc(m.name||'')}" placeholder="مثلًا مدير الرياض"></td>
     <td><input class="mg-u" dir="ltr" autocomplete="off" value="${esc(m.user||'')}" placeholder="riyadh"></td>
-    <td><input class="mg-p" dir="ltr" type="password" autocomplete="new-password" value="${esc(m.password||'')}" placeholder="${m.hasPassword?'متسجّل ✓ (اكتب لتغييره)':'8 حروف على الأقل'}"></td>
+    <td><input class="mg-p" dir="ltr" type="password" autocomplete="new-password" value="${esc(m.password||'')}" placeholder="${m.hasPassword?'متسجّل ✓':'8 حروف على الأقل'}"></td>
     <td><div class="mg-teams">${TM.teams.map(t=>`<label><input type="checkbox" class="mg-t" value="${esc(t.id)}" ${(m.teams||[]).includes(t.id)?'checked':''}> ${esc(t.name||'فريق جديد')}</label>`).join('')||'<span class="muted">اعمل فرق الأول</span>'}</div></td>
     <td><button class="x" title="امسح المدير" onclick="tmDelMgr(${i})">✕</button></td></tr>`).join('')
     ||'<tr><td colspan="5" class="muted">مفيش مديرين — دوس ＋ مدير جديد</td></tr>';
@@ -1428,7 +1431,7 @@ function tmRender(){ setTimeout(tmRenderMgrs,0);
     <td><div class="tm-exts">${exts(t.id).map(r=>`<span class="tm-ext"><b>${esc(r.ext)}</b> ${esc(r.name||'')}</span>`).join('')||'<span class="muted" style="font-size:12px">مفيش — اربطهم من شاشة الموظفين</span>'}</div></td>
     <td><select class="tm-l"><option value="">— من غير —</option>${TM.reps.filter(r=>r.team===t.id).map(r=>`<option value="${esc(r.ext)}" ${r.ext===t.leaderExt?'selected':''}>${esc(r.name||r.ext)} (${esc(r.ext)})</option>`).join('')}</select></td>
     <td><input class="tm-u" dir="ltr" autocomplete="off" value="${esc(t.leaderUser||'')}" placeholder="مثلًا sahar"></td>
-    <td><input class="tm-p" dir="ltr" type="password" autocomplete="new-password" value="${esc(t.leaderPassword||'')}" placeholder="${t.hasPassword?'متسجّل ✓ (اكتب لتغييره)':'8 حروف على الأقل'}"></td>
+    <td><input class="tm-p" dir="ltr" type="password" autocomplete="new-password" value="${esc(t.leaderPassword||'')}" placeholder="${t.hasPassword?'متسجّل ✓':'8 حروف على الأقل'}"></td>
     <td><button class="x" title="امسح الفريق" onclick="tmDel('${esc(t.id)}')">✕</button></td></tr>`).join('')
     ||'<tr><td colspan="6" class="muted">مفيش فرق — دوس ＋ فريق جديد</td></tr>';
 
