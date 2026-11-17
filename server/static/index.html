@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script>(function(){var t;try{t=localStorage.getItem('nq_theme')}catch(e){}if(!t)t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();
+<script>(function(){var t;try{t=localStorage.getItem('nq_theme')}catch(e){}if(!t)t='light';document.documentElement.dataset.theme=t;})();
 function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=t;try{localStorage.setItem('nq_theme',t)}catch(e){}if(window.refresh)try{refresh()}catch(e){}}</script>
 <title>NQ Call Monitor - مراقبة مكالمات المناديب</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
@@ -349,6 +349,7 @@ html[data-theme=light] .lw-box input{background:#fff}html[data-theme=light] .lw-
 .lw-msg{color:var(--red);min-height:20px;font-size:13px;margin-top:6px}
 .logoutbtn{border:1px solid var(--border);background:transparent;color:var(--text);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
 .logoutbtn:hover{border-color:var(--red);color:var(--red)}
+.mg-teams{display:flex;flex-wrap:wrap;gap:6px 12px}.mg-teams label{display:flex;align-items:center;gap:4px;font-size:13px;white-space:nowrap}.mg-teams input{width:auto}
 .crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl .crm-line{width:130px;font-variant-numeric:tabular-nums}.crm-tbl .crm-u{width:130px}.crm-tbl .crm-p{width:170px}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .crm-n{font-size:11px;margin-top:3px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
 .crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
@@ -537,6 +538,10 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <h4 style="margin:10px 0 4px">الفرق</h4>
     <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم الفريق</th><th>قائد الفريق</th><th>يوزر القائد للوحة</th><th>باسورد القائد</th><th>التحويلات</th><th></th></tr></thead><tbody id="tmTeams"></tbody></table></div>
     <button class="btn o sm" onclick="tmAddTeam()">＋ فريق جديد</button>
+    <h4 style="margin:18px 0 4px">المديرين (فوق قادة الفرق)</h4>
+    <div class="muted" style="font-size:12px">كل مدير بيدخل اللوحة بيوزره ويشوف الفرق اللي تحددها له بس — من غير الإعدادات.</div>
+    <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم المدير</th><th>اليوزر</th><th>الباسورد</th><th>الفرق اللي يشوفها</th><th></th></tr></thead><tbody id="tmMgrs"></tbody></table></div>
+    <button class="btn o sm" onclick="tmAddMgr()">＋ مدير جديد</button>
     <div class="muted" style="font-size:12px;margin-top:10px">ربط كل موظف بفريقه بقى في شاشة <b>الموظفين</b> (الربط مع الـ CRM) جنب اسمه.</div>
     <div class="muted" style="font-size:12px;margin-top:4px">🔐 <b>يوزر وباسورد القائد</b>: القائد بيدخل اللوحة بيهم ويشوف فريقه بس (المكالمات، التقييم، المواعيد، التعارضات) من غير الإعدادات. شيل اليوزر عشان تقفل دخوله.</div>
     <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" onclick="tmSave()">💾 حفظ</button><span id="tmMsg"></span></div>
@@ -1354,8 +1359,8 @@ setTimeout(owLoad,1500);
 /* ===================== مين داخل: المدير ولا قائد فريق ===================== */
 let ROLE='admin';
 (async()=>{try{const w=await (await fetch(API_BASE+'/whoami',{cache:'no-store'})).json(); ROLE=w.role;
-  if(w.role==='leader'){
-    $('whoBox').innerHTML=`👥 قائد: <b>${esc(w.teamName)}</b> <span class="muted">(${esc(w.user)})</span>`;
+  if(w.role==='leader'||w.role==='manager'){
+    $('whoBox').innerHTML=w.role==='manager'?`🧑‍💼 مدير: <b>${esc(w.name)}</b> <span class="muted">(${esc(w.teamName)})</span>`:`👥 قائد: <b>${esc(w.teamName)}</b> <span class="muted">(${esc(w.user)})</span>`;
     document.querySelectorAll('.tab[data-p="set"]').forEach(t=>t.remove());
     document.body.classList.add('leader');
   }}catch(e){}})();
@@ -1366,13 +1371,29 @@ async function openTeams(){
   try{TM=await (await fetch(API_BASE+'/teams',{cache:'no-store'})).json();}catch(e){alert(e.message);return}
   $('tmMsg').textContent=''; tmRender(); $('teamModal').classList.add('show');
 }
+function tmReadMgrs(){
+  TM.managers=[...document.querySelectorAll('#tmMgrs tr[data-i]')].map(tr=>{const old=(TM.managers||[])[+tr.dataset.i]||{};
+    return {...old,name:tr.querySelector('.mg-n').value.trim(),user:tr.querySelector('.mg-u').value.trim(),password:tr.querySelector('.mg-p').value,
+      teams:[...tr.querySelectorAll('.mg-t:checked')].map(c=>c.value)}});
+}
+function tmRenderMgrs(){
+  const M=TM.managers||[];
+  $('tmMgrs').innerHTML=M.map((m,i)=>`<tr data-i="${i}"><td><input class="mg-n" value="${esc(m.name||'')}" placeholder="مثلًا مدير الرياض"></td>
+    <td><input class="mg-u" dir="ltr" autocomplete="off" value="${esc(m.user||'')}" placeholder="riyadh"></td>
+    <td><input class="mg-p" dir="ltr" type="password" autocomplete="new-password" value="${esc(m.password||'')}" placeholder="${m.hasPassword?'متسجّل ✓ (اكتب لتغييره)':'8 حروف على الأقل'}"></td>
+    <td><div class="mg-teams">${TM.teams.map(t=>`<label><input type="checkbox" class="mg-t" value="${esc(t.id)}" ${(m.teams||[]).includes(t.id)?'checked':''}> ${esc(t.name||'فريق جديد')}</label>`).join('')||'<span class="muted">اعمل فرق الأول</span>'}</div></td>
+    <td><button class="x" title="امسح المدير" onclick="tmDelMgr(${i})">✕</button></td></tr>`).join('')
+    ||'<tr><td colspan="5" class="muted">مفيش مديرين — دوس ＋ مدير جديد</td></tr>';
+}
+function tmAddMgr(){tmRead();tmReadMgrs();(TM.managers=TM.managers||[]).push({name:'',user:'',teams:[]});tmRender();const n=document.querySelectorAll('#tmMgrs .mg-n');n[n.length-1]?.focus();}
+function tmDelMgr(i){tmRead();tmReadMgrs();TM.managers.splice(i,1);tmRender();$('tmMsg').innerHTML='<span class="muted">دوس حفظ عشان المسح يتسجّل</span>';}
 function tmRead(){
   TM.teams=[...document.querySelectorAll('#tmTeams tr[data-id]')].map(tr=>{const old=TM.teams.find(t=>t.id===tr.dataset.id)||{};
     return {...old,id:tr.dataset.id,name:tr.querySelector('.tm-n').value.trim(),leaderExt:tr.querySelector('.tm-l').value,
       leaderUser:tr.querySelector('.tm-u').value.trim(),leaderPassword:tr.querySelector('.tm-p').value}});
 
 }
-function tmRender(){
+function tmRender(){ setTimeout(tmRenderMgrs,0);
   const cnt=id=>TM.reps.filter(r=>r.team===id).length;
   $('tmTeams').innerHTML=TM.teams.map(t=>`<tr data-id="${esc(t.id)}"><td><input class="tm-n" value="${esc(t.name)}" placeholder="مثلًا فريق الرياض" oninput="tmSync()"></td>
     <td><select class="tm-l"><option value="">— من غير —</option>${TM.reps.filter(r=>r.team===t.id).map(r=>`<option value="${esc(r.ext)}" ${r.ext===t.leaderExt?'selected':''}>${esc(r.name||r.ext)} (${esc(r.ext)})</option>`).join('')}</select></td>
@@ -1382,17 +1403,17 @@ function tmRender(){
     ||'<tr><td colspan="6" class="muted">مفيش فرق — دوس ＋ فريق جديد</td></tr>';
 
 }
-function tmSync(){tmRead()}
+function tmSync(){tmRead();tmReadMgrs();tmRenderMgrs()}
 function tmAddTeam(){tmRead(); TM.teams.push({id:'t'+Date.now().toString(36),name:'',leaderExt:''}); tmRender(); const ins=document.querySelectorAll('#tmTeams .tm-n'); ins[ins.length-1]?.focus();}
 function tmDel(id){tmRead(); const n=TM.reps.filter(r=>r.team===id).length;
   TM.teams=TM.teams.filter(t=>t.id!==id); TM.reps.forEach(r=>{if(r.team===id)r.team=''}); tmRender();
   $('tmMsg').innerHTML=`<span class="muted">${n?n+' تحويلة بقت من غير فريق — ':''}دوس حفظ عشان المسح يتسجّل</span>`;}
 async function tmSave(){
-  tmRead();
+  tmRead(); tmReadMgrs();
   if(TM.teams.some(t=>!t.name)){$('tmMsg').innerHTML='<span style="color:var(--red)">✖ اكتب اسم كل فريق</span>';return}
   const assign={}; TM.reps.forEach(r=>{if(r.team)assign[r.ext]=r.team});
-  try{const r=await fetch(API_BASE+'/teams',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({teams:TM.teams,assign})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
-    TM=j; TM.teams.forEach(t=>delete t.leaderPassword); tmRender(); $('tmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; await loadConfig(); try{fillSelects()}catch(e){} loadedRange=''; refresh(); try{loadEval&&$('p-eval').classList.contains('active')&&loadEval()}catch(e){}
+  try{const r=await fetch(API_BASE+'/teams',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({teams:TM.teams,assign,managers:TM.managers||[]})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    TM=j; TM.teams.forEach(t=>delete t.leaderPassword); (TM.managers||[]).forEach(m=>delete m.password); tmRender(); $('tmMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; await loadConfig(); try{fillSelects()}catch(e){} loadedRange=''; refresh(); try{loadEval&&$('p-eval').classList.contains('active')&&loadEval()}catch(e){}
   }catch(e){$('tmMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
 

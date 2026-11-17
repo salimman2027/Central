@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>NQ Phone</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;600;700&display=swap" rel="stylesheet">
-<script>(function(){var t;try{t=localStorage.getItem('nq_theme')}catch(e){}if(!t)t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();
+<script>(function(){var t;try{t=localStorage.getItem('nq_theme')}catch(e){}if(!t)t='light';document.documentElement.dataset.theme=t;})();
 function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=t;try{localStorage.setItem('nq_theme',t)}catch(e){}}</script>
 <style>
   :root {
@@ -23,6 +23,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .btn { padding:14px; border-radius:12px; font-size:16px; color:#fff; background:var(--pri); width:100%; }
   .btn.gray { background:#9aa5b1; } .btn.light { background:#eef2f5; color:var(--fg); }
   .lbl { display:block; font-size:13px; color:var(--muted); margin:12px 4px 6px; }
+  html[data-theme=light] .themebtn .i-dark, html:not([data-theme=light]) .themebtn .i-light { display:none; }
   .who-name { min-height:18px; font-size:14px; color:var(--accent,#19e6c1); text-align:center; font-weight:600; }
   .who-name small { color:var(--muted); font-weight:400; margin-inline-start:6px; }
   .who-name.big { font-size:17px; color:#fff; margin-top:4px; } .who-name.big small { color:rgba(255,255,255,.65); }
@@ -296,6 +297,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <div class="who"><b id="whoExt">—</b><small id="whoSt">متصل بالسنترال</small></div>
     <button class="viachip app-only" id="viaChip" onclick="NQVia.cycle()"></button>
     <span class="ver" id="appVer"></span>
+    <button class="iconbtn themebtn" onclick="toggleTheme()" aria-label="فاتح / غامق" title="فاتح / غامق"><span class="i-dark">🌙</span><span class="i-light">☀️</span></button>
     <button class="iconbtn" onclick="showSettings()" aria-label="الإعدادات">⚙</button>
   </div>
   <div class="display"><div id="dialNum" class="num"></div><div id="dialName" class="who-name"></div><div id="dialErr" class="err"></div>

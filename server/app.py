@@ -81,11 +81,19 @@ def leader_info(user: str) -> dict | None:
     if not u:
         return None
     tm = _teams_file()
-    t = next((t for t in tm.get("teams", []) if (t.get("leaderUser") or "").strip().lower() == u), None)
-    if not t:
-        return None
-    exts = {e for e, tid in (tm.get("assign") or {}).items() if tid == t["id"]}
-    return {"user": user, "team": t["id"], "teamName": t["name"], "exts": exts}
+    names = {t["id"]: t["name"] for t in tm.get("teams", [])}
+    m = next((m for m in tm.get("managers", []) if (m.get("user") or "").strip().lower() == u), None)
+    if m:   # مدير: مجموعة فرق
+        ids = [t for t in m.get("teams", []) if t in names]
+        role, label = "manager", m.get("name") or user
+    else:
+        t = next((t for t in tm.get("teams", []) if (t.get("leaderUser") or "").strip().lower() == u), None)
+        if not t:
+            return None
+        ids, role, label = [t["id"]], "leader", t["name"]
+    exts = {e for e, tid in (tm.get("assign") or {}).items() if tid in ids}
+    return {"user": user, "role": role, "teams": set(ids), "team": ids[0] if ids else "",
+            "teamName": label if role == "leader" else "، ".join(names[i] for i in ids), "name": label, "exts": exts}
 
 
 def in_scope(ext) -> bool:
@@ -230,7 +238,7 @@ async def leader_scope(request, call_next):
 def whoami(request: Request):
     sc = SCOPE.get()
     if sc:
-        return {"role": "leader", "user": sc["user"], "team": sc["team"], "teamName": sc["teamName"]}
+        return {"role": sc["role"], "user": sc["user"], "name": sc["name"], "team": sc["team"], "teams": sorted(sc["teams"]), "teamName": sc["teamName"]}
     return {"role": "admin", "user": _session_user(request.cookies.get(COOKIE, ""))}
 
 
@@ -300,8 +308,8 @@ def config_api():
     sc = SCOPE.get()
     if sc:
         c["reps"] = [r for r in c.get("reps", []) if str(r.get("id")) in sc["exts"]]
-        c["teams"] = [t for t in c.get("teams", []) if t["id"] == sc["team"]]
-        c["leader"] = {"team": sc["team"], "teamName": sc["teamName"], "user": sc["user"]}
+        c["teams"] = [t for t in c.get("teams", []) if t["id"] in sc["teams"]]
+        c["leader"] = {"role": sc["role"], "teamName": sc["teamName"], "user": sc["user"]}
     return c
 
 
@@ -985,7 +993,9 @@ def get_teams():
                        "leaderUser": raw.get(t["id"], {}).get("leaderUser", ""),
                        "hasPassword": raw.get(t["id"], {}).get("leaderUser", "") in users}
                       for t in c.get("teams", [])],
-            "reps": [{"ext": str(r["id"]), "name": r.get("name", ""), "team": r.get("team", "")} for r in c.get("reps", [])]}
+            "reps": [{"ext": str(r["id"]), "name": r.get("name", ""), "team": r.get("team", "")} for r in c.get("reps", [])],
+            "managers": [{"name": m.get("name", ""), "user": m.get("user", ""), "teams": m.get("teams", []),
+                          "hasPassword": m.get("user", "") in users} for m in _teams_file().get("managers", [])]}
 
 
 @app.put("/api/teams")
@@ -1023,18 +1033,61 @@ async def put_teams(request: Request):
             raise HTTPException(400, f"باسورد قائد \"{t['name']}\" لازم 8 حروف على الأقل")
         if not t["_pw"] and t["leaderUser"] not in _ht_users():
             raise HTTPException(400, f"اكتب باسورد لقائد \"{t['name']}\"")
+    # المديرين: نتأكد من كل حاجة قبل ما نكتب أي باسورد (يا كله يتحفظ يا ولا حاجة)
+    managers, mgr_pw, mgr_removed = _check_managers(b, seen, seen_u)
     for t in teams:
         if t["leaderUser"] and t["_pw"]:
-            _ht_set(t["leaderUser"], t.pop("_pw"))
+            _ht_set(t["leaderUser"], t["_pw"])
         t.pop("_pw", None)
-    for u in old_leaders - seen_u:          # قائد اتشال أو اتغيّر اسمه → يتقفل دخوله
+    for u, pw in mgr_pw:
+        _ht_set(u, pw)
+    keep = seen_u | {m["user"].lower() for m in managers}
+    for u in (old_leaders | mgr_removed) - keep:   # قائد أو مدير اتشال → يتقفل دخوله
         real = next((x for x in _ht_users() if x.lower() == u), None)
         if real:
             _ht_del(real)
     assign = {str(k): str(v) for k, v in (b.get("assign") or {}).items() if str(k).isdigit() and str(v) in seen}
     f = DATA_DIR / "teams.json"
-    f.write_text(json.dumps({"teams": teams, "assign": assign}, ensure_ascii=False, indent=1), encoding="utf-8")
+    f.write_text(json.dumps({"teams": teams, "assign": assign, "managers": managers}, ensure_ascii=False, indent=1), encoding="utf-8")
     return get_teams()
+
+
+def _check_managers(b: dict, team_ids: set, leader_users: set):
+    """المديرين: كل مدير ليه يوزر وباسورد ومجموعة فرق يشوفها. لو الطلب مفيهوش managers بيفضلوا زي ما هم.
+    بيرجّع (القايمة، الباسوردات اللي هتتكتب، اليوزرات اللي اتشالت) — من غير ما يكتب حاجة"""
+    old = _teams_file().get("managers", [])
+    if "managers" not in b:
+        return [{**m, "teams": [t for t in m.get("teams", []) if t in team_ids]} for m in old], [], set()
+    old_users = {(m.get("user") or "").lower(): m for m in old}
+    admins = {u.lower() for u in _ht_users()} - set(old_users) - {(t.get("leaderUser") or "").lower() for t in _teams_file().get("teams", [])}
+    out, seen, pws = [], set(), []
+    for m in b.get("managers") or []:
+        name = str(m.get("name") or "").strip()[:60]
+        user = str(m.get("user") or "").strip()
+        pw = str(m.get("password") or "")
+        if not (name or user):
+            continue
+        if not name or not user:
+            raise HTTPException(400, "كل مدير لازم يبقى ليه اسم ويوزر")
+        if not re.fullmatch(r"[\w.\-@]{3,40}", user):
+            raise HTTPException(400, f"يوزر المدير \"{name}\": من 3 لـ 40 حرف من غير مسافات")
+        k = user.lower()
+        if k in seen or k in leader_users:
+            raise HTTPException(400, f"اليوزر \"{user}\" مستخدم لحد تاني")
+        if k in admins:
+            raise HTTPException(400, f"\"{user}\" ده يوزر المدير العام — اختار اسم تاني")
+        if pw and len(pw) < 8:
+            raise HTTPException(400, f"باسورد المدير \"{name}\" لازم 8 حروف على الأقل")
+        if not pw and user not in _ht_users():
+            raise HTTPException(400, f"اكتب باسورد للمدير \"{name}\"")
+        ids = [t for t in (m.get("teams") or []) if t in team_ids]
+        if not ids:
+            raise HTTPException(400, f"اختار فريق واحد على الأقل للمدير \"{name}\"")
+        seen.add(k)
+        if pw:
+            pws.append((user, pw))
+        out.append({"name": name, "user": user, "teams": ids})
+    return out, pws, set(old_users) - seen
 
 
 def _ht_users() -> set:
