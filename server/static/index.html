@@ -823,17 +823,17 @@ function renderAll(){
   TEAMS.forEach(t=>{
     const reps=REPS.filter(r=>r.team===t.id&&(!$('fTeam').value||t.id===$('fTeam').value)&&(!$('fRep').value||r.id==$('fRep').value));
     if(!reps.length)return;
-    rows+=`<tr class="team"><td colspan="14">${t.name} — التيم ليدر: ${t.leader}</td></tr>`;
+    rows+=`<tr class="team"><td colspan="15">${t.name} — التيم ليدر: ${t.leader}</td></tr>`;
     reps.sort((a,b)=>stats(list.filter(c=>c.rep===b.id)).tot-stats(list.filter(c=>c.rep===a.id)).tot).forEach(r=>{
       const x=stats(list.filter(c=>c.rep===r.id));const pct=Math.min(100,Math.round(x.out/target*100));
-      rows+=`<tr><td>${r.name}${r.lead?' <span class="badge b-out">ليدر</span>':''}</td>
+      rows+=`<tr><td class="c"><b>${r.id}</b></td><td>${r.name}${r.lead?' <span class="badge b-out">ليدر</span>':''}</td>
       <td class="c">${x.tot}</td><td class="c">${x.out}</td><td class="c">${x.in}</td><td class="c">${x.ans}</td><td class="c">${x.no+x.rej}</td><td class="c">${x.miss}</td>
       <td class="c">${x.rate}%</td><td class="c">${fmt(x.talk)}</td><td class="c">${ms(x.aht)}</td><td class="c">${x.uniq.size}</td>
       <td class="c">${x.first?tm(x.first):'—'}</td><td class="c">${x.last?tm(x.last):'—'}</td>
       <td><div style="display:flex;align-items:center;gap:6px"><div class="bar ${pct<50?'low':pct<80?'mid':''}"><b style="width:${pct}%"></b></div><span class="muted">${pct}%</span></div></td></tr>`;
     });
   });
-  $('repTbl').innerHTML=`<tr><th>المندوب</th><th class="c">الإجمالي</th><th class="c">صادرة</th><th class="c">واردة</th><th class="c">تم الرد</th><th class="c">لم يرد/مرفوضة</th><th class="c">فائتة</th><th class="c">نسبة الرد</th><th class="c">مدة التحدث</th><th class="c">متوسط المكالمة</th><th class="c">عملاء مختلفين</th><th class="c">أول مكالمة</th><th class="c">آخر مكالمة</th><th>إنجاز التارجت</th></tr>${rows}
+  $('repTbl').innerHTML=`<tr><th class="c">الكود</th><th>المندوب</th><th class="c">الإجمالي</th><th class="c">صادرة</th><th class="c">واردة</th><th class="c">تم الرد</th><th class="c">لم يرد/مرفوضة</th><th class="c">فائتة</th><th class="c">نسبة الرد</th><th class="c">مدة التحدث</th><th class="c">متوسط المكالمة</th><th class="c">عملاء مختلفين</th><th class="c">أول مكالمة</th><th class="c">آخر مكالمة</th><th>إنجاز التارجت</th></tr>${rows}
   <tr class="tot"><td>الإجمالي</td><td class="c">${s.tot}</td><td class="c">${s.out}</td><td class="c">${s.in}</td><td class="c">${s.ans}</td><td class="c">${s.no+s.rej}</td><td class="c">${s.miss}</td><td class="c">${s.rate}%</td><td class="c">${fmt(s.talk)}</td><td class="c">${ms(s.aht)}</td><td class="c">${s.uniq.size}</td><td class="c">—</td><td class="c">—</td><td></td></tr>`;
 
   // hourly chart
@@ -868,7 +868,7 @@ function renderLog(){
   const pages=Math.max(1,Math.ceil(logList.length/PS));logPage=Math.min(logPage,pages);
   const rows=logList.slice((logPage-1)*PS,logPage*PS).map((c,i)=>{
     const r=repOf(c.rep);
-    return `<tr id="row-${esc(c.id)}"><td class="c">${(logPage-1)*PS+i+1}</td><td>${dmy(c.t)} ${c.t.toLocaleTimeString('en-GB')}</td><td>${r.name}</td><td>${teamOf(r.team).name}</td>
+    return `<tr id="row-${esc(c.id)}"><td class="c">${(logPage-1)*PS+i+1}</td><td>${dmy(c.t)} ${c.t.toLocaleTimeString('en-GB')}</td><td>${r.name} <span class="muted" style="font-size:12px">(${r.id})</span></td><td>${teamOf(r.team).name}</td>
     <td style="direction:ltr;text-align:right">${c.num}</td><td>${c.cust}</td>
     <td><span class="badge ${c.dir==='out'?'b-out':'b-in'}">${c.dir==='out'?'↗ صادرة':'↙ واردة'}</span>${c.sim?' <span class="badge b-no" title="من شريحة الموظف — اترفعت من التطبيق">📱 شريحة</span>':''}</td>
     <td><span class="badge ${stBadge(c.st)}">${c.st}</span></td><td class="c">${ms(c.ring)}</td><td class="c">${c.dur?ms(c.dur):'—'}</td>
@@ -904,11 +904,11 @@ function renderReport(){
   let i=0,rows='';
   REPS.filter(r=>!tmv||r.team===tmv).forEach(r=>{
     const s=stats(list.filter(c=>c.rep===r.id));i++;
-    rows+=`<tr><td>${i}</td><td class="r">${r.name}</td><td class="r">${teamOf(r.team).name}</td><td>${dash(s.tot)}</td><td>${dash(s.out)}</td><td>${dash(s.in)}</td><td>${dash(s.ans)}</td><td>${dash(s.no+s.rej)}</td><td>${dash(s.miss)}</td><td>${s.tot?s.rate+'%':'—'}</td><td>${s.talk?fmt(s.talk):'—'}</td><td>${s.aht?ms(s.aht):'—'}</td><td>${dash(s.rec)}</td></tr>`;
+    rows+=`<tr><td>${i}</td><td><b>${r.id}</b></td><td class="r">${r.name}</td><td class="r">${teamOf(r.team).name}</td><td>${dash(s.tot)}</td><td>${dash(s.out)}</td><td>${dash(s.in)}</td><td>${dash(s.ans)}</td><td>${dash(s.no+s.rej)}</td><td>${dash(s.miss)}</td><td>${s.tot?s.rate+'%':'—'}</td><td>${s.talk?fmt(s.talk):'—'}</td><td>${s.aht?ms(s.aht):'—'}</td><td>${dash(s.rec)}</td></tr>`;
   });
   const s=stats(list);
-  $('rTbl').innerHTML=`<tr><th>م</th><th class="r">المندوب</th><th class="r">الفريق</th><th>إجمالي المكالمات</th><th>صادرة</th><th>واردة</th><th>تم الرد</th><th>لم يرد / مرفوضة</th><th>فائتة</th><th>نسبة الرد</th><th>مدة التحدث</th><th>متوسط المكالمة</th><th>مكالمات مسجّلة</th></tr>${rows}
-  <tr class="tot"><td></td><td class="r"><b>الإجمالي</b></td><td></td><td><b>${num(s.tot)}</b></td><td><b>${s.out}</b></td><td><b>${s.in}</b></td><td><b>${s.ans}</b></td><td><b>${s.no+s.rej}</b></td><td><b>${s.miss}</b></td><td><b>${s.rate}%</b></td><td><b>${fmt(s.talk)}</b></td><td><b>${ms(s.aht)}</b></td><td><b>${s.rec}</b></td></tr>`;
+  $('rTbl').innerHTML=`<tr><th>م</th><th>الكود</th><th class="r">المندوب</th><th class="r">الفريق</th><th>إجمالي المكالمات</th><th>صادرة</th><th>واردة</th><th>تم الرد</th><th>لم يرد / مرفوضة</th><th>فائتة</th><th>نسبة الرد</th><th>مدة التحدث</th><th>متوسط المكالمة</th><th>مكالمات مسجّلة</th></tr>${rows}
+  <tr class="tot"><td></td><td></td><td class="r"><b>الإجمالي</b></td><td></td><td><b>${num(s.tot)}</b></td><td><b>${s.out}</b></td><td><b>${s.in}</b></td><td><b>${s.ans}</b></td><td><b>${s.no+s.rej}</b></td><td><b>${s.miss}</b></td><td><b>${s.rate}%</b></td><td><b>${fmt(s.talk)}</b></td><td><b>${ms(s.aht)}</b></td><td><b>${s.rec}</b></td></tr>`;
 }
 
 /* ============ AI ANALYSIS ============ */
