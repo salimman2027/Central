@@ -101,18 +101,129 @@ def unscoped(fn, *a):
         SCOPE.reset(tok)
 
 
+# ---------------- تسجيل الدخول للوحة (جلسة بكوكي — بدل نافذة المتصفح) ----------------
+import base64  # noqa: E402
+import hashlib  # noqa: E402
+import hmac as _hmac  # noqa: E402
+
+SESSION_HOURS = 10            # الجلسة بتخلص بعد 10 ساعات من آخر استخدام
+COOKIE = "nq_sess"
+LOGIN_FAILS: dict = {}
+
+
+def _session_key() -> bytes:
+    f = DATA_DIR / "session.key"
+    try:
+        k = f.read_bytes()
+        if len(k) >= 32:
+            return k
+    except OSError:
+        pass
+    k = os.urandom(48)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_bytes(k)
+    try:
+        f.chmod(0o600)
+    except OSError:
+        pass
+    return k
+
+
+def _sign(user: str) -> str:
+    body = base64.urlsafe_b64encode(json.dumps({"u": user, "x": int(time.time()) + SESSION_HOURS * 3600}).encode()).decode()
+    sig = _hmac.new(_session_key(), body.encode(), hashlib.sha256).hexdigest()
+    return body + "." + sig
+
+
+def _session_user(tok: str) -> str:
+    try:
+        body, sig = (tok or "").rsplit(".", 1)
+        if not _hmac.compare_digest(sig, _hmac.new(_session_key(), body.encode(), hashlib.sha256).hexdigest()):
+            return ""
+        d = json.loads(base64.urlsafe_b64decode(body.encode()))
+        return d["u"] if d.get("x", 0) > time.time() else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _check_htpasswd(user: str, pw: str) -> str:
+    """بيرجّع اسم اليوزر زي ما هو متسجّل لو الباسورد صح"""
+    try:
+        lines = HTPASSWD.read_text().splitlines()
+    except OSError:
+        return ""
+    for ln in lines:
+        if ":" not in ln:
+            continue
+        name, h = ln.split(":", 1)
+        if name.lower() != user.lower():
+            continue
+        h = h.strip()
+        try:
+            if h.startswith(("$2y$", "$2b$", "$2a$")):
+                import bcrypt
+                ok = bcrypt.checkpw(pw.encode(), ("$2b$" + h[4:]).encode())
+            elif h.startswith("{SHA}"):
+                ok = _hmac.compare_digest(h[5:], base64.b64encode(hashlib.sha1(pw.encode()).digest()).decode())
+            else:
+                ok = False
+        except Exception:  # noqa: BLE001
+            ok = False
+        return name if ok else ""
+    return ""
+
+
+OPEN_PATHS = ("/api/auth/", "/app/")
+
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request):
+    b = await request.json()
+    user, pw = str(b.get("username") or "").strip(), str(b.get("password") or "")
+    ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else "")
+    now = time.time()
+    LOGIN_FAILS[ip] = [t for t in LOGIN_FAILS.get(ip, []) if now - t < 900]
+    if len(LOGIN_FAILS[ip]) >= 8:
+        raise HTTPException(429, "محاولات كتير غلط — استنى ربع ساعة وجرّب تاني")
+    name = _check_htpasswd(user, pw) if user and pw else ""
+    if not name:
+        LOGIN_FAILS[ip].append(now)
+        raise HTTPException(401, "اسم المستخدم أو كلمة السر غلط")
+    LOGIN_FAILS.pop(ip, None)
+    resp = JSONResponse({"ok": True, "user": name})
+    resp.set_cookie(COOKIE, _sign(name), max_age=SESSION_HOURS * 3600, httponly=True, secure=True, samesite="lax", path="/")
+    return resp
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(COOKIE, path="/")
+    return resp
+
+
 @app.middleware("http")
 async def leader_scope(request, call_next):
-    info = leader_info(request.headers.get("x-nq-user", ""))
+    # المسار من غير /calls (السيرفر شغال بـ root-path)
+    path = request.scope.get("path", "")
+    rp = request.scope.get("root_path", "")
+    if rp and path.startswith(rp):
+        path = path[len(rp):] or "/"
+    user = _session_user(request.cookies.get(COOKIE, ""))
+    if path.startswith("/api/") and not path.startswith(OPEN_PATHS) and not user:
+        return JSONResponse({"detail": "سجّل دخول الأول", "login": True}, 401)
+    info = leader_info(user)
     if info:
-        path = request.url.path
         if LEADER_DENY.match(path) and (request.method != "GET" or path.startswith("/api/logins")):
             return JSONResponse({"detail": "الإعدادات للمدير بس"}, 403)
     tok = SCOPE.set(info)
     try:
-        return await call_next(request)
+        resp = await call_next(request)
     finally:
         SCOPE.reset(tok)
+    if user and path.startswith("/api/") and not path.startswith("/api/auth/"):
+        resp.set_cookie(COOKIE, _sign(user), max_age=SESSION_HOURS * 3600, httponly=True, secure=True, samesite="lax", path="/")
+    return resp
 
 
 @app.get("/api/whoami")
@@ -120,7 +231,7 @@ def whoami(request: Request):
     sc = SCOPE.get()
     if sc:
         return {"role": "leader", "user": sc["user"], "team": sc["team"], "teamName": sc["teamName"]}
-    return {"role": "admin", "user": request.headers.get("x-nq-user", "")}
+    return {"role": "admin", "user": _session_user(request.cookies.get(COOKIE, ""))}
 
 
 @app.middleware("http")

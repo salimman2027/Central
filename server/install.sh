@@ -178,13 +178,7 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   # لوحة المكالمات
   RedirectMatch ^/calls\$ /calls/
   <Location /calls/>
-    AuthType Basic
-    AuthName "NQ Calls"
-    AuthUserFile $CONF/htpasswd
-    Require valid-user
-    # اسم اللي داخل بيتبعت للسيرفر (قائد الفريق يشوف فريقه بس) — ومحدش يقدر يزوّره
-    RequestHeader unset X-NQ-User
-    RequestHeader set X-NQ-User "expr=%{REMOTE_USER}"
+    # الدخول بصفحة تسجيل دخول جوه اللوحة (جلسة + زرار خروج) — اليوزرات في $CONF/htpasswd
     ProxyPass        http://127.0.0.1:8090/
     ProxyPassReverse http://127.0.0.1:8090/
   </Location>

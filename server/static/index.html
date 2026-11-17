@@ -339,6 +339,16 @@ html[data-theme=light] .crm-f input,html[data-theme=light] .crm-sales input,html
 .cf-reason{background:rgba(255,170,60,.1);border-radius:10px;padding:8px 10px;font-size:13px;line-height:1.7}
 .cf-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.cf-tag{font-size:12px;border-radius:99px;padding:2px 9px;background:var(--glass);border:1px solid var(--border)}
 .set-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}.set-c{display:flex;flex-direction:column;gap:8px}.set-c h3{margin:0}.set-c p{margin:0;flex:1;line-height:1.7}.set-c .btn{align-self:flex-start}
+#loginWall{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:var(--bg,#060a14);padding:16px}
+#loginWall[hidden]{display:none}body.locked>*:not(#loginWall){visibility:hidden}
+.lw-box{width:min(380px,100%);background:#0f182b;border:1px solid var(--border);border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:6px;box-shadow:0 30px 80px -30px rgba(0,0,0,.5)}
+.lw-box h2{margin:6px 0 0}.lw-box label{font-size:13px;color:var(--grey);margin-top:8px}
+.lw-box input{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:11px 12px;font:inherit}
+html[data-theme=light] .lw-box input{background:#fff}html[data-theme=light] .lw-box{background:#fff}
+.lw-logo{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-weight:800;color:#04101a;background:linear-gradient(135deg,#19e6c1,#5aa8ff)}
+.lw-msg{color:var(--red);min-height:20px;font-size:13px;margin-top:6px}
+.logoutbtn{border:1px solid var(--border);background:transparent;color:var(--text);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.logoutbtn:hover{border-color:var(--red);color:var(--red)}
 .crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl .crm-line{width:130px;font-variant-numeric:tabular-nums}.crm-tbl .crm-u{width:130px}.crm-tbl .crm-p{width:170px}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .crm-n{font-size:11px;margin-top:3px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
 .crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
@@ -369,6 +379,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div><span class="live-dot"></span> مباشر — آخر تحديث <b id="lastUpd"></b></div>
   <div id="whoBox">👤 المدير: <b>NQS AI</b></div>
   <button class="themebtn" onclick="toggleTheme()" title="فاتح / غامق"><span class="i-dark">🌙</span><span class="i-light">☀️</span></button>
+  <button class="logoutbtn" onclick="nqLogout()" title="تسجيل خروج">🚪 خروج</button>
   <div class="ver">⚡ إصدار <b>__VER__</b></div>
 </div>
 
@@ -645,6 +656,30 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
 </div>
 
+<div id="loginWall" hidden>
+  <form class="lw-box" id="lwForm" autocomplete="on">
+    <div class="lw-logo">NQ</div>
+    <h2>Call Monitor</h2>
+    <p class="muted">سجّل دخول عشان تكمّل</p>
+    <label for="lwUser">اسم المستخدم</label>
+    <input id="lwUser" name="username" autocomplete="username" dir="ltr" required>
+    <label for="lwPass">كلمة السر</label>
+    <input id="lwPass" name="password" type="password" autocomplete="current-password" dir="ltr" required>
+    <button class="btn" type="submit" id="lwBtn" style="width:100%;margin-top:14px">دخول</button>
+    <div id="lwMsg" class="lw-msg"></div>
+  </form>
+</div>
+<script>
+/* أي طلب للسيرفر يرجع "سجّل دخول" → صفحة الدخول */
+(function(){const f=window.fetch;window.fetch=async(...a)=>{const r=await f(...a);
+  try{const u=String(a[0]&&a[0].url||a[0]);if(r.status===401&&!u.includes('auth/')&&(u.startsWith('api')||u.includes('/api/')))showLogin();}catch(e){}return r;};})();
+function showLogin(){const w=document.getElementById('loginWall');if(!w.hidden)return;w.hidden=false;document.body.classList.add('locked');setTimeout(()=>document.getElementById('lwUser').focus(),50);}
+document.getElementById('lwForm').addEventListener('submit',async e=>{e.preventDefault();const b=document.getElementById('lwBtn'),m=document.getElementById('lwMsg');b.disabled=true;m.textContent='';
+  try{const r=await fetch('api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:lwUser.value.trim(),password:lwPass.value})});
+    const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);location.reload();}
+  catch(err){m.textContent='✖ '+err.message;b.disabled=false;}});
+async function nqLogout(){try{await fetch('api/auth/logout',{method:'POST'});}catch(e){}location.reload();}
+</script>
 <script>
 /* ============ CONFIG ============
    API_BASE: عنوان الـ API في الـ CRM (.NET) — نفس الدومين لو الصفحة جوه الـ CRM.
