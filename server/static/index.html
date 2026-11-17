@@ -389,7 +389,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div class="muted" style="color:#cfe7e6">مكالمات المناديب من السنترال</div>
   <div class="sp"></div>
   <div><span class="live-dot"></span> مباشر — آخر تحديث <b id="lastUpd"></b></div>
-  <div id="whoBox">👤 المدير: <b>NQS AI</b></div>
+  <div id="whoBox">👤 <b id="whoName"></b></div>
   <button class="themebtn" onclick="toggleTheme()" title="فاتح / غامق"><span class="i-dark">🌙</span><span class="i-light">☀️</span></button>
   <button class="logoutbtn" onclick="pwOpen()" title="غيّر كلمة السر">🔑</button>
   <button class="logoutbtn" onclick="nqLogout()" title="تسجيل خروج">🚪 خروج</button>
@@ -476,7 +476,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
           <div class="ci">س.ت: 1010XXXXXX</div><div class="ci">الرقم الضريبي: 3XXXXXXXXXXXXX3</div></div>
       </div>
       <div class="ti"><div class="ar">تقرير عدد مكالمات المناديب</div><div class="en">Sales Reps Calls Report</div></div>
-      <div class="us"><div><span>المستخدم:</span> <b>NQS AI</b></div><div><span>تاريخ الطباعة:</span> <b id="rPrint"></b></div></div>
+      <div class="us"><div><span>المستخدم:</span> <b id="rpUser"></b></div><div><span>تاريخ الطباعة:</span> <b id="rPrint"></b></div></div>
     </div>
     <div class="rpar">
       <div><span>من تاريخ:</span> <b id="rpFrom"></b></div>
@@ -1400,6 +1400,7 @@ setTimeout(owLoad,1500);
 /* ===================== مين داخل: المدير ولا قائد فريق ===================== */
 let ROLE='admin';
 (async()=>{try{const w=await (await fetch(API_BASE+'/whoami',{cache:'no-store'})).json(); ROLE=w.role;
+  $('rpUser').textContent=w.name||w.user||''; if(w.role==='admin')$('whoBox').innerHTML=`👤 المدير: <b>${esc(w.user||'')}</b>`;
   if(w.role==='leader'||w.role==='manager'){
     $('whoBox').innerHTML=w.role==='manager'?`🧑‍💼 مدير: <b>${esc(w.name)}</b> <span class="muted">(${esc(w.teamName)})</span>`:`👥 قائد: <b>${esc(w.teamName)}</b> <span class="muted">(${esc(w.user)})</span>`;
     document.querySelectorAll('.tab[data-p="set"]').forEach(t=>t.remove());
