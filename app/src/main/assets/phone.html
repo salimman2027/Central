@@ -134,6 +134,19 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .mini.call { background:var(--ok); color:#fff; } .mini.x { background:#eef2f5; color:var(--muted); font-size:14px; }
   .pill { font-size:12px; padding:3px 9px; border-radius:12px; background:#e8f6ee; color:var(--ok); white-space:nowrap; }
   .pill.wait { background:#fff4e2; color:#c47a12; }
+  .pf-h { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+  .pf-h b { font-size:15px; } .pf-sub { color:var(--muted); font-size:12px; }
+  .pf-li { display:flex; gap:8px; align-items:flex-start; padding:7px 0; border-top:1px solid var(--line); font-size:14px; line-height:1.6; }
+  .pf-li:first-of-type { border-top:0; } .pf-li .n { margin-inline-start:auto; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .pf-bar { height:7px; border-radius:9px; background:rgba(127,140,160,.18); overflow:hidden; margin-top:3px; }
+  .pf-bar i { display:block; height:100%; border-radius:9px; background:var(--grad,linear-gradient(90deg,#19e6c1,#5aa8ff)); }
+  .pf-bar i.lo { background:linear-gradient(90deg,#ff6b6b,#ffb86b); }
+  .pill { display:inline-block; font-size:12px; border-radius:99px; padding:1px 9px; border:1px solid var(--line); white-space:nowrap; }
+  .pill.ok { background:rgba(25,230,193,.14); border-color:rgba(25,230,193,.4); } .pill.bad { background:rgba(255,107,107,.14); border-color:rgba(255,107,107,.4); }
+  .pill.wait { background:rgba(255,184,107,.16); border-color:rgba(255,184,107,.45); }
+  .pf-call { padding:9px 0; border-top:1px solid var(--line); } .pf-call:first-of-type { border-top:0; }
+  .pf-call .t { display:flex; gap:8px; align-items:center; font-size:14px; } .pf-call .s { color:var(--muted); font-size:13px; line-height:1.6; margin-top:3px; }
+  .score { font-weight:700; border-radius:9px; padding:1px 7px; font-size:13px; } .score.hi { background:rgba(25,230,193,.18); } .score.mid { background:rgba(255,184,107,.2); } .score.lo { background:rgba(255,107,107,.2); }
   .kgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
   .kgrid .card { margin:0; }
   .kgrid .v { font-size:26px; font-weight:700; margin-top:4px; }
@@ -334,15 +347,15 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     </select>
   </div>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px">
-    <b>☎️ حساب السنترال</b>
-    <div style="color:var(--muted);font-size:12px">اختياري — من غيره التطبيق بيتصل من شريحتك بس</div>
-    <label class="lbl">رقم التحويلة</label>
-    <input id="ext" class="ltr" inputmode="numeric" placeholder="مثلًا 106">
-    <label class="lbl">باسورد التحويلة</label>
-    <input id="pwd" class="ltr" type="password" placeholder="••••••••">
+    <b>☎️ حسابك</b>
+    <div style="color:var(--muted);font-size:12px">ادخل باسم المستخدم وكلمة السر اللي المدير ادّاهوملك</div>
+    <label class="lbl">اسم المستخدم</label>
+    <input id="ext" class="ltr" autocomplete="username" autocapitalize="off" placeholder="مثلًا hadeer">
+    <label class="lbl">كلمة السر</label>
+    <input id="pwd" class="ltr" type="password" autocomplete="current-password" placeholder="••••••••">
     <div class="row2">
-      <button class="btn light" onclick="NQPhone.logout()">فصل</button>
-      <button class="btn" onclick="NQPhone.login(ext.value.trim(), pwd.value)">حفظ واتصال</button>
+      <button class="btn light" onclick="NQPhone.logout()">خروج</button>
+      <button class="btn" onclick="NQAuth.signIn(ext.value.trim(), pwd.value)">دخول</button>
     </div>
     <div id="err" class="err"></div>
     <details id="srvBox" style="margin-top:8px;border:0;padding:0">
@@ -453,6 +466,15 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 </section>
 
 
+<section id="scrPerf" class="screen page">
+  <div style="display:flex;align-items:center;gap:10px"><h2 style="flex:1;margin:0">🧠 أدائي</h2>
+    <button class="iconbtn" onclick="NQPerf.load()" aria-label="تحديث">⟳</button></div>
+  <div class="seg" id="pSeg" style="margin-top:12px">
+    <button data-p="day">اليوم</button><button data-p="week" class="sel">الأسبوع</button><button data-p="month">الشهر</button><button data-p="quarter">3 شهور</button>
+  </div>
+  <div id="pBody"><div class="card muted">بيحمّل…</div></div>
+</section>
+
 <section id="scrFiles" class="screen page">
   <div style="display:flex;align-items:center;gap:10px"><h2 style="flex:1;margin:0">📁 الملفات</h2>
     <button class="iconbtn" onclick="NQFiles.refresh(true)" aria-label="تحديث">⟳</button></div>
@@ -545,6 +567,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   <button data-s="scrLog" onclick="NQLog.open()"><b>🕘</b>السجل</button>
   <button data-s="scrTargets" onclick="NQTargets.open()"><b>🎯</b>التارجت</button>
   <button data-s="scrStats" onclick="NQStats.open()"><b>📊</b>إنجازي</button>
+  <button data-s="scrPerf" onclick="NQPerf.open()"><b>🧠</b>أدائي<i class="tbadge" id="pBadge"></i></button>
   <button data-s="scrFiles" onclick="NQFiles.open()"><b>📁</b>الملفات<i class="tbadge" id="tBadge"></i></button>
 </nav>
 
@@ -750,6 +773,28 @@ function pbxNumber(n) {
   return n;
 }
 
+/* ---------- الدخول باسم المستخدم (السيرفر بيرجّع بيانات التحويلة) ---------- */
+const NQAuth = {
+  async signIn(user, pass) {
+    if (!user || !pass) return NQPhone._err("اكتب اسم المستخدم وكلمة السر");
+    NQPhone._err("جاري الدخول…");
+    let r, j = {};
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+      r = await fetch(CONFIG.api + "/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password: pass }), signal: ctl.signal });
+      clearTimeout(t); j = await r.json().catch(() => ({}));
+    } catch (e) { r = null; }
+    if (r && r.ok && j.ext) {
+      store.set("nq_user", { username: j.username || user, name: j.name || "" });
+      $("pwd").value = ""; $("pwd").placeholder = "متسجّل ✓"; $("ext").value = j.username || user;
+      return NQPhone.login(String(j.ext), j.password);
+    }
+    // سيرفر قديم أو مش متاح: الدخول برقم التحويلة وباسوردها زي الأول
+    if ((!r || r.status === 404) && /^\d{2,6}$/.test(user)) return NQPhone.login(user, pass);
+    NQPhone._err(!r ? "مش قادر يوصل للسيرفر — اتأكد من النت" : (j.detail || "فشل الدخول"));
+  }
+};
+
 /* ---------- phone ---------- */
 const NQPhone = {
   ua: null, session: null, muted: false, speaker: false, callStart: null, direction: null, peer: null, timer: null, ext: null, pass: null,
@@ -776,7 +821,7 @@ const NQPhone = {
       this._reg(false);
       const bad = e.cause === "Authentication Error" || e.cause === "Rejected";
       if (bad) { store.del("nq_login"); if (this.ua) { try { this.ua.stop(); } catch (x) {} } this.ua = null; this.ext = null; this._reg(false); }
-      this._err(bad ? "رقم التحويلة أو الباسورد غلط" : "فشل الدخول: " + e.cause);
+      this._err(bad ? "الحساب اتغيّر — ادخل تاني باسم المستخدم وكلمة السر" : "فشل الدخول: " + e.cause);
     });
     ua.on("disconnected", () => { if (ua !== this.ua) return; this._reg(false); this._err("مش قادر يوصل للسنترال — بيحاول تاني…"); });
     ua.on("newRTCSession", e => this._onSession(e));
@@ -784,7 +829,7 @@ const NQPhone = {
   },
 
   logout() {
-    store.del("nq_login");
+    store.del("nq_login"); store.del("nq_user");
     if (this.ua) { try { this.ua.stop(); } catch (e) {} } this.ua = null;
     this.ext = null; $("pwd").value = "";
     this._err("اتفصل من السنترال — الاتصال هيبقى من شريحتك"); this._reg(false);
@@ -1156,6 +1201,62 @@ if (!IS_APP) {
   window.addEventListener("beforeunload", e => { if (NQPhone.ua) { e.preventDefault(); e.returnValue = ""; } });
   try { if (window.Notification && Notification.permission === "default") document.addEventListener("click", () => Notification.requestPermission(), { once: true }); } catch (e) {}
 }
+
+/* ---------- أدائي: تحليل مكالماتي، أخطائي، الدروس، طلبات النقل، المواعيد ---------- */
+const NQPerf = {
+  period: "week", data: null,
+  open() { show("scrPerf"); this.load(); },
+  async load() {
+    const c = NQOwner.creds();
+    if (!c) { $("pBody").innerHTML = `<div class="card">ادخل بحسابك الأول من ⚙ الإعدادات عشان تشوف أداءك.</div>`; return; }
+    document.querySelectorAll("#pSeg button").forEach(b => b.classList.toggle("sel", b.dataset.p === this.period));
+    $("pBody").innerHTML = `<div class="card muted">بيحمّل…</div>`;
+    try {
+      const r = await fetch(CONFIG.api + "/me", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, period: this.period }) });
+      const j = await r.json(); if (!r.ok) throw new Error(j.detail || r.status);
+      this.data = j; this.render(j);
+    } catch (e) { $("pBody").innerHTML = `<div class="card">✖ ${esc(e.message === "Failed to fetch" ? "مش قادر يوصل للسيرفر" : e.message)}</div>`; }
+  },
+  when(s) { return s ? new Date(s).toLocaleString("ar-EG", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""; },
+  sc(v) { return v == null ? "" : `<span class="score ${v >= 75 ? "hi" : v >= 55 ? "mid" : "lo"}">${v}</span>`; },
+  list(items, empty, fmt) { return items && items.length ? items.map(fmt).join("") : `<div class="pf-sub">${empty}</div>`; },
+  render(j) {
+    const S = j.summary, mm = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    const st = { pending: ["⏳ مستني", "wait"], approved: ["✔ اتوافق", "ok"], rejected: ["✖ اترفض", "bad"], confirmed: ["✔ اتأكد", "ok"] };
+    const pend = j.conflicts.filter(x => x.status === "pending").length + j.appointments.filter(x => x.status === "pending").length;
+    $("pBadge").textContent = pend || "";
+    const parts = [];
+    parts.push(`<div class="kgrid">
+      <div class="card"><div class="l">مكالماتي</div><div class="v">${S.calls}</div></div>
+      <div class="card"><div class="l">اترد عليها</div><div class="v">${S.answered}</div></div>
+      <div class="card"><div class="l">اتحلّلت</div><div class="v">${S.analyzed}</div></div>
+      <div class="card"><div class="l">متوسط تقييمي</div><div class="v">${S.avgScore == null ? "—" : S.avgScore + "<small style='font-size:14px'>/100</small>"}</div></div></div>`);
+    if (j.focus) parts.push(`<div class="card" style="border-color:rgba(25,230,193,.45)"><div class="pf-h"><b>🎯 أهم حاجة تشتغل عليها</b><span class="pf-sub">من المدير</span></div>
+      <div style="line-height:1.8">${esc(j.focus.focus)}</div>${j.focus.training ? `<div class="pf-sub" style="margin-top:6px">🏋️ تمرين: ${esc(j.focus.training)}</div>` : ""}</div>`);
+    if (j.criteria.length) parts.push(`<div class="card"><div class="pf-h"><b>📏 تقييمي في كل بند</b><span class="pf-sub">من 10</span></div>
+      ${j.criteria.map(c => `<div style="margin:7px 0"><div style="display:flex;font-size:13px"><span>${esc(c.name)}</span><b style="margin-inline-start:auto">${c.avg}</b></div>
+        <div class="pf-bar"><i class="${c.avg < 5 ? "lo" : ""}" style="width:${Math.max(4, c.avg * 10)}%"></i></div></div>`).join("")}</div>`);
+    parts.push(`<div class="card"><div class="pf-h"><b>💪 نقاط قوتي</b></div>${this.list(j.strengths, "لسه مفيش تحليل كفاية", x => `<div class="pf-li">✔ <span>${esc(x.text)}</span><span class="n">${x.count}×</span></div>`)}</div>`);
+    parts.push(`<div class="card"><div class="pf-h"><b>⚠️ نقاط ضعفي</b></div>${this.list(j.weaknesses, "مفيش — كمّل كده 👏", x => `<div class="pf-li">• <span>${esc(x.text)}</span><span class="n">${x.count}×</span></div>`)}</div>`);
+    parts.push(`<div class="card"><div class="pf-h"><b>❌ أخطائي في المكالمات</b></div>${this.list(j.issues, "مفيش أخطاء متسجّلة في الفترة دي", x => `<div class="pf-li"><span><b>${esc(x.type)}</b>${x.examples.length ? `<div class="pf-sub">${x.examples.map(esc).join(" · ")}</div>` : ""}</span><span class="n">${x.count} مرة</span></div>`)}</div>`);
+    parts.push(`<div class="card"><div class="pf-h"><b>📚 الدروس اللي لازم أتعلمها</b></div>
+      ${this.list(j.tips.concat(j.lessons.map(l => ({ ...l, lesson: 1 }))), "لسه مفيش دروس — حلّل مكالماتك الأول", x => `<div class="pf-li">${x.lesson ? "💡" : "🎓"} <span>${esc(x.text)}<div class="pf-sub">${esc(this.when(x.time))} · <span dir="ltr">${esc(x.number)}</span></div></span></div>`)}</div>`);
+    parts.push(`<div class="card"><div class="pf-h"><b>🗂 مكالماتي المتحلّلة</b><span class="pf-sub">${j.calls.length}</span></div>
+      ${this.list(j.calls, "مفيش مكالمات متحلّلة في الفترة دي", c => `<div class="pf-call"><div class="t">${this.sc(c.score)} <b>${esc(c.customer || c.number)}</b>${c.outcome ? `<span class="pill">${esc(c.outcome)}</span>` : ""}<span class="pf-sub" style="margin-inline-start:auto">${esc(this.when(c.time))}</span></div>
+        ${c.summary ? `<div class="s">${esc(c.summary)}</div>` : ""}${c.tip ? `<div class="s">🎓 ${esc(c.tip)}</div>` : ""}</div>`)}</div>`);
+    parts.push(`<div class="card"><div class="pf-h"><b>⚔️ طلبات نقل العملاء</b></div>
+      ${this.list(j.conflicts, "مفيش طلبات", x => { const [t, k] = st[x.status] || [x.status, ""]; return `<div class="pf-li"><span>${x.side === "mine" ? "📤 طلبت عميل" : "📥 طلب عميلك"} <b>${esc(x.customer || x.number)}</b>
+        <div class="pf-sub">${x.side === "mine" ? "صاحبه" : "اللي طلبه"}: ${esc(x.other || x.otherExt)} · ${esc(this.when(x.decidedAt || x.requestedAt))}</div>
+        ${x.status !== "pending" ? `<div class="pf-sub">${x.status === "approved" ? (x.side === "mine" ? "العميل بقى بتاعك ✔" : "العميل اتنقل لزميلك") : (x.side === "mine" ? "العميل فضل مع زميلك" : "العميل فضل معاك ✔")}</div>` : ""}</span><span class="pill ${k}">${t}</span></div>`; })}</div>`);
+    parts.push(`<div class="card"><div class="pf-h"><b>📅 طلبات المواعيد</b></div>
+      ${this.list(j.appointments, "مفيش طلبات مواعيد", a => { const [t, k] = st[a.status] || [a.status, ""];
+        const crm = a.status === "confirmed" ? (a.crm ? (a.crm.ok ? `<span class="pill ok">اتسجّل في الـ CRM</span>` : a.crm.pending ? `<span class="pill wait">بيتبعت للـ CRM</span>` : `<span class="pill bad">مش متسجّل في الـ CRM</span>`) : "") : "";
+        return `<div class="pf-li"><span><b>${esc(a.customer || a.number)}</b> ${a.kind ? `<span class="pf-sub">${esc(a.kind)}</span>` : ""}
+        <div class="pf-sub">${a.date ? esc(a.date) + (a.time ? " · " + esc(a.time) : "") : "من غير ميعاد محدد"} ${crm}</div></span><span class="pill ${k}">${t}</span></div>`; })}</div>`);
+    $("pBody").innerHTML = parts.join("");
+  }
+};
+document.querySelectorAll("#pSeg button").forEach(b => b.onclick = () => { NQPerf.period = b.dataset.p; NQPerf.load(); });
 
 /* ---------- call history (on this phone) ---------- */
 const digits9 = n => String(n || "").replace(/\D/g, "").slice(-9);
@@ -1585,7 +1686,8 @@ NQSettings.apply(NQSettings.load());
 (function boot() {
   const s = store.get("nq_login", null);
   show("scrDial"); NQVia.chip();
-  if (s && s.ext && s.password) { $("ext").value = s.ext; $("pwd").value = s.password; NQPhone.ext = s.ext; NQPhone._reg(false); NQPhone.login(s.ext, s.password); }
+  if (s && s.ext && s.password) { const u = store.get("nq_user", null); $("ext").value = (u && u.username) || s.ext; $("pwd").value = ""; $("pwd").placeholder = "متسجّل ✓";
+    NQPhone.ext = s.ext; NQPhone._reg(false); NQPhone.login(s.ext, s.password); }
   else NQPhone._reg(false);
   if (IS_APP && Android.setCreds && s && s.ext) Android.setCreds(NQSettings.load().host, s.ext, s.password);
   if ($("simUp")) { $("simUp").checked = !!NQPrefs.get("simUpload", false); if ($("simUp").checked) NQSim.cfg(true); NQSim.refresh(); }

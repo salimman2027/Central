@@ -29,7 +29,7 @@ apt-get install -y -qq python3-venv python3-pip apache2-utils >/dev/null
 
 echo "== app files"
 mkdir -p "$APP" "$CONF" "$DATA/analysis"
-cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
+cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
 sed -i "s/__VER__/$VER/" "$APP/static/index.html"
@@ -122,7 +122,7 @@ WEB_USER=$(ps -o user= -C apache2 2>/dev/null | grep -v '^root' | head -1 || tru
 WEB_GROUP=$( [[ -n "$WEB_USER" ]] && id -gn "$WEB_USER" 2>/dev/null || true )
 WEB_GROUP=${WEB_GROUP:-www-data}
 echo "   apache group: $WEB_GROUP"
-chown root:"$WEB_GROUP" "$CONF/htpasswd"; chmod 640 "$CONF/htpasswd"
+chown root:"$WEB_GROUP" "$CONF/htpasswd"; chmod 660 "$CONF/htpasswd"   # السيرفر بيضيف يوزرات قادة الفرق
 
 CERT=/etc/asterisk/keys/integration/certificate.pem
 KEY=/etc/asterisk/keys/integration/webserver.key
@@ -162,6 +162,10 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/owner http://127.0.0.1:8090/app/owner
   ProxyPass        /calls-app/lookup http://127.0.0.1:8090/app/lookup
   ProxyPassReverse /calls-app/lookup http://127.0.0.1:8090/app/lookup
+  ProxyPass        /calls-app/login http://127.0.0.1:8090/app/login
+  ProxyPassReverse /calls-app/login http://127.0.0.1:8090/app/login
+  ProxyPass        /calls-app/me http://127.0.0.1:8090/app/me
+  ProxyPassReverse /calls-app/me http://127.0.0.1:8090/app/me
 
   # التليفون من اللابتوب
   RedirectMatch ^/phone\$ /phone/
@@ -178,6 +182,9 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
     AuthName "NQ Calls"
     AuthUserFile $CONF/htpasswd
     Require valid-user
+    # اسم اللي داخل بيتبعت للسيرفر (قائد الفريق يشوف فريقه بس) — ومحدش يقدر يزوّره
+    RequestHeader unset X-NQ-User
+    RequestHeader set X-NQ-User "expr=%{REMOTE_USER}"
     ProxyPass        http://127.0.0.1:8090/
     ProxyPassReverse http://127.0.0.1:8090/
   </Location>

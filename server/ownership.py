@@ -233,6 +233,9 @@ def list_conflicts(status: str = ""):
     items = _jload("conflicts.json", [])
     names = CTX["names"]()
     out = []
+    sc = CTX.get("scope", lambda: None)()
+    if sc:   # قائد الفريق: الطلبات اللي فيها حد من فريقه بس
+        items = [x for x in items if str(x["firstExt"]) in sc["exts"] or str(x["newExt"]) in sc["exts"]]
     for x in items:
         if status and x["status"] != status:
             continue
@@ -262,6 +265,9 @@ def _decide(cid: str, approve: bool, note: str):
             raise HTTPException(404, "الطلب مش موجود")
         if it["status"] != "pending":
             raise HTTPException(400, "الطلب ده اتقرر قبل كده")
+        sc = CTX.get("scope", lambda: None)()
+        if sc and not (str(it["firstExt"]) in sc["exts"] and str(it["newExt"]) in sc["exts"]):
+            raise HTTPException(403, "الطلب ده بين فريقين — القرار للمدير")
         winner = str(it["newExt"]) if approve else str(it["firstExt"])
         owners = _jload("owners.json", {})
         owners[it["numberKey"]] = {"ext": winner, "since": _now(), "by": "approved" if approve else "kept",

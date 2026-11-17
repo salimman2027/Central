@@ -53,9 +53,74 @@ app.include_router(files_api.router)
 app.include_router(APPT.router)
 import ownership as OWN  # noqa: E402
 app.include_router(OWN.router)
+import rep_portal as PORTAL  # noqa: E402
+app.include_router(PORTAL.router)
 # التطبيق (WebView) بيكلّم /app/* من origin تاني
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
                    allow_headers=["*"], expose_headers=["Content-Disposition"])
+
+
+# ---------------- قادة الفرق: كل قائد يشوف فريقه بس ----------------
+import contextvars  # noqa: E402
+
+SCOPE = contextvars.ContextVar("nq_scope", default=None)   # None = المدير (يشوف كله)
+HTPASSWD = Path(os.environ.get("NQ_CONF", "/etc/nq-calls")) / "htpasswd"
+LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings)")
+
+
+def _teams_file() -> dict:
+    try:
+        return json.loads((DATA_DIR / "teams.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {"teams": [], "assign": {}}
+
+
+def leader_info(user: str) -> dict | None:
+    """لو اليوزر ده قائد فريق: اسم الفريق والتحويلات اللي فيه"""
+    u = (user or "").strip().lower()
+    if not u:
+        return None
+    tm = _teams_file()
+    t = next((t for t in tm.get("teams", []) if (t.get("leaderUser") or "").strip().lower() == u), None)
+    if not t:
+        return None
+    exts = {e for e, tid in (tm.get("assign") or {}).items() if tid == t["id"]}
+    return {"user": user, "team": t["id"], "teamName": t["name"], "exts": exts}
+
+
+def in_scope(ext) -> bool:
+    sc = SCOPE.get()
+    return sc is None or str(ext) in sc["exts"]
+
+
+def unscoped(fn, *a):
+    tok = SCOPE.set(None)
+    try:
+        return fn(*a)
+    finally:
+        SCOPE.reset(tok)
+
+
+@app.middleware("http")
+async def leader_scope(request, call_next):
+    info = leader_info(request.headers.get("x-nq-user", ""))
+    if info:
+        path = request.url.path
+        if LEADER_DENY.match(path) and (request.method != "GET" or path.startswith("/api/logins")):
+            return JSONResponse({"detail": "الإعدادات للمدير بس"}, 403)
+    tok = SCOPE.set(info)
+    try:
+        return await call_next(request)
+    finally:
+        SCOPE.reset(tok)
+
+
+@app.get("/api/whoami")
+def whoami(request: Request):
+    sc = SCOPE.get()
+    if sc:
+        return {"role": "leader", "user": sc["user"], "team": sc["team"], "teamName": sc["teamName"]}
+    return {"role": "admin", "user": request.headers.get("x-nq-user", "")}
 
 
 @app.middleware("http")
@@ -119,6 +184,16 @@ def stem(recordingfile: str) -> str:
 
 # ---------------- config ----------------
 @app.get("/api/config")
+def config_api():
+    c = config()
+    sc = SCOPE.get()
+    if sc:
+        c["reps"] = [r for r in c.get("reps", []) if str(r.get("id")) in sc["exts"]]
+        c["teams"] = [t for t in c.get("teams", []) if t["id"] == sc["team"]]
+        c["leader"] = {"team": sc["team"], "teamName": sc["teamName"], "user": sc["user"]}
+    return c
+
+
 def config():
     f = CONF_DIR / "reps.json"
     reps = json.loads(f.read_text()) if f.exists() else {"teams": [], "reps": []}
@@ -165,7 +240,7 @@ def config():
     return reps
 
 
-APPT.CTX.update(dir=DATA_DIR,
+APPT.CTX.update(scope=lambda: SCOPE.get(), dir=DATA_DIR,
                 names=lambda: {str(r.get("id")): r.get("name", "") for r in config().get("reps", [])},
                 notes=lambda a, b: load_notes(a, b))
 files_api.CTX.update(dir=DATA_DIR / "files", auth=lambda e, p: check_ext_password(e, p),
@@ -411,6 +486,8 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
             supNote=(SUP_NOTES.get(r["id"]) or {}).get("text", ""),
         ))
     out.sort(key=lambda c: c["time"], reverse=True)
+    if SCOPE.get():
+        out = [c for c in out if in_scope(c["ext"])]
     return out
 
 
@@ -790,8 +867,12 @@ def db_error(_, exc):
 @app.get("/api/teams")
 def get_teams():
     c = config()
+    users = _ht_users()
+    raw = {t["id"]: t for t in _teams_file().get("teams", [])}
     return {"teams": [{"id": t["id"], "name": t["name"],
-                       "leaderExt": next((str(r["id"]) for r in c["reps"] if r.get("team") == t["id"] and r.get("lead")), "")}
+                       "leaderExt": next((str(r["id"]) for r in c["reps"] if r.get("team") == t["id"] and r.get("lead")), ""),
+                       "leaderUser": raw.get(t["id"], {}).get("leaderUser", ""),
+                       "hasPassword": raw.get(t["id"], {}).get("leaderUser", "") in users}
                       for t in c.get("teams", [])],
             "reps": [{"ext": str(r["id"]), "name": r.get("name", ""), "team": r.get("team", "")} for r in c.get("reps", [])]}
 
@@ -808,11 +889,59 @@ async def put_teams(request: Request):
         while tid in seen:
             tid += "_"
         seen.add(tid)
-        teams.append({"id": tid, "name": name, "leaderExt": str(t.get("leaderExt") or "")})
+        old = next((o for o in _teams_file().get("teams", []) if o.get("id") == tid), {})
+        lu = str(t["leaderUser"]).strip() if "leaderUser" in t else old.get("leaderUser", "")
+        if lu and not re.fullmatch(r"[\w.\-@]{3,40}", lu):
+            raise HTTPException(400, f"يوزر قائد \"{name}\": من 3 لـ 40 حرف من غير مسافات")
+        teams.append({"id": tid, "name": name, "leaderExt": str(t.get("leaderExt") or ""), "leaderUser": lu,
+                      "_pw": str(t.get("leaderPassword") or "")})
+    # اليوزرات: مايتكرروش، ومايبقوش يوزر المدير
+    old_leaders = {(o.get("leaderUser") or "").lower() for o in _teams_file().get("teams", []) if o.get("leaderUser")}
+    admins = {u.lower() for u in _ht_users()} - old_leaders
+    seen_u = set()
+    for t in teams:
+        k = t["leaderUser"].lower()
+        if not k:
+            continue
+        if k in seen_u:
+            raise HTTPException(400, f"يوزر القائد \"{t['leaderUser']}\" متكرر")
+        if k in admins:
+            raise HTTPException(400, f"\"{t['leaderUser']}\" ده يوزر المدير — اختار اسم تاني")
+        seen_u.add(k)
+        if len(t["_pw"]) and len(t["_pw"]) < 8:
+            raise HTTPException(400, f"باسورد قائد \"{t['name']}\" لازم 8 حروف على الأقل")
+        if not t["_pw"] and t["leaderUser"] not in _ht_users():
+            raise HTTPException(400, f"اكتب باسورد لقائد \"{t['name']}\"")
+    for t in teams:
+        if t["leaderUser"] and t["_pw"]:
+            _ht_set(t["leaderUser"], t.pop("_pw"))
+        t.pop("_pw", None)
+    for u in old_leaders - seen_u:          # قائد اتشال أو اتغيّر اسمه → يتقفل دخوله
+        real = next((x for x in _ht_users() if x.lower() == u), None)
+        if real:
+            _ht_del(real)
     assign = {str(k): str(v) for k, v in (b.get("assign") or {}).items() if str(k).isdigit() and str(v) in seen}
     f = DATA_DIR / "teams.json"
     f.write_text(json.dumps({"teams": teams, "assign": assign}, ensure_ascii=False, indent=1), encoding="utf-8")
     return get_teams()
+
+
+def _ht_users() -> set:
+    try:
+        return {ln.split(":", 1)[0] for ln in HTPASSWD.read_text().splitlines() if ":" in ln}
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def _ht_set(user: str, pw: str):
+    r = subprocess.run(["htpasswd", "-iB", str(HTPASSWD), user], input=pw, text=True, capture_output=True)
+    if r.returncode != 0:
+        raise HTTPException(500, "مقدرتش أحفظ باسورد القائد: " + (r.stderr or "").strip()[:200]
+                            + " — شغّل sudo nq-update الأول")
+
+
+def _ht_del(user: str):
+    subprocess.run(["htpasswd", "-D", str(HTPASSWD), user], capture_output=True, text=True)
 
 
 def _analysis_of(rec: str):
@@ -824,7 +953,20 @@ def _analysis_of(rec: str):
         return None
 
 
-OWN.CTX.update(dir=DATA_DIR, calls=lambda a, b: calls(a, b), auth=lambda e, p: check_ext_password(e, p),
+OWN.CTX.update(dir=DATA_DIR, calls=lambda a, b: unscoped(calls, a, b), scope=lambda: SCOPE.get(), auth=lambda e, p: check_ext_password(e, p),
                names=lambda: {str(r.get("id")): r.get("name", "") for r in config().get("reps", [])},
                analysis=_analysis_of,
                crm=lambda n: APPT.match_client(n) if APPT.crm_configured() else None)
+
+
+def _sip_secret(ext: str) -> str:
+    rows = query("SELECT data FROM sip WHERE id=%s AND keyword='secret' LIMIT 1", (ext,),
+                 database=os.environ.get("NQ_PBX_DB", "asterisk"))
+    return str(rows[0]["data"]) if rows else ""
+
+
+PORTAL.CTX.update(dir=DATA_DIR, sip_secret=_sip_secret, check_ext=lambda e, p: check_ext_password(e, p),
+                  names=lambda: {str(r.get("id")): r.get("name", "") for r in config().get("reps", [])},
+                  analysis=lambda a, b: analysis(a, b), calls=lambda a, b: calls(a, b),
+                  rubric=lambda: RUBRIC.load(), lessons=lambda: _lessons_cache(),
+                  appointments=lambda: APPT._load(), conflicts=lambda: OWN._jload("conflicts.json", []), tz=TZ)

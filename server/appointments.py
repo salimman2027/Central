@@ -138,13 +138,23 @@ def process_async(note: dict):
 
 
 # ------------------------------------------------------------------ API (اللوحة)
+def _visible(x: dict) -> bool:
+    sc = CTX.get("scope", lambda: None)()
+    return sc is None or str(x.get("ext")) in sc["exts"]
+
+
+def _guard(aid: str):
+    it = next((x for x in _load() if x["id"] == aid), None)
+    if it and not _visible(it):
+        raise HTTPException(403, "الطلب ده مش لفريقك")
+
+
 @router.get("/api/appointments")
 def list_appointments(status: str = ""):
-    items = _load()
-    if status:
-        items = [x for x in items if x["status"] == status]
+    mine = [x for x in _load() if _visible(x)]
+    items = [x for x in mine if x["status"] == status] if status else list(mine)
     items.sort(key=lambda x: (x["status"] != "pending", x.get("date") or "9999", x.get("time") or ""))
-    counts = {s: sum(1 for x in _load() if x["status"] == s) for s in ("pending", "confirmed", "rejected")}
+    counts = {s: sum(1 for x in mine if x["status"] == s) for s in ("pending", "confirmed", "rejected")}
     return {"items": items, "counts": counts, "crm": crm_configured()}
 
 
@@ -161,6 +171,7 @@ def _update(aid: str, fn):
 
 @router.post("/api/appointments/{aid}/confirm")
 async def confirm(aid: str, request: Request):
+    _guard(aid)
     body = {}
     try:
         body = await request.json()
@@ -185,6 +196,7 @@ async def confirm(aid: str, request: Request):
 
 @router.post("/api/appointments/{aid}/client")
 async def set_client(aid: str, request: Request):
+    _guard(aid)
     b = await request.json()
     cid = str(b.get("clientId") or "").strip()
     if not cid.isdigit():
@@ -195,16 +207,19 @@ async def set_client(aid: str, request: Request):
 
 @router.post("/api/appointments/{aid}/reject")
 def reject(aid: str):
+    _guard(aid)
     return _update(aid, lambda it: it.update(status="rejected", rejectedAt=dt.datetime.now(dt.timezone.utc).isoformat()))
 
 
 @router.post("/api/appointments/{aid}/reopen")
 def reopen(aid: str):
+    _guard(aid)
     return _update(aid, lambda it: it.update(status="pending"))
 
 
 @router.post("/api/appointments/{aid}/crm")
 async def retry_crm(aid: str, request: Request):
+    _guard(aid)
     body = {}
     try:
         body = await request.json()
