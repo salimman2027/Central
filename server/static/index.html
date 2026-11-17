@@ -360,6 +360,7 @@ html[data-theme=light] .pw-form input{background:#fff}
 #teamModal .crm-tbl select,#teamModal .crm-tbl .tm-l{min-width:0;width:150px}
 #teamModal .tm-n{width:140px}#teamModal .tm-u,#teamModal .mg-u{width:110px}#teamModal .tm-p,#teamModal .mg-p{width:150px}#teamModal .mg-n{width:140px}
 #teamModal .crm-tbl td,#teamModal .crm-tbl th{padding:6px 5px}.tm-ext{font-size:12px;border:1px solid var(--border);border-radius:99px;padding:1px 8px;white-space:nowrap}
+#crmSales tr.crm-new td{background:rgba(25,230,193,.10)}
 .crm-tw{overflow-x:auto;margin:8px 0}.crm-tbl{width:100%;border-collapse:collapse}.crm-tbl th{font-size:12px;color:var(--grey);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}.crm-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}.crm-tbl .crm-e{width:80px;text-align:center}.crm-tbl .crm-line{width:130px;font-variant-numeric:tabular-nums}.crm-tbl .crm-u{width:130px}.crm-tbl .crm-p{width:170px}.crm-tbl select,.crm-tbl .crm-v{width:100%;min-width:170px}.crm-tbl .crm-n{font-size:11px;margin-top:3px}.crm-tbl .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:16px}
 .crm-tbl input,.crm-tbl select{background:rgba(4,8,18,.5);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}html[data-theme=light] .crm-tbl input,html[data-theme=light] .crm-tbl select{background:#fff}.crm-tbl select.auto{border-color:var(--green)}
 .crm-sales{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
@@ -549,7 +550,8 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <h4 style="margin:10px 0 4px">الفرق</h4>
     <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم الفريق</th><th>التحويلات</th><th>قائد الفريق</th><th>يوزر القائد للوحة</th><th>باسورد القائد</th><th></th></tr></thead><tbody id="tmTeams"></tbody></table></div>
     <div id="tmFree" class="muted" style="font-size:12px;margin:6px 0"></div>
-    <button class="btn o sm" onclick="tmAddTeam()">＋ فريق جديد</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn o sm" onclick="tmAddTeam()">＋ فريق جديد</button>
+      <button class="btn o sm" onclick="$('teamModal').classList.remove('show');openEmployees(true)">＋ تحويلة جديدة</button></div>
     <h4 style="margin:18px 0 4px">المديرين (فوق قادة الفرق)</h4>
     <div class="muted" style="font-size:12px">كل مدير بيدخل اللوحة بيوزره ويشوف الفرق اللي تحددها له بس — من غير الإعدادات.</div>
     <div class="crm-tw"><table class="crm-tbl"><thead><tr><th>اسم المدير</th><th>اليوزر</th><th>الباسورد</th><th>الفرق اللي يشوفها</th><th></th></tr></thead><tbody id="tmMgrs"></tbody></table></div>
@@ -595,6 +597,9 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="card set-c"><h3>⭐ بنود التقييم والأوزان</h3>
       <p class="muted">البنود اللي الـ AI بيقيّم بيها كل مكالمة، ووزن كل بند من 100. التعديل بيتطبّق على المكالمات اللي هتتحلّل بعد كده.</p>
       <button class="btn" onclick="openRubric()">تعديل البنود</button></div>
+    <div class="card set-c"><h3>👤 الموظفين والتحويلات</h3>
+      <p class="muted">ضيف تحويلة جديدة، واكتب لكل موظف: رقم الخط، اسمه في الـ CRM، فريقه، واسم الدخول وكلمة السر بتوع التطبيق.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="openEmployees(true)">＋ تحويلة جديدة</button><button class="btn o" onclick="openEmployees(false)">كل الموظفين</button></div></div>
     <div class="card set-c"><h3>🔗 الربط مع الـ CRM</h3>
       <p class="muted">رابط حجز الاجتماعات، مدة الاجتماع، الشروط، والموظف في الـ CRM قصاد كل تحويلة.</p>
       <button class="btn" onclick="openCrm()">إعدادات الـ CRM والموظفين</button></div>
@@ -1553,6 +1558,13 @@ async function taxSave(){
 }
 
 let AP_DUR=60;
+async function openEmployees(addNew){
+  await openCrm();
+  const tw=document.querySelector('#crmModal .crm-tw'); if(!tw)return;
+  if(addNew){crmAddRow(); const rows=document.querySelectorAll('#crmSales tr'); const last=rows[rows.length-1];
+    last?.scrollIntoView({block:'center',behavior:'smooth'}); last?.classList.add('crm-new'); setTimeout(()=>last?.querySelector('.crm-e')?.focus(),300);}
+  else tw.scrollIntoView({block:'start',behavior:'smooth'});
+}
 async function openCrm(){
   const c=await (await fetch(API_BASE+'/crm/settings',{cache:'no-store'})).json();
   $('crmUrl').value=c.url||''; $('crmHdr').value=c.authHeader||'Authorization'; $('crmPfx').value=c.authPrefix??'Bearer ';
