@@ -55,6 +55,8 @@ import ownership as OWN  # noqa: E402
 app.include_router(OWN.router)
 import rep_portal as PORTAL  # noqa: E402
 app.include_router(PORTAL.router)
+import training as TRAIN  # noqa: E402
+app.include_router(TRAIN.router)
 # التطبيق (WebView) بيكلّم /app/* من origin تاني
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
                    allow_headers=["*"], expose_headers=["Content-Disposition"])
@@ -1183,3 +1185,8 @@ PORTAL.CTX.update(dir=DATA_DIR, sip_secret=_sip_secret, check_ext=lambda e, p: c
                   analysis=lambda a, b: analysis(a, b), calls=lambda a, b: calls(a, b),
                   rubric=lambda: RUBRIC.load(), lessons=lambda: _lessons_cache(),
                   appointments=lambda: APPT._load(), conflicts=lambda: OWN._jload("conflicts.json", []), tz=TZ)
+PORTAL.CTX.update(training=lambda ext: TRAIN.latest_for_ext(ext))
+TRAIN.CTX.update(dir=DATA_DIR, tz=TZ, scope=lambda: SCOPE.get(), rubric=lambda: RUBRIC.load(), teams=_teams_file,
+                 names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},
+                 analysis=lambda a, b: unscoped(analysis, a, b), calls=lambda a, b: unscoped(calls, a, b),
+                 insights=lambda a, b: unscoped(insights, a, b))

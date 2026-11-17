@@ -318,6 +318,22 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 .ib-ex{margin:6px 0 10px;padding-inline-start:18px;font-size:13px;display:grid;gap:5px}.ib-l{color:var(--teal);font-size:12.5px;margin-top:2px}
 .ls-over{display:grid;gap:8px}.ls-i{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--teal-l)}
 .ls-i b{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#19e6c1,#5aa8ff);color:#04101a;display:grid;place-items:center;flex-shrink:0;font-size:13px}
+.tr-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.tr-nav a{text-decoration:none;color:var(--text);border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:14px;cursor:pointer}
+.tr-nav a.on{background:var(--teal,#19e6c1);color:#04201b;border-color:transparent;font-weight:700}
+.tr-sec{margin-bottom:18px}.tr-sec>h3{display:flex;align-items:center;gap:8px}
+.tr-plan{border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;background:var(--glass)}
+.tr-plan>summary{cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap;list-style:none;font-size:15px}
+.tr-plan>summary::-webkit-details-marker{display:none}.tr-plan>summary:after{content:"▾";margin-inline-start:auto;opacity:.6}
+.tr-plan[open]>summary:after{content:"▴"}
+.tr-tag{font-size:12px;border-radius:99px;padding:2px 10px;background:rgba(25,230,193,.12);color:var(--teal,#0f9e86)}
+.tr-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:10px}
+.tr-box{border:1px solid var(--border);border-radius:12px;padding:10px 12px}.tr-box h5{margin:0 0 6px;font-size:14px}
+.tr-box ul{margin:0;padding-inline-start:18px;line-height:1.8;font-size:14px}
+.tr-weeks{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
+.tr-wk{border:1px solid var(--border);border-radius:12px;padding:10px 12px;border-top:3px solid var(--teal,#19e6c1)}
+.tr-wk b{display:block;margin-bottom:4px}.tr-wk ul{margin:0;padding-inline-start:18px;font-size:13.5px;line-height:1.75}
+.tr-kpi{width:100%;border-collapse:collapse;font-size:13.5px}.tr-kpi td,.tr-kpi th{padding:5px 6px;border-bottom:1px solid var(--border);text-align:start}
+.tr-kpi .now{color:var(--orange,#e8a33c)}.tr-kpi .tg{color:var(--teal,#0f9e86);font-weight:700}
 .ls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
 .ls-card{border:1px solid var(--border);border-radius:14px;padding:12px;background:var(--glass);display:grid;gap:5px;font-size:14px}
 .ls-script{background:rgba(25,230,193,.08);border-inline-start:3px solid var(--teal);padding:8px 10px;border-radius:8px;font-size:13.5px}
@@ -410,6 +426,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div class="tab" data-p="ai">🤖 تحليل المكالمات</div>
   <div class="tab" data-p="eval">⭐ تقييم الموظفين</div>
   <div class="tab" data-p="ins">🧭 المشاكل وأسباب عدم الشراء</div>
+  <div class="tab" data-p="train">🏋️ خطط التدريب</div>
   <div class="tab" data-p="appt">📅 طلبات تحديد موعد <span class="tcount" id="apCount"></span></div>
   <div class="tab" data-p="cf">⚔️ التعارضات <span class="tcount" id="cfCount"></span></div>
   <div class="tab" data-p="set">⚙️ الإعدادات</div>
@@ -514,6 +531,20 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
   <div class="card" style="margin-top:14px"><h3>👤 مشاكل كل موظف في المكالمات <span class="muted" style="font-weight:400;font-size:13px">— عدد المرات</span></h3><div class="tw"><table id="iReps"></table></div></div>
   <div class="card" style="margin-top:14px"><h3>🎓 الدروس المستفادة<span class="sp"></span><button class="btn" id="iLessBtn" onclick="makeLessons()">🧠 استخرج الدروس المستفادة</button></h3><div id="iLessons"></div></div>
+</div>
+
+<div class="page" id="p-train">
+  <div class="filters">
+    <div class="f"><label>من تاريخ</label><input type="date" id="trFrom"></div>
+    <div class="f"><label>إلى تاريخ</label><input type="date" id="trTo"></div>
+    <button class="btn" onclick="loadTrain()">عرض</button>
+    <button class="btn" id="trMake" onclick="makeTrain()">🧠 اعمل خطط التدريب</button>
+    <span class="sp" style="flex:1"></span>
+    <button class="btn" onclick="trPrint('trBody')">🖨️ طباعة الكل</button>
+  </div>
+  <div class="note" id="trNote" style="margin-bottom:12px"></div>
+  <div class="tr-nav" id="trNav"></div>
+  <div id="trBody"></div>
 </div>
 
 <div class="modal" id="taxModal" onclick="if(event.target===this)this.classList.remove('show')">
@@ -1048,6 +1079,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.p==='cf')loadCf();
   if(t.dataset.p==='set')owLoad();
   if(t.dataset.p==='ins')loadIns();
+  if(t.dataset.p==='train')loadTrain();
 });
 loadConfig().then(()=>{fillSelects();refresh();initAI();}).catch(e=>{$('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل الإعدادات</div><div class="s">${e.message}</div></div>`});
 // تحديث تلقائي كل دقيقة
@@ -1563,6 +1595,71 @@ async function makeLessons(){
     if(!r.ok)throw new Error(j.detail||r.status); renderLessons(j);}
   catch(e){$('iLessons').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
   b.disabled=false; b.textContent='🧠 استخرج الدروس المستفادة';
+}
+/* ===================== خطط التدريب: الشركة / الفرق / الموظفين / القادة ===================== */
+let TRP=null, TR_SEC='company', TR_POLL=null;
+const trList=a=>(a||[]).length?`<ul>${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<div class="muted">—</div>';
+const trKpi=k=>(k||[]).length?`<table class="tr-kpi"><tr><th>المؤشر</th><th>دلوقتي</th><th>المستهدف</th></tr>${k.map(x=>`<tr><td>${esc(x.name)}</td><td class="now">${esc(x.now)}</td><td class="tg">${esc(x.target)}</td></tr>`).join('')}</table>`:'<div class="muted">—</div>';
+const trWeeks=w=>(w||[]).length?`<div class="tr-weeks">${w.map(x=>`<div class="tr-wk"><b>الأسبوع ${x.week}: ${esc(x.theme||x.goal||'')}</b>${trList(x.activities)}</div>`).join('')}</div>`:'';
+const trBox=(t,html)=>`<div class="tr-box"><h5>${t}</h5>${html}</div>`;
+function trPlan(id,title,tags,sum,inner,open){
+  return `<details class="tr-plan" id="${id}"${open?' open':''}><summary><b>${title}</b>${tags.filter(Boolean).map(t=>`<span class="tr-tag">${esc(t)}</span>`).join('')}
+    <button class="btn" style="padding:3px 10px;font-size:12px" onclick="event.preventDefault();trPrint('${id}')">🖨️</button></summary>
+    ${sum?`<div style="margin-top:8px;line-height:1.8">${esc(sum)}</div>`:''}${inner}</details>`;
+}
+function renderTrain(){
+  const P=TRP;
+  if(!P){$('trNav').innerHTML='';$('trBody').innerHTML=`<div class="card muted">مفيش خطة لسه. ${ROLE==='admin'?'اختار الفترة ودوس "🧠 اعمل خطط التدريب" — الـ AI هيقرا تقييمات كل الموظفين وأخطاءهم وأسباب الرفض ويعمل خطة 4 أسابيع لكل مستوى.':'المدير لسه ماعملش خطة.'}</div>`;return}
+  const secs=[['company','🏢 الشركة ككل',1],['teams','👥 الفرق',(P.teams||[]).length],['reps','👤 الموظفين',(P.reps||[]).length],['leaders','🧑‍💼 قادة الفرق والمديرين',(P.leaders||[]).length]].filter(x=>x[2]);
+  if(!secs.some(x=>x[0]===TR_SEC))TR_SEC=secs[0][0];
+  $('trNav').innerHTML=secs.map(([k,l,n])=>`<a class="${k===TR_SEC?'on':''}" onclick="TR_SEC='${k}';renderTrain()">${l}${k!=='company'?` (${n})`:''}</a>`).join('');
+  let h='';
+  if(TR_SEC==='company'){const c=P.company||{};
+    h=trPlan('trp-co','🏢 خطة تدريب الشركة ككل',[P.period],c.summary,
+      `<div class="tr-g">${trBox('⚠️ الفجوات المشتركة',trList(c.gaps))}${trBox('📈 مؤشرات القياس',trKpi(c.kpis))}</div>
+       ${(c.workshops||[]).length?`<h4 style="margin:14px 0 4px">🎤 الورش الجماعية</h4><div class="tr-g">${c.workshops.map(w=>trBox(`${esc(w.title)} <span class="muted" style="font-weight:400">· ${esc(w.audience)} · ${esc(w.duration)}</span>`,`<div style="font-size:14px;line-height:1.8">${esc(w.content)}</div>`)).join('')}</div>`:''}
+       <h4 style="margin:14px 0 4px">🗓️ خطة الـ 4 أسابيع</h4>${trWeeks(c.weeks)}`,true);}
+  if(TR_SEC==='teams')h=(P.teams||[]).map((t,i)=>trPlan('trp-t'+i,'👥 '+esc(t.name),[t.leader&&('القائد: '+t.leader),t.avg!=null&&('متوسط التقييم '+t.avg)],t.summary,
+      `<div class="tr-g">${trBox('⚠️ فجوات الفريق',trList(t.gaps))}${trBox('📈 مؤشرات القياس',trKpi(t.kpis))}</div>
+       <h4 style="margin:14px 0 4px">🗓️ خطة الـ 4 أسابيع</h4>${trWeeks(t.weeks)}
+       ${(t.role_plays||[]).length?`<h4 style="margin:14px 0 4px">🎭 تمثيل أدوار</h4><div class="tr-g">${t.role_plays.map(r=>trBox('🎬 '+esc(r.scenario),`<div style="font-size:14px">🎯 ${esc(r.goal)}</div>`)).join('')}</div>`:''}`,(P.teams||[]).length===1)).join('');
+  if(TR_SEC==='reps')h=(P.reps||[]).slice().sort((a,b)=>(a.avg??999)-(b.avg??999)).map((r,i)=>trPlan('trp-r'+i,`👤 ${esc(r.name)} <span class="muted" style="font-weight:400">(${esc(r.ext)})</span>`,[r.team,r.level,r.avg!=null&&('التقييم '+r.avg)],r.summary,
+      `<div class="tr-g">${trBox('💪 نقاط القوة',trList(r.strengths))}${trBox('⚠️ يشتغل على',trList(r.gaps))}${trBox('📈 مؤشرات القياس',trKpi(r.kpis))}</div>
+       <h4 style="margin:14px 0 4px">🗓️ خطة الـ 4 أسابيع</h4>${trWeeks(r.weeks)}
+       ${(r.scripts||[]).length?`<h4 style="margin:14px 0 4px">💬 جمل جاهزة</h4>${r.scripts.map(x=>`<div class="ls-script" style="margin-bottom:6px">"${esc(x)}"</div>`).join('')}`:''}`,false)).join('');
+  if(TR_SEC==='leaders')h=(P.leaders||[]).map((x,i)=>trPlan('trp-l'+i,`🧑‍💼 ${esc(x.name)}`,[x.role==='manager'?'مدير':'قائد فريق',(x.teams||[]).join('، ')],x.summary,
+      `<div class="tr-g">${trBox('🧠 مهارات يطوّرها',trList(x.skills))}${trBox('🔁 الروتين الثابت',(x.routines||[]).length?`<ul>${x.routines.map(r=>`<li><b>${esc(r.when)}:</b> ${esc(r.what)}</li>`).join('')}</ul>`:'—')}${trBox('📈 مؤشرات نجاحه كقائد',trKpi(x.kpis))}</div>
+       <h4 style="margin:14px 0 4px">🗓️ خطة الـ 4 أسابيع</h4>${trWeeks(x.weeks)}`,(P.leaders||[]).length===1)).join('');
+  $('trBody').innerHTML=`<div class="tr-sec">${h}</div>`;
+}
+function trNote(job){
+  const P=TRP; let n=P?`📅 الخطة دي من مكالمات ${esc(P.period||'')} (${P.calls} مكالمة متحلّلة) · اتعملت ${new Date(P.generated).toLocaleString('ar-EG')}`:'';
+  if(job&&job.running)n=`⏳ بنعمل الخطط دلوقتي… ممكن تاخد 2–4 دقايق، الصفحة هتتحدث لوحدها.`+(n?'<br>'+n:'');
+  else if(job&&job.error&&job.mine)n=`<span style="color:var(--red)">✖ ${esc(job.error)}</span>`+(n?'<br>'+n:'');
+  $('trNote').innerHTML=n; $('trNote').style.display=n?'':'none';
+  $('trMake').style.display=ROLE==='admin'?'':'none'; $('trMake').disabled=!!(job&&job.running);
+}
+async function loadTrain(){
+  if(!$('trFrom').value){const t=new Date(),f=new Date(t.getTime()-29*864e5);$('trFrom').value=isoD(f);$('trTo').value=isoD(t);}
+  try{const j=await (await fetch(`${API_BASE}/training?from=${$('trFrom').value}&to=${$('trTo').value}`,{cache:'no-store'})).json();
+    TRP=j.plan; renderTrain(); trNote(j.job);
+    clearTimeout(TR_POLL); if(j.job&&j.job.running)TR_POLL=setTimeout(()=>{if($('p-train').classList.contains('active'))loadTrain()},6000);
+  }catch(e){$('trBody').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
+}
+async function makeTrain(){
+  $('trMake').disabled=true;
+  try{const r=await fetch(`${API_BASE}/training?from=${$('trFrom').value}&to=${$('trTo').value}`,{method:'POST'});const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||r.status); trNote(j.job); TR_POLL=setTimeout(loadTrain,6000);}
+  catch(e){$('trNote').style.display='';$('trNote').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`;$('trMake').disabled=false}
+}
+function trPrint(id){
+  const el=$(id); if(!el)return; el.querySelectorAll?.('details').forEach(d=>d.open=true); if(el.tagName==='DETAILS')el.open=true;
+  const w=window.open('','_blank'); if(!w)return;
+  const css=[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n');
+  w.document.write(`<!doctype html><html dir="rtl" lang="ar" data-theme="light"><head><meta charset="utf-8"><title>خطة التدريب — NQ</title><style>${css}
+    body{background:#fff!important;padding:20px}body:before{display:none}.btn{display:none!important}.tr-plan{break-inside:auto;background:#fff}.tr-wk,.tr-box{break-inside:avoid}</style></head>
+    <body><h2>🏋️ خطة التدريب — NQ</h2><div class="muted" style="margin-bottom:12px">${TRP?esc(TRP.period||''):''}</div>${el.outerHTML}</body></html>`);
+  w.document.close(); setTimeout(()=>w.print(),400);
 }
 let TAX_DEF=null, TAX_LBL={};
 async function openTax(){

@@ -1256,6 +1256,17 @@ const NQPerf = {
       <div class="card"><div class="l">متوسط تقييمي</div><div class="v">${S.avgScore == null ? "—" : S.avgScore + "<small style='font-size:14px'>/100</small>"}</div></div></div>`);
     if (j.focus) parts.push(`<div class="card" style="border-color:rgba(25,230,193,.45)"><div class="pf-h"><b>🎯 أهم حاجة تشتغل عليها</b><span class="pf-sub">من المدير</span></div>
       <div style="line-height:1.8">${esc(j.focus.focus)}</div>${j.focus.training ? `<div class="pf-sub" style="margin-top:6px">🏋️ تمرين: ${esc(j.focus.training)}</div>` : ""}</div>`);
+    const T = j.training;
+    if (T) {
+      const ul = a => (a || []).length ? `<ul style="margin:4px 0;padding-inline-start:18px;line-height:1.8">${a.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
+      parts.push(`<div class="card" style="border-color:rgba(25,230,193,.45)"><div class="pf-h"><b>🏋️ خطة تدريبي (4 أسابيع)</b><span class="pf-sub">${esc(T.level || "")}</span></div>
+        ${T.summary ? `<div style="line-height:1.8">${esc(T.summary)}</div>` : ""}
+        ${(T.gaps || []).length ? `<div class="pf-sub" style="margin-top:8px">⚠️ أشتغل على:</div>${ul(T.gaps)}` : ""}
+        ${(T.kpis || []).map(k => `<div style="display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:3px 0;border-bottom:1px solid var(--line,rgba(127,127,127,.2))"><span>${esc(k.name)}</span><span><span style="color:#e8a33c">${esc(k.now)}</span> ← <b style="color:var(--pri)">${esc(k.target)}</b></span></div>`).join("")}
+        ${(T.weeks || []).map(w => `<details style="margin-top:8px"><summary style="cursor:pointer"><b>الأسبوع ${w.week}:</b> ${esc(w.theme || "")}</summary>${ul(w.activities)}</details>`).join("")}
+        ${(T.scripts || []).map(x => `<div style="margin-top:8px;padding:8px 10px;border-inline-start:3px solid var(--pri);background:rgba(25,230,193,.08);border-radius:8px;font-size:13.5px">💬 "${esc(x)}"</div>`).join("")}
+      </div>`);
+    }
     if (j.criteria.length) parts.push(`<div class="card"><div class="pf-h"><b>📏 تقييمي في كل بند</b><span class="pf-sub">من 10</span></div>
       ${j.criteria.map(c => `<div style="margin:7px 0"><div style="display:flex;font-size:13px"><span>${esc(c.name)}</span><b style="margin-inline-start:auto">${c.avg}</b></div>
         <div class="pf-bar"><i class="${c.avg < 5 ? "lo" : ""}" style="width:${Math.max(4, c.avg * 10)}%"></i></div></div>`).join("")}</div>`);

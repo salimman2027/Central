@@ -26,7 +26,7 @@ FAILS: dict = {}
 # بتتظبط من app.py
 CTX = {"dir": Path("/var/lib/nq-calls"), "sip_secret": None, "check_ext": None, "names": lambda: {},
        "analysis": None, "calls": None, "rubric": lambda: [], "lessons": lambda: {},
-       "appointments": lambda: [], "conflicts": lambda: [], "tz": dt.timezone(dt.timedelta(hours=3))}
+       "appointments": lambda: [], "conflicts": lambda: [], "training": lambda e: None, "tz": dt.timezone(dt.timedelta(hours=3))}
 
 
 # ------------------------------------------------------------------ تخزين الحسابات
@@ -274,7 +274,7 @@ async def me(request: Request):
                      for k, v in crit.items() if v],
         "strengths": _top(strengths), "weaknesses": _top(weaknesses),
         "issues": [{"type": t, "count": n, "examples": issue_ex.get(t, [])[:3]} for t, n in issues.most_common(8)],
-        "tips": tips[:6], "lessons": lessons[:6], "focus": focus,
+        "tips": tips[:6], "lessons": lessons[:6], "focus": focus, "training": CTX["training"](ext),
         "calls": recent[:25],
         "conflicts": conf[:30],
         "appointments": appts[:40],
