@@ -584,7 +584,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
    - وضع CRM: بعد المكالمة يسأل عن العميل والملخص ويبعته للسيرفر
    =================================================================== */
 const $ = id => document.getElementById(id);
-const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrFiles"];
+const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrPerf", "scrFiles"];
 function show(id) {
   // خانة كتابة في شاشة اتقفلت (زي الباسورد) متفضلش واخدة الكيبورد
   const ae = document.activeElement; if (ae && ae !== document.body && ae.closest && !ae.closest("#" + id)) try { ae.blur(); } catch (e) {}
