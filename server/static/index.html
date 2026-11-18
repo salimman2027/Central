@@ -301,6 +301,24 @@ html[data-theme=light] .rub-row input,html[data-theme=light] .rub-row textarea{b
 .ai-meta{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:13px;color:var(--grey)}.ai-meta b{color:var(--text)}
 @media(max-width:700px){.cr-n{width:120px;font-size:12px}.cr-d{padding:4px 0 8px}}
 
+.tabs{overflow:visible;flex-wrap:wrap;position:relative;z-index:40}
+.tgrp{position:relative}
+.tgbtn{border:1px solid var(--border);border-radius:999px;padding:9px 18px;color:var(--grey);background:var(--glass);backdrop-filter:blur(10px);font-weight:600;white-space:nowrap;cursor:pointer;transition:.25s;user-select:none}
+.tgbtn:hover{color:var(--text);border-color:rgba(25,230,193,.4)}
+.tgrp.active .tgbtn{color:#04101a;background:linear-gradient(135deg,#19e6c1,#5aa8ff);border-color:transparent;box-shadow:0 0 30px -4px rgba(25,230,193,.6)}
+html[data-theme=light] .tgrp.active .tgbtn{color:#fff;background:linear-gradient(135deg,#0aa58c,#2b7de0)}
+.tsub{font-weight:500;opacity:.85;font-size:12.5px}.tsub:not(:empty):before{content:" · "}
+.tmenu{display:none;position:absolute;top:100%;inset-inline-start:0;padding-top:8px;min-width:260px;z-index:60}
+.tmenu:before{content:"";display:block}
+.tmenu>.tab{display:flex;align-items:center;gap:6px;border:0;border-radius:10px;background:transparent;backdrop-filter:none;box-shadow:none;padding:11px 14px;color:var(--text)}
+.tmenu{filter:drop-shadow(0 14px 30px rgba(0,0,0,.25))}
+.tmenu>.tab:first-child{border-top-left-radius:14px;border-top-right-radius:14px}
+.tmenu{--mbg:#0f182b}html[data-theme=light] .tmenu{--mbg:#fff}
+.tmenu>.tab{background:var(--mbg)}.tmenu>.tab:hover{background:color-mix(in srgb,var(--mbg) 85%,#19e6c1)}
+.tmenu>.tab.active{background:color-mix(in srgb,var(--mbg) 78%,#19e6c1);color:var(--text);font-weight:800}
+.tmenu>.tab:last-child{border-bottom-left-radius:14px;border-bottom-right-radius:14px}
+.tgrp.open .tmenu{display:block}
+@media (hover:hover){.tgrp:hover .tmenu{display:block}}
 .tcount{background:var(--red);color:#fff;border-radius:99px;font-size:11px;padding:1px 7px;margin-inline-start:4px}.tcount:empty{display:none}
 .seg2{display:flex;gap:6px;flex-wrap:wrap}.seg2 button{border:1px solid var(--border);background:var(--glass);color:var(--grey);border-radius:99px;padding:8px 14px;cursor:pointer;font:inherit}
 .seg2 button.on{background:linear-gradient(135deg,#19e6c1,#5aa8ff);color:#04101a;border-color:transparent;font-weight:700}
@@ -458,17 +476,24 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
 
 <div class="tabs">
   <div class="tab active" data-p="dash">📊 لوحة التحكم</div>
-  <div class="tab" data-p="log">📞 سجل المكالمات والتسجيلات</div>
-  <div class="tab" data-p="report">🖨️ تقرير عدد المكالمات</div>
-  <div class="tab" data-p="ai">🤖 تحليل المكالمات</div>
-  <div class="tab" data-p="eval">⭐ تقييم الموظفين</div>
-  <div class="tab" data-p="ins">🧭 المشاكل وأسباب عدم الشراء</div>
-  <div class="tab" data-p="tg">🎯 التارجت</div>
-  <div class="tab" data-p="cb">📞 الفائتة والمتابعات <span class="tcount" id="cbCount"></span></div>
-  <div class="tab" data-p="train">🏋️ خطط التدريب</div>
-  <div class="tab" data-p="appt">📅 طلبات تحديد موعد <span class="tcount" id="apCount"></span></div>
-  <div class="tab" data-p="cf">⚔️ التعارضات <span class="tcount" id="cfCount"></span></div>
+  <div class="tgrp"><div class="tgbtn">📞 المكالمات <span class="tcount gcount"></span><small class="tsub"></small> ▾</div><div class="tmenu">
+    <div class="tab" data-p="log">📞 سجل المكالمات والتسجيلات</div>
+    <div class="tab" data-p="cb">🔔 الفائتة والمتابعات <span class="tcount" id="cbCount"></span></div>
+    <div class="tab" data-p="report">🖨️ تقرير عدد المكالمات</div>
+  </div></div>
+  <div class="tgrp"><div class="tgbtn">💼 المبيعات <span class="tcount gcount"></span><small class="tsub"></small> ▾</div><div class="tmenu">
+    <div class="tab" data-p="tg">🎯 التارجت</div>
+    <div class="tab" data-p="appt">📅 طلبات تحديد موعد <span class="tcount" id="apCount"></span></div>
+    <div class="tab" data-p="cf">⚔️ التعارضات <span class="tcount" id="cfCount"></span></div>
+  </div></div>
+  <div class="tgrp"><div class="tgbtn">🤖 التحليل والتدريب <span class="tcount gcount"></span><small class="tsub"></small> ▾</div><div class="tmenu">
+    <div class="tab" data-p="ai">🤖 تحليل المكالمات</div>
+    <div class="tab" data-p="eval">⭐ تقييم الموظفين</div>
+    <div class="tab" data-p="ins">🧭 المشاكل وأسباب عدم الشراء</div>
+    <div class="tab" data-p="train">🏋️ خطط التدريب</div>
+  </div></div>
   <div class="tab" data-p="set">⚙️ الإعدادات</div>
+</div>
 </div>
 
 <div class="wrap">
@@ -1182,8 +1207,17 @@ function openRecById(id,info){
 }
 
 /* ============ INIT ============ */
+function grpSync(){document.querySelectorAll('.tgrp').forEach(g=>{const a=g.querySelector('.tmenu .tab.active');g.classList.toggle('active',!!a);
+  const set=(el,v)=>{v=String(v);if(el.textContent!==v)el.textContent=v};   // من غير ما نغيّر لو زي ما هو (عشان الـ observer ميلفّش)
+  set(g.querySelector('.tsub'),a?a.textContent.replace(/\d+\s*$/,'').replace(/^\S+\s/,'').trim():'');
+  const n=[...g.querySelectorAll('.tmenu .tcount')].reduce((t,c)=>t+(+c.textContent||0),0); set(g.querySelector('.gcount'),n||'');});}
+document.querySelectorAll('.tgbtn').forEach(b=>b.onclick=e=>{const g=b.parentNode, o=g.classList.contains('open');document.querySelectorAll('.tgrp').forEach(x=>x.classList.remove('open'));if(!o)g.classList.add('open');e.stopPropagation();});
+document.addEventListener('click',e=>{if(!e.target.closest('.tgrp'))document.querySelectorAll('.tgrp').forEach(x=>x.classList.remove('open'))});
+new MutationObserver(grpSync).observe(document.querySelector('.tabs'),{subtree:true,childList:true,characterData:true});
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');
+  document.querySelectorAll('.tgrp').forEach(x=>x.classList.remove('open'));grpSync();
+  if(document.querySelector('.tgrp:hover'))document.activeElement&&document.activeElement.blur();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));$('p-'+t.dataset.p).classList.add('active');
   if(t.dataset.p==='ai')loadAI();
   if(t.dataset.p==='eval')loadEval();
