@@ -205,6 +205,7 @@ UPD
 chmod 755 /usr/local/bin/nq-update
 
 echo "== backup (nightly 2:00)"
+command -v rclone >/dev/null || apt-get install -y -qq rclone >/dev/null 2>&1 || true
 command -v aws >/dev/null || apt-get install -y -qq awscli >/dev/null 2>&1 || "$APP/venv/bin/pip" install -q awscli >/dev/null 2>&1 || true
 cat > /usr/local/bin/nq-backup <<'BAK'
 #!/bin/bash
@@ -229,6 +230,15 @@ if [[ -n "${NQ_BACKUP_BUCKET:-}" ]]; then
   "$AWS" s3 cp --recursive --quiet "$DIR" "$B/daily/$DAY/" 2>/tmp/nqb.err || ERR="${ERR:+$ERR · }S3: $(tail -c 200 /tmp/nqb.err)"
   "$AWS" s3 sync --quiet /var/spool/asterisk/monitor "$B/recordings/" 2>>/tmp/nqb.err || ERR="${ERR:+$ERR · }تسجيلات S3"
   [[ -d /var/lib/nq-calls/mobile ]] && "$AWS" s3 sync --quiet /var/lib/nq-calls/mobile "$B/mobile/" 2>>/tmp/nqb.err
+fi
+# Google Drive (sudo nq-setkey google) — بيرفع على فولدر NQ-Backup في الدرايف
+RC=/etc/nq-calls/rclone.conf
+if [[ -f "$RC" ]] && grep -q '^\[gdrive\]' "$RC"; then
+  G="gdrive:NQ-Backup"; S3="${S3:+$S3 + }Google Drive (NQ-Backup)"
+  rclone --config "$RC" copy "$DIR" "$G/daily/$DAY" 2>/tmp/nqb.err || ERR="${ERR:+$ERR · }Google Drive: $(tail -c 200 /tmp/nqb.err)"
+  rclone --config "$RC" copy /var/spool/asterisk/monitor "$G/recordings" 2>>/tmp/nqb.err || ERR="${ERR:+$ERR · }تسجيلات Google Drive"
+  [[ -d /var/lib/nq-calls/mobile ]] && rclone --config "$RC" copy /var/lib/nq-calls/mobile "$G/mobile" 2>>/tmp/nqb.err
+  rclone --config "$RC" delete "$G/daily" --min-age 30d 2>/dev/null; rclone --config "$RC" rmdirs "$G/daily" --leave-root 2>/dev/null
 fi
 SIZE=$(du -sh "$DIR" | cut -f1)
 OK=$([[ -z "$ERR" ]] && echo true || echo false)
@@ -277,6 +287,7 @@ cat > /usr/local/bin/nq-setkey <<'KEY'
 # sudo nq-setkey crm-login -> يوزر وباسورد الـ CRM (التوكن يتجدد لوحده)
 # sudo nq-setkey telegram -> بوت تليجرام للتنبيهات والملخص اليومي
 # sudo nq-setkey backup   -> bucket على S3 للنسخة الاحتياطية
+# sudo nq-setkey google   -> النسخة الاحتياطية على Google Drive
 set -e
 F=/etc/nq-calls/env
 setv() { local n=$1 v=$2; grep -v "^$n=" "$F" > "$F.tmp" || true; printf '%s=%s\n' "$n" "$v" >> "$F.tmp"; cat "$F.tmp" > "$F"; rm -f "$F.tmp"; }
@@ -302,6 +313,23 @@ if [[ "${1:-}" == telegram ]]; then
   setv NQ_TG_TOKEN "$T"; setv NQ_TG_CHAT "$CH"; systemctl restart nq-calls
   curl -s -o /dev/null -w '%{http_code}' "https://api.telegram.org/bot$T/sendMessage" -d chat_id="$CH" -d text="✅ تنبيهات NQ اتوصلت هنا" | grep -q 200 && echo "✔ وصلت رسالة تجربة على تليجرام" || echo "✖ تليجرام رفض — اتأكد إن البوت في الجروب"
   exit 0
+fi
+if [[ "${1:-}" == google ]]; then
+  command -v rclone >/dev/null || apt-get install -y -qq rclone >/dev/null
+  echo "على اللاب (ويندوز):"
+  echo "  1) نزّل rclone من https://rclone.org/downloads  (Windows - Intel/AMD 64 Bit) وفك الضغط"
+  echo "  2) افتح CMD جوه الفولدر ده واكتب:"
+  echo '     rclone authorize "drive"'
+  echo "  3) هيفتح المتصفح — اختار حساب جوجل ووافق"
+  echo "  4) هيطبعلك سطر طويل بين ---> و <--- انسخه كله"
+  read -rp "الصق السطر هنا: " TOK
+  TOK=$(printf '%s' "$TOK" | sed 's/^.*\({.*}\).*$/\1/')
+  [[ "$TOK" == "{"*"}" ]] || { echo "✖ ده مش التوكن — لازم يبدأ بـ { ويخلص بـ }"; exit 1; }
+  RC=/etc/nq-calls/rclone.conf; rm -f "$RC"
+  rclone --config "$RC" config create gdrive drive scope=drive token="$TOK" >/dev/null || { echo "✖ rclone رفض التوكن"; exit 1; }
+  chmod 600 "$RC"
+  rclone --config "$RC" mkdir gdrive:NQ-Backup && echo "✔ اتربط بجوجل درايف — الفولدر NQ-Backup" || { echo "✖ مش قادر يكتب في الدرايف"; exit 1; }
+  echo "بنجرّب نسخة دلوقتي (أول مرة بتاخد وقت عشان التسجيلات)..."; /usr/local/bin/nq-backup; exit $?
 fi
 if [[ "${1:-}" == backup ]]; then
   echo "اعمل bucket في AWS S3 (مثلاً nq-backup-2026) — ولو السيرفر عليه IAM role فيها صلاحية S3 سيب المفاتيح فاضية"
