@@ -268,6 +268,7 @@ def main():
     ap.add_argument("--from", dest="d_from", help="من يوم YYYY-MM-DD")
     ap.add_argument("--to", dest="d_to", help="لحد يوم YYYY-MM-DD (افتراضي: النهارده)")
     ap.add_argument("--last-week", action="store_true", help="آخر 7 أيام (للتشغيل الأسبوعي)")
+    ap.add_argument("--yesterday", action="store_true", help="امبارح والنهارده (للتشغيل الليلي)")
     ap.add_argument("--min-sec", type=int, default=30, help="تجاهل التسجيلات الأقصر من كده بالثواني")
     ap.add_argument("--redo", action="store_true", help="حلّل تاني حتى لو اتحلّلت قبل كده")
     ap.add_argument("--transcript-only", action="store_true", help="حوّل لنص بس من غير تحليل")
@@ -275,6 +276,8 @@ def main():
 
     files = list(args.files)
     today = dt.date.today()
+    if args.yesterday:
+        args.d_from, args.d_to = str(today - dt.timedelta(days=1)), str(today)
     if args.last_week:
         args.d_from, args.d_to = str(today - dt.timedelta(days=7)), str(today)
     if args.d_from:

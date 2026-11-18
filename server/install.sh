@@ -29,7 +29,7 @@ apt-get install -y -qq python3-venv python3-pip apache2-utils >/dev/null
 
 echo "== app files"
 mkdir -p "$APP" "$CONF" "$DATA/analysis"
-cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
+cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/ops.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
 sed -i "s/__VER__/$VER/" "$APP/static/index.html"
@@ -108,6 +108,7 @@ if [[ "${NQ_PHASE2:-}" == 1 ]]; then
   fi
   "$APP/venv/bin/pip" install -q -r "$SRC/requirements-phase2.txt"
   cat > /etc/cron.d/nq-calls <<EOF
+30 1 * * * $RUN_USER set -a; . $CONF/env; nice -n 19 $APP/venv/bin/python $APP/analyzer.py --yesterday >> $DATA/nightly.log 2>&1
 0 3 * * 6 $RUN_USER set -a; . $CONF/env; nice -n 19 $APP/venv/bin/python $APP/analyzer.py --last-week >> $DATA/weekly.log 2>&1
 EOF
 fi
@@ -168,6 +169,8 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/me http://127.0.0.1:8090/app/me
   ProxyPass        /calls-app/history http://127.0.0.1:8090/app/history
   ProxyPassReverse /calls-app/history http://127.0.0.1:8090/app/history
+  ProxyPass        /calls-app/inbox http://127.0.0.1:8090/app/inbox
+  ProxyPassReverse /calls-app/inbox http://127.0.0.1:8090/app/inbox
   ProxyPass        /calls-app/password http://127.0.0.1:8090/app/password
   ProxyPassReverse /calls-app/password http://127.0.0.1:8090/app/password
 
@@ -201,6 +204,70 @@ cd /tmp && rm -rf Central && git clone -q https://github.com/salimman2027/Centra
 UPD
 chmod 755 /usr/local/bin/nq-update
 
+echo "== backup (nightly 2:00)"
+command -v aws >/dev/null || apt-get install -y -qq awscli >/dev/null 2>&1 || "$APP/venv/bin/pip" install -q awscli >/dev/null 2>&1 || true
+cat > /usr/local/bin/nq-backup <<'BAK'
+#!/bin/bash
+# نسخة احتياطية: قاعدة بيانات السنترال + بيانات اللوحة + إعدادات السنترال → /var/backups/nq (آخر 7 أيام)
+# ولو متظبط bucket (sudo nq-setkey backup) → بتترفع على S3 مع التسجيلات
+set -o pipefail
+set -a; . /etc/nq-calls/env 2>/dev/null; set +a
+DAY=$(date +%F); DIR=/var/backups/nq/$DAY; ST=/var/lib/nq-calls/backup.json; ERR=""
+mkdir -p "$DIR"; chmod 700 /var/backups/nq
+DUMP() { mysqldump --single-transaction --databases asterisk asteriskcdrdb "$@" 2>/tmp/nqb.err | gzip > "$DIR/db.sql.gz"; }
+if ! DUMP; then   # لو root مش داخل → بيانات FreePBX
+  U=$(sed -n "s/.*AMPDBUSER'\] *= *'\([^']*\)'.*/\1/p" /etc/freepbx.conf 2>/dev/null)
+  P=$(sed -n "s/.*AMPDBPASS'\] *= *'\([^']*\)'.*/\1/p" /etc/freepbx.conf 2>/dev/null)
+  MYSQL_PWD="$P" DUMP -u"$U" || ERR="قاعدة البيانات: $(head -c 200 /tmp/nqb.err)"
+fi
+tar czf "$DIR/files.tgz" --exclude=/var/lib/nq-calls/models /var/lib/nq-calls /etc/nq-calls /etc/asterisk 2>/dev/null || [[ $? == 1 ]] || ERR="${ERR:+$ERR · }ملفات"
+find /var/backups/nq -mindepth 1 -maxdepth 1 -type d -mtime +7 -exec rm -rf {} + 2>/dev/null
+S3=""
+AWS=$(command -v aws || echo /opt/nq-calls/venv/bin/aws)
+if [[ -n "${NQ_BACKUP_BUCKET:-}" ]]; then
+  B="${NQ_BACKUP_BUCKET%/}"; [[ "$B" == s3://* ]] || B="s3://$B"; S3="$B"
+  "$AWS" s3 cp --recursive --quiet "$DIR" "$B/daily/$DAY/" 2>/tmp/nqb.err || ERR="${ERR:+$ERR · }S3: $(tail -c 200 /tmp/nqb.err)"
+  "$AWS" s3 sync --quiet /var/spool/asterisk/monitor "$B/recordings/" 2>>/tmp/nqb.err || ERR="${ERR:+$ERR · }تسجيلات S3"
+  [[ -d /var/lib/nq-calls/mobile ]] && "$AWS" s3 sync --quiet /var/lib/nq-calls/mobile "$B/mobile/" 2>>/tmp/nqb.err
+fi
+SIZE=$(du -sh "$DIR" | cut -f1)
+OK=$([[ -z "$ERR" ]] && echo true || echo false)
+ERR="$ERR" python3 -c "import json,os,datetime as d;json.dump({'at':d.datetime.now(d.timezone.utc).isoformat(),'ok':$( [[ $OK == true ]] && echo True || echo False ),'s3':'$S3','size':'$SIZE','error':os.environ['ERR']},open('$ST','w'),ensure_ascii=False)"
+chown asterisk:asterisk "$ST" 2>/dev/null
+[[ $OK == true ]] && echo "✔ النسخة الاحتياطية اتعملت ($SIZE)${S3:+ واترفعت على $S3}" || { echo "✖ $ERR"; exit 1; }
+BAK
+chmod 755 /usr/local/bin/nq-backup
+echo "0 2 * * * root /usr/local/bin/nq-backup >> /var/log/nq-backup.log 2>&1" > /etc/cron.d/nq-backup
+[[ -f "$DATA/backup.json" ]] || /usr/local/bin/nq-backup >/dev/null 2>&1 || true
+
+echo "== listen / whisper / barge (*741 / *742 / *743 + ext)"
+EC=/etc/asterisk/extensions_custom.conf; touch "$EC"
+sed -i '/;; NQ-SPY-BEGIN/,/;; NQ-SPY-END/d; /include => nq-spy ;nq/d' "$EC"
+if grep -q '^\[from-internal-custom\]' "$EC"; then
+  sed -i '0,/^\[from-internal-custom\]/s//[from-internal-custom]\ninclude => nq-spy ;nq/' "$EC"
+else
+  printf '\n[from-internal-custom]\ninclude => nq-spy ;nq\n' >> "$EC"
+fi
+cat >> "$EC" <<'SPY'
+;; NQ-SPY-BEGIN  (متضاف من لوحة NQ — بيتكتب تاني مع كل تحديث)
+[nq-spy]
+exten => _*741X.,1,Gosub(nq-spy-do,s,1(${EXTEN:4},qE))
+exten => _*742X.,1,Gosub(nq-spy-do,s,1(${EXTEN:4},qwE))
+exten => _*743X.,1,Gosub(nq-spy-do,s,1(${EXTEN:4},qBE))
+[nq-spy-do]
+exten => s,1,Set(NQA=${DB(NQSPY/${CALLERID(num)})})
+ same => n,GotoIf($["${NQA}" = "*"]?ok)
+ same => n,GotoIf($["${REGEX("(^|,)${ARG1}(,|$)" ${NQA})}" = "1"]?ok)
+ same => n,Playback(ss-noservice)
+ same => n,Hangup()
+ same => n(ok),Answer()
+ same => n,ChanSpy(PJSIP/${ARG1}-,${ARG2})
+ same => n,Hangup()
+;; NQ-SPY-END
+SPY
+chown asterisk:asterisk "$EC" 2>/dev/null
+asterisk -rx "dialplan reload" >/dev/null 2>&1 || true
+
 # تغيير مفتاح Claude: sudo nq-setkey
 cat > /usr/local/bin/nq-setkey <<'KEY'
 #!/bin/bash
@@ -208,6 +275,8 @@ cat > /usr/local/bin/nq-setkey <<'KEY'
 # sudo nq-setkey openai   -> مفتاح OpenAI لتحويل الصوت لنص
 # sudo nq-setkey crm      -> توكن الـ CRM لتسجيل المواعيد
 # sudo nq-setkey crm-login -> يوزر وباسورد الـ CRM (التوكن يتجدد لوحده)
+# sudo nq-setkey telegram -> بوت تليجرام للتنبيهات والملخص اليومي
+# sudo nq-setkey backup   -> bucket على S3 للنسخة الاحتياطية
 set -e
 F=/etc/nq-calls/env
 setv() { local n=$1 v=$2; grep -v "^$n=" "$F" > "$F.tmp" || true; printf '%s=%s\n' "$n" "$v" >> "$F.tmp"; cat "$F.tmp" > "$F"; rm -f "$F.tmp"; }
@@ -221,6 +290,27 @@ if [[ "${1:-}" == crm-login ]]; then
   systemctl restart nq-calls
   if printf '%s' "$R" | grep -q '"accessToken" *: *"[^"]'; then echo "✔ الدخول على الـ CRM شغال — التوكن هيتجدد لوحده"; else echo "✖ الـ CRM رفض الدخول: $(printf '%s' "$R" | head -c 300)"; fi
   exit 0
+fi
+if [[ "${1:-}" == telegram ]]; then
+  echo "1) في تليجرام كلّم @BotFather واكتب /newbot وخد التوكن"
+  echo "2) اعمل جروب للمديرين وضيف البوت فيه، واكتب أي رسالة في الجروب"
+  read -rsp "الصق توكن البوت: " T; echo
+  T=$(printf '%s' "$T" | tr -d '[:space:]'); [[ -n "$T" ]] || { echo "✖ مفيش توكن"; exit 1; }
+  CH=$(curl -s "https://api.telegram.org/bot$T/getUpdates" | python3 -c "import json,sys;r=json.load(sys.stdin).get('result',[]);ids=[str((u.get('message') or u.get('my_chat_member') or {}).get('chat',{}).get('id','')) for u in r];ids=[i for i in ids if i];print(ids[-1] if ids else '')" 2>/dev/null)
+  [[ -n "$CH" ]] && echo "لقيت الشات: $CH" || read -rp "مالقيتش الشات — اكتب رسالة في الجروب وجرّب تاني، أو اكتب رقم الشات: " CH
+  [[ -n "$CH" ]] || exit 1
+  setv NQ_TG_TOKEN "$T"; setv NQ_TG_CHAT "$CH"; systemctl restart nq-calls
+  curl -s -o /dev/null -w '%{http_code}' "https://api.telegram.org/bot$T/sendMessage" -d chat_id="$CH" -d text="✅ تنبيهات NQ اتوصلت هنا" | grep -q 200 && echo "✔ وصلت رسالة تجربة على تليجرام" || echo "✖ تليجرام رفض — اتأكد إن البوت في الجروب"
+  exit 0
+fi
+if [[ "${1:-}" == backup ]]; then
+  echo "اعمل bucket في AWS S3 (مثلاً nq-backup-2026) — ولو السيرفر عليه IAM role فيها صلاحية S3 سيب المفاتيح فاضية"
+  read -rp "اسم الـ bucket: " B; [[ -n "$B" ]] || exit 1
+  read -rp "AWS Access Key ID (أو Enter): " AK
+  if [[ -n "$AK" ]]; then read -rsp "AWS Secret Access Key: " SK; echo; setv AWS_ACCESS_KEY_ID "$AK"; setv AWS_SECRET_ACCESS_KEY "$SK"; fi
+  RG=$(curl -s -m 3 http://169.254.169.254/latest/meta-data/placement/region || true); setv AWS_DEFAULT_REGION "${RG:-us-east-1}"
+  setv NQ_BACKUP_BUCKET "$B"; systemctl restart nq-calls
+  echo "بنجرّب نسخة دلوقتي..."; /usr/local/bin/nq-backup; exit $?
 fi
 if [[ "${1:-}" == crm ]]; then
   NAME=NQ_CRM_TOKEN; PFX=""; LBL="الـ CRM"

@@ -67,7 +67,7 @@ import contextvars  # noqa: E402
 
 SCOPE = contextvars.ContextVar("nq_scope", default=None)   # None = المدير (يشوف كله)
 HTPASSWD = Path(os.environ.get("NQ_CONF", "/etc/nq-calls")) / "htpasswd"
-LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings)")
+LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings|ops/)")
 
 
 def _teams_file() -> dict:
@@ -1186,6 +1186,19 @@ PORTAL.CTX.update(dir=DATA_DIR, sip_secret=_sip_secret, check_ext=lambda e, p: c
                   rubric=lambda: RUBRIC.load(), lessons=lambda: _lessons_cache(),
                   appointments=lambda: APPT._load(), conflicts=lambda: OWN._jload("conflicts.json", []), tz=TZ)
 PORTAL.CTX.update(training=lambda ext: TRAIN.latest_for_ext(ext))
+import ops as OPS  # noqa: E402
+app.include_router(OPS.router)
+OPS.CTX.update(dir=DATA_DIR, tz=TZ, trunk=TRUNK.split("/", 1)[1], query=query, scope=lambda: SCOPE.get(),
+               calls=lambda a, b: unscoped(calls, a, b), notes=load_notes, teams=_teams_file,
+               analysis=lambda a, b: unscoped(analysis, a, b),
+               names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},
+               reps=lambda: unscoped(config).get("reps", []),
+               lines=lambda: {str(r.get("id")): r.get("line", "") for r in unscoped(config).get("reps", []) if r.get("line")},
+               owner_of=lambda n: OWN.owner_of(n), check_ext=lambda e, p: check_ext_password(e, p),
+               appointments=lambda: APPT._load(), training=lambda: TRAIN.load_all(),
+               crm_get=lambda path, params: APPT._items(APPT._get_json(path, params)), crm_on=APPT.crm_configured,
+               sales_ids=lambda: APPT.crm_settings()["salesIds"])
+OPS.start()
 TRAIN.CTX.update(dir=DATA_DIR, tz=TZ, scope=lambda: SCOPE.get(), rubric=lambda: RUBRIC.load(), teams=_teams_file,
                  names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},
                  analysis=lambda a, b: unscoped(analysis, a, b), calls=lambda a, b: unscoped(calls, a, b),
