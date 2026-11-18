@@ -304,14 +304,50 @@ if [[ "${1:-}" == crm-login ]]; then
 fi
 if [[ "${1:-}" == telegram ]]; then
   echo "1) في تليجرام كلّم @BotFather واكتب /newbot وخد التوكن"
-  echo "2) اعمل جروب للمديرين وضيف البوت فيه، واكتب أي رسالة في الجروب"
-  read -rsp "الصق توكن البوت: " T; echo
-  T=$(printf '%s' "$T" | tr -d '[:space:]'); [[ -n "$T" ]] || { echo "✖ مفيش توكن"; exit 1; }
-  CH=$(curl -s "https://api.telegram.org/bot$T/getUpdates" | python3 -c "import json,sys;r=json.load(sys.stdin).get('result',[]);ids=[str((u.get('message') or u.get('my_chat_member') or {}).get('chat',{}).get('id','')) for u in r];ids=[i for i in ids if i];print(ids[-1] if ids else '')" 2>/dev/null)
-  [[ -n "$CH" ]] && echo "لقيت الشات: $CH" || read -rp "مالقيتش الشات — اكتب رسالة في الجروب وجرّب تاني، أو اكتب رقم الشات: " CH
-  [[ -n "$CH" ]] || exit 1
-  setv NQ_TG_TOKEN "$T"; setv NQ_TG_CHAT "$CH"; systemctl restart nq-calls
-  curl -s -o /dev/null -w '%{http_code}' "https://api.telegram.org/bot$T/sendMessage" -d chat_id="$CH" -d text="✅ تنبيهات NQ اتوصلت هنا" | grep -q 200 && echo "✔ وصلت رسالة تجربة على تليجرام" || echo "✖ تليجرام رفض — اتأكد إن البوت في الجروب"
+  echo "2) اعمل جروب وضيف البوت فيه واكتب في الجروب /start  (أو ابعت /start للبوت نفسه في الخاص)"
+  read -rsp "الصق توكن البوت (مش هيظهر وانت بتلصقه): " T; echo
+  T=$(printf '%s' "$T" | tr -d '[:space:]')
+  OUT=$(TG_T="$T" python3 - <<'PY'
+import json, os, sys, urllib.parse, urllib.request
+t = os.environ["TG_T"]
+def call(m, **kw):
+    try:
+        r = urllib.request.urlopen(f"https://api.telegram.org/bot{t}/{m}", urllib.parse.urlencode(kw).encode() if kw else None, timeout=15)
+        return json.load(r)
+    except urllib.error.HTTPError as e:
+        try: return json.load(e)
+        except Exception: return {"ok": False, "description": str(e)}
+    except Exception as e:
+        return {"ok": False, "description": str(e)}
+me = call("getMe")
+if not me.get("ok"):
+    print("✖ التوكن غلط أو ناقص — انسخه تاني من BotFather (" + str(me.get("description")) + ")", file=sys.stderr); sys.exit(1)
+print("✔ البوت: @" + me["result"]["username"], file=sys.stderr)
+chats = {}
+for u in call("getUpdates").get("result", []):
+    for k in ("message", "my_chat_member", "channel_post", "edited_message"):
+        c = (u.get(k) or {}).get("chat")
+        if c: chats[c["id"]] = c.get("title") or c.get("first_name") or str(c["id"])
+if not chats:
+    print("✖ البوت لسه ماوصلوش ولا رسالة — اكتب /start في الجروب (أو في الخاص مع البوت) وشغّل الأمر تاني", file=sys.stderr); sys.exit(1)
+cid = list(chats)[-1]
+if len(chats) > 1:
+    print("لقيت أكتر من شات:", file=sys.stderr)
+    for i, (k, v) in enumerate(chats.items(), 1): print(f"  {i}) {v}", file=sys.stderr)
+    sys.stderr.write("اختار رقم: "); sys.stderr.flush()
+    try: cid = list(chats)[int(open("/dev/tty").readline().strip()) - 1]
+    except Exception: pass
+r = call("sendMessage", chat_id=cid, text="✅ تنبيهات NQ اتوصلت هنا")
+if not r.get("ok") and (r.get("parameters") or {}).get("migrate_to_chat_id"):
+    cid = r["parameters"]["migrate_to_chat_id"]; r = call("sendMessage", chat_id=cid, text="✅ تنبيهات NQ اتوصلت هنا")
+if not r.get("ok"):
+    print("✖ تليجرام رفض الرسالة: " + str(r.get("description")), file=sys.stderr); sys.exit(1)
+print(f"✔ وصلت رسالة تجربة على: {chats.get(cid, cid)}", file=sys.stderr)
+print(cid)
+PY
+) || { echo "✖ اتلغى"; exit 1; }
+  setv NQ_TG_TOKEN "$T"; setv NQ_TG_CHAT "$OUT"; systemctl restart nq-calls
+  echo "✔ التنبيهات هتوصل هنا من دلوقتي"
   exit 0
 fi
 if [[ "${1:-}" == google ]]; then
