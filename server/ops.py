@@ -615,6 +615,15 @@ def api_digest():
     return {"text": digest_text(), "last": _jload("digest.json", {})}
 
 
+@router.post("/api/ops/digest-now")
+def digest_now():
+    if not tg_ready():
+        raise HTTPException(400, "تليجرام مش متظبط")
+    if not tg_send(digest_text()):
+        raise HTTPException(502, "تليجرام رفض الرسالة")
+    return {"ok": True}
+
+
 @router.get("/api/training/progress")
 def api_progress():
     return {"items": training_progress()}

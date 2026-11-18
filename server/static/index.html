@@ -707,7 +707,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
       </div>
       <div id="opTg" class="muted" style="margin:6px 0"></div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="opSave()">💾 حفظ</button>
-        <button class="btn sm o" onclick="opTest()">📨 جرّب تليجرام</button><button class="btn sm o" onclick="opDigest()">📊 شوف ملخص النهارده</button><span id="opMsg"></span></div>
+        <button class="btn sm o" onclick="opTest()">📨 جرّب تليجرام</button><button class="btn sm o" onclick="opDigest()">📊 شوف ملخص النهارده</button><button class="btn sm o" onclick="opDigestSend()">📨 ابعت الملخص على تليجرام</button><span id="opMsg"></span></div>
       <pre id="opDig" class="op-dig" hidden></pre></div>
     <div class="card set-c"><h3>🛡️ حماية العميل من تكرار الاتصال</h3>
       <p class="muted">العميل بيفضل تبع أول مندوب كلّمه طول ما آخر تواصل منه أقل من المدة دي. أي مندوب تاني بيتنبّه، ولو أصرّ بيتبعت طلب في ⚔️ التعارضات. بعد المدة العميل بيبقى متاح لأي حد.</p>
@@ -1790,6 +1790,7 @@ async function opSave(){
   catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
 async function opTest(){ try{const r=await fetch(API_BASE+'/ops/test',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('opMsg').innerHTML='<span style="color:var(--green)">✔ الرسالة اتبعتت — شوف تليجرام</span>'}catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`} }
+async function opDigestSend(){ try{const r=await fetch(API_BASE+'/ops/digest-now',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('opMsg').innerHTML='<span style="color:var(--green)">✔ الملخص اتبعت — شوف تليجرام</span>'}catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`} }
 async function opDigest(){ try{const j=await (await fetch(API_BASE+'/digest',{cache:'no-store'})).json(); $('opDig').hidden=false; $('opDig').textContent=j.text;}catch(e){} }
 
 /* ===================== خطط التدريب: الشركة / الفرق / الموظفين / القادة ===================== */
