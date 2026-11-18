@@ -184,6 +184,29 @@ def _top(counter: Counter, n=6):
     return [{"text": k, "count": v} for k, v in counter.most_common(n)]
 
 
+@router.post("/app/history")
+async def history(request: Request):
+    """سجل مكالمات التحويلة من السنترال (موبايل + لاب) — عشان السجل يبقى واحد على كل الأجهزة"""
+    body = await request.json()
+    ext, pw = str(body.get("ext") or ""), str(body.get("password") or "")
+    if not CTX["check_ext"](ext, pw):
+        raise HTTPException(401, "سجّل دخول تاني")
+    days = max(1, min(int(body.get("days") or 30), 90))
+    d2 = dt.datetime.now(CTX["tz"]).date()
+    out = []
+    for c in CTX["calls"](d2 - dt.timedelta(days=days - 1), d2):
+        if str(c["ext"]) != ext:
+            continue
+        n = c.get("note") or {}
+        out.append({"id": c["id"], "number": c.get("number") or "", "direction": c["dir"], "started": c["time"],
+                    "answered": c["status"] == "تم الرد", "duration": int(c.get("talkSec") or 0),
+                    "via": "sim" if c.get("source") == "sim" else "pbx", "customer": n.get("customer") or "",
+                    "outcome": n.get("outcome") or "", "summary": n.get("summary") or "", "srv": True})
+        if len(out) >= 400:
+            break
+    return JSONResponse({"items": out}, headers=HDR)
+
+
 @router.post("/app/me")
 async def me(request: Request):
     body = await request.json()

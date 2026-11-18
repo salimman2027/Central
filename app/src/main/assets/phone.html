@@ -1339,13 +1339,39 @@ const NQHistory = {
   }
 };
 
-/* ---------- call log ---------- */
+/* ---------- call log: مكالمات الجهاز ده + مكالمات التحويلة من السنترال (الموبايل واللاب) ---------- */
 const NQLog = {
-  open() { this.render(); show("scrLog"); },
+  srv: null, loading: false,
+  open() { this.srv = store.get("nq_srv_hist", null); this.render(); show("scrLog"); this.sync(); },
+  async sync() {
+    const c = NQOwner.creds(); if (!c || this.loading) return; this.loading = true;
+    try {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 8000);
+      const r = await fetch(CONFIG.api + "/history", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, days: 30 }), signal: ctl.signal });
+      clearTimeout(tm);
+      if (r.ok) { const j = await r.json(); this.srv = { ext: c.ext, items: j.items || [] }; store.set("nq_srv_hist", this.srv);
+        if ($("scrLog").classList.contains("on")) this.render(); }
+    } catch (e) {} finally { this.loading = false; }
+  },
+  // نفس المكالمة على السيرفر وعلى الجهاز: نفس الرقم والاتجاه وفرق الوقت أقل من 3 دقايق
+  merged() {
+    const local = NQHistory.all().slice(-400), ext = String(NQPhone.ext || "");
+    const srv = this.srv && String(this.srv.ext) === ext ? this.srv.items : [];
+    if (!srv.length) return local;
+    const used = new Set(), out = [];
+    srv.forEach(s => {
+      const st = new Date(s.started).getTime();
+      const i = local.findIndex((l, k) => !used.has(k) && l.direction === s.direction && digits9(l.number) === digits9(s.number) && Math.abs(new Date(l.started).getTime() - st) < 180e3);
+      if (i >= 0) { used.add(i); const l = local[i]; out.push({ ...s, ...l, answered: s.answered || l.answered, duration: s.duration || l.duration, customer: l.customer || s.customer, outcome: l.outcome || s.outcome }); }
+      else out.push(s);
+    });
+    local.forEach((l, k) => { if (!used.has(k)) out.push(l); });
+    return out.sort((a, b) => new Date(a.started) - new Date(b.started));
+  },
   nameOf(h) { if (h.customer) return h.customer; if (h.name) return h.name; const t = NQTargets.findByNumber(h.number); return t ? t.customer : ""; },
   render() {
     const box = $("logList"); box.innerHTML = "";
-    const all = NQHistory.all().slice(-200).reverse();
+    const all = this.merged().slice(-300).reverse();
     if (!all.length) { box.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px">لسه مفيش مكالمات</div>'; return; }
     let lastDay = "";
     all.forEach(h => {
