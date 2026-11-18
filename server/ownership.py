@@ -17,7 +17,7 @@ router = APIRouter()
 LOCK = threading.Lock()
 DEFAULT_DAYS = 60       # العميل بيفضل محجوز للمندوب X يوم من آخر تواصل
 # بتتظبط من app.py
-CTX = {"dir": Path("/var/lib/nq-calls"), "calls": None, "names": lambda: {}, "auth": None,
+CTX = {"dir": Path("/var/lib/nq-calls"), "calls": None, "names": lambda: {}, "auth": None, "extra": lambda n: {},
        "notes": lambda a, b: [], "analysis": lambda rec: None, "crm": lambda n: None}
 _CRM_CACHE: dict = {}
 HDR = {"Access-Control-Allow-Origin": "*"}
@@ -353,8 +353,31 @@ async def lookup(request: Request):
     own = owner_of(number)
     if own:
         out["owner"] = {"ext": own["ext"], "name": CTX["names"]().get(own["ext"], "")}
-    calls = [c for c in _history().get(d, []) if _contacted(c)]
+    allc = _history().get(d, [])
+    calls = [c for c in allc if _contacted(c)]
     out["calls"] = len(calls)
+    names = CTX["names"]()
     if calls:
         out["lastCall"] = calls[-1]["time"]
+    if allc:   # بطاقة العميل: آخر مكالمة وآخر ملاحظة
+        lc = allc[-1]
+        out["last"] = {"time": lc["time"], "dir": lc.get("dir"), "status": lc.get("status"),
+                       "talkSec": lc.get("talkSec") or 0, "by": names.get(str(lc["ext"]), str(lc["ext"]))}
+        missed = 0
+        for c in reversed(allc):
+            if c.get("status") == "تم الرد":
+                break
+            if c.get("dir") == "in":
+                missed += 1
+        out["missedInRow"] = missed
+    nt = next((c for c in reversed(allc) if c.get("note")), None)
+    if nt:
+        n = nt["note"]
+        out["note"] = {"time": nt["time"], "by": names.get(str(nt["ext"]), str(nt["ext"])),
+                       "outcome": n.get("outcome") or "", "summary": (n.get("summary") or "")[:400],
+                       "followUp": n.get("followUp") or ""}
+    try:
+        out.update(CTX["extra"](number) or {})
+    except Exception as e:  # noqa: BLE001
+        print("lookup extra failed:", e, flush=True)
     return JSONResponse(out, headers=HDR)

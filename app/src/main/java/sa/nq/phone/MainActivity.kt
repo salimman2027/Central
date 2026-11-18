@@ -554,6 +554,11 @@ class MainActivity : Activity() {
             val uri = writeDownload(name, mime, android.util.Base64.decode(b64, android.util.Base64.DEFAULT))
             runOnUiThread { shareUri(uri, mime) }; true
         } catch (e: Exception) { false }
+        // يفتح رابط بره التطبيق (واتساب wa.me، خرايط…)
+        @JavascriptInterface fun openLink(url: String) = runOnUiThread {
+            try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            catch (_: Exception) { android.widget.Toast.makeText(this@MainActivity, "واتساب مش متسطب", android.widget.Toast.LENGTH_SHORT).show() }
+        }
         // تنبيه على الموبايل (عميل فاتك، متابعة، عميل جديد، الخط واقف)
         @JavascriptInterface fun notify(id: Int, title: String, text: String) {
             try {

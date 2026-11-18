@@ -67,7 +67,7 @@ import contextvars  # noqa: E402
 
 SCOPE = contextvars.ContextVar("nq_scope", default=None)   # None = المدير (يشوف كله)
 HTPASSWD = Path(os.environ.get("NQ_CONF", "/etc/nq-calls")) / "htpasswd"
-LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings|ops/)")
+LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings|ops/|wa\b)")
 
 
 def _teams_file() -> dict:
@@ -1201,6 +1201,30 @@ OPS.CTX.update(dir=DATA_DIR, tz=TZ, trunk=TRUNK.split("/", 1)[1], query=query, s
 OPS.start()
 import targets as TGT  # noqa: E402
 app.include_router(TGT.router)
+def _lookup_extra(number: str) -> dict:
+    """بطاقة العميل: تارجت مفتوح + آخر ميعاد"""
+    d, out = _digits(number), {}
+    today = str(dt.datetime.now(TZ).date())
+    tg = [x for x in TGT.load() if _digits(x["number"]) == d and x["date"] >= str(dt.datetime.now(TZ).date() - dt.timedelta(days=7))]
+    if tg:
+        x = sorted(tg, key=lambda x: abs((dt.date.fromisoformat(x["date"]) - dt.date.fromisoformat(today)).days))[0]
+        nm = {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])}
+        out["target"] = {"date": x["date"], "name": nm.get(x["ext"], x["ext"]), "note": x.get("note", "")}
+    w = WA.log_for(number)
+    if w:
+        out["wa"] = {"at": w["at"], "title": w.get("title", ""), "ext": w.get("ext", "")}
+    ap = [a for a in APPT._load() if _digits(a.get("number")) == d and a.get("status") != "rejected"]
+    if ap:
+        a = sorted(ap, key=lambda a: a.get("created") or "")[-1]
+        out["appt"] = {"date": a.get("date"), "time": a.get("time"), "status": a.get("status"), "by": a.get("repName", "")}
+    return out
+
+
+import wa as WA  # noqa: E402
+app.include_router(WA.router)
+WA.CTX.update(dir=DATA_DIR, host=os.environ.get("NQ_HOST", "3.89.245.93.sslip.io"), check_ext=lambda e, p: check_ext_password(e, p),
+              names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])})
+OWN.CTX.update(extra=_lookup_extra)
 TGT.CTX.update(dir=DATA_DIR, tz=TZ, calls=lambda a, b: OPS.calls_c(a, b), scope=lambda: SCOPE.get(),
                check_ext=lambda e, p: check_ext_password(e, p),
                names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])})
