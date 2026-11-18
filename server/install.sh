@@ -376,8 +376,7 @@ if [[ "${1:-}" == google ]]; then
   TOK=$(printf '%s' "$TOK" | sed 's/^.*\({.*}\).*$/\1/')
   [[ "$TOK" == "{"*"}" ]] || { echo "✖ ده مش التوكن — لازم يبدأ بـ { ويخلص بـ }"; exit 1; }
   RC=/etc/nq-calls/rclone.conf; rm -f "$RC"
-  rclone --config "$RC" config create gdrive drive scope=drive token="$TOK" >/dev/null || { echo "✖ rclone رفض التوكن"; exit 1; }
-  chmod 600 "$RC"
+  printf '[gdrive]\ntype = drive\nscope = drive\ntoken = %s\n' "$TOK" > "$RC"; chmod 600 "$RC"
   rclone --config "$RC" mkdir gdrive:NQ-Backup && echo "✔ اتربط بجوجل درايف — الفولدر NQ-Backup" || { echo "✖ مش قادر يكتب في الدرايف"; exit 1; }
   echo "بنجرّب نسخة دلوقتي (أول مرة بتاخد وقت عشان التسجيلات)..."; /usr/local/bin/nq-backup; exit $?
 fi
