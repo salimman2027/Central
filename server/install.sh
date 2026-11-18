@@ -358,7 +358,7 @@ if [[ "${1:-}" == google ]]; then
   if [[ "${WAY:-1}" == 2 ]]; then
     read -rp "الصق السطر هنا: " TOK
   else
-    pkill -f "rclone authorize" 2>/dev/null; LOG=$(mktemp)
+    pkill -f "rclone authorize" 2>/dev/null || true; LOG=$(mktemp)
     rclone authorize drive --auth-no-open-browser >"$LOG" 2>&1 & RP=$!
     for i in $(seq 1 20); do LOCAL=$(grep -o 'http://127.0.0.1:53682/auth[^ ]*' "$LOG" | head -1); [[ -n "$LOCAL" ]] && break; sleep 0.5; done
     GURL=$( [[ -n "$LOCAL" ]] && curl -s --noproxy '*' -o /dev/null -w '%{redirect_url}' "$LOCAL" )
@@ -368,9 +368,9 @@ if [[ "${1:-}" == google ]]; then
     echo "③ هتلاقي صفحة فيها خطأ (ده طبيعي) — انسخ الرابط اللي فوق في شريط العنوان كله (بيبدأ بـ http://127.0.0.1:53682)"
     read -rp "الصق الرابط هنا: " BACK
     [[ "$BACK" == http://127.0.0.1:53682/* ]] || { kill $RP 2>/dev/null; echo "✖ الرابط لازم يبدأ بـ http://127.0.0.1:53682"; exit 1; }
-    curl -s --noproxy '*' -o /dev/null "$BACK"
-    for i in $(seq 1 30); do kill -0 $RP 2>/dev/null || break; sleep 0.5; done; kill $RP 2>/dev/null
-    TOK=$(tr -d '\n' < "$LOG" | grep -o '{"access_token"[^}]*}' | tail -1); rm -f "$LOG"
+    curl -s --noproxy '*' -o /dev/null "$BACK" || true
+    for i in $(seq 1 30); do kill -0 $RP 2>/dev/null || break; sleep 0.5; done; kill $RP 2>/dev/null || true
+    TOK=$(tr -d '\n' < "$LOG" | grep -o '{"access_token"[^}]*}' | tail -1 || true); rm -f "$LOG"
     [[ -n "$TOK" ]] || { echo "✖ جوجل مارجّعش التوكن — جرّب تاني من الأول (الرابط بيخلص بسرعة)"; exit 1; }
   fi
   TOK=$(printf '%s' "$TOK" | sed 's/^.*\({.*}\).*$/\1/')
