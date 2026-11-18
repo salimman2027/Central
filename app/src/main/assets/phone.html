@@ -488,7 +488,8 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <button class="btn" id="tAddBtn" onclick="NQTargets.add()">إضافة</button>
     <div style="height:10px"></div>
     <label class="btn ghost" style="display:block;text-align:center;cursor:pointer">📥 رفع ملف Excel<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="NQTargets.upload(this.files[0]);this.value=''"></label>
-    <div class="pf-sub" style="margin-top:6px;font-size:12.5px;color:var(--muted)">الملف فيه عمود <b>اسم العميل</b> وعمود <b>رقم التليفون</b> (والتاريخ لو عايز) — هيتضافوا لليوم اللي مختاره فوق</div>
+    <button class="btn ghost" style="margin-top:8px" onclick="NQTargets.template()">⬇️ نزّل نموذج Excel</button>
+    <div class="pf-sub" style="margin-top:6px;font-size:12.5px;color:var(--muted)">نزّل النموذج، املاه بأسماء العملاء وأرقامهم، وارفعه — هيتضافوا لليوم اللي مختاره فوق (أو التاريخ اللي في الملف)</div>
   </div>
   <div class="card" id="tList"></div>
 </section>
@@ -1579,12 +1580,25 @@ const NQTargets = {
     t.push({ id: Date.now() + "" + Math.random().toString(36).slice(2, 6), date, customer, number, done: false });
     this.save(t); $("tName").value = ""; $("tPhone").value = ""; this.render(); toast("اتضاف ✓");
   },
+  xlsxLib() { return window.XLSX ? Promise.resolve() : new Promise((ok, no) => { const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; sc.onload = ok; sc.onerror = () => no(new Error("مفيش نت أو مش قادر أحمّل الإكسيل")); document.head.appendChild(sc); }); },
+  async template() {
+    try {
+      await this.xlsxLib();
+      const day = $("tDate").value || isoDay(new Date());
+      const ws = XLSX.utils.aoa_to_sheet([["اسم العميل", "رقم التليفون", "التاريخ", "ملاحظة"], ["مؤسسة الريان (مثال — امسحه)", "0533333333", day, "مهتم بنظام المخازن"]]);
+      ws["!cols"] = [{ wch: 30 }, { wch: 16 }, { wch: 12 }, { wch: 30 }]; ws["!views"] = [{ RTL: true }];
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "تارجت");
+      const name = "NQ-target-template.xlsx", mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      if (IS_APP && Android.saveAndOpen) { const b64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" }); if (!Android.saveAndOpen(name, mime, b64)) toast("✖ مش قادر أحفظ الملف"); else toast("✔ اتحفظ في التنزيلات"); }
+      else XLSX.writeFile(wb, name);
+    } catch (e) { toast("✖ " + e.message); }
+  },
   async upload(file) {
     if (!file) return;
     if (!NQOwner.creds()) { toast("ادخل بحسابك الأول"); return; }
     try {
       toast("بنقرا الملف…");
-      if (!window.XLSX) await new Promise((ok, no) => { const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; sc.onload = ok; sc.onerror = () => no(new Error("مفيش نت أو مش قادر أحمّل قارئ الإكسيل")); document.head.appendChild(sc); });
+      await this.xlsxLib();
       const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, dateNF: "yyyy-mm-dd", defval: "" }).filter(r => r.some(v => String(v).trim()));
       if (rows.length < 2) throw new Error("الملف فاضي");
@@ -1595,7 +1609,7 @@ const NQTargets = {
       find("customer", /اسم|عميل|customer|client|name|شركة|مؤسسة|محل/);
       if (col.number == null) throw new Error('مالقيتش عمود رقم التليفون — سمّيه "رقم التليفون" أو "جوال"');
       const day = $("tDate").value || isoDay(new Date());
-      const items = rows.slice(1).map(r => { const g = k => col[k] == null ? "" : String(r[col[k]] ?? "").trim(); return { customer: g("customer"), number: g("number"), date: g("date") || day, note: g("note") }; }).filter(x => x.number);
+      const items = rows.slice(1).map(r => { const g = k => col[k] == null ? "" : String(r[col[k]] ?? "").trim(); return { customer: g("customer"), number: g("number"), date: g("date") || day, note: g("note") }; }).filter(x => x.number && !/\(مثال/.test(x.customer));
       if (!items.length) throw new Error("مفيش أرقام في الملف");
       if (!confirm(`تضيف ${items.length} عميل للتارجت بتاعك؟`)) return;
       const j = await this.api("/add", { items });
