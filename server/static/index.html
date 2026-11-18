@@ -331,6 +331,12 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 .lv.idle .st i{background:var(--green)}.lv.off{opacity:.55}
 .lv .sb{display:flex;gap:6px;margin-top:4px}.lv .sb button{flex:1;border:1px solid var(--border);background:transparent;border-radius:8px;padding:4px 0;cursor:pointer;font-size:15px}
 .lv .sb button:hover{border-color:var(--teal)}
+.tg-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}
+.tg-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}.tg-form input,.tg-form select{width:100%}
+.tg-reps{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin:12px 0}
+.tg-rep{border:1px solid var(--border);border-radius:12px;padding:8px 10px;font-size:13.5px;cursor:pointer}.tg-rep.sel{border-color:var(--teal);background:rgba(25,230,193,.08)}
+.tg-bar{height:7px;border-radius:9px;background:rgba(127,127,127,.18);margin-top:6px;overflow:hidden}.tg-bar b{display:block;height:100%;background:var(--green)}
+.tg-done td{opacity:.6}.tg-done td:nth-child(2) b{text-decoration:line-through}
 .cb-t{width:100%;border-collapse:collapse;font-size:14px}.cb-t th,.cb-t td{padding:8px 6px;border-bottom:1px solid var(--border);text-align:start;vertical-align:top}
 .cb-t tr.late td:first-child{border-inline-start:4px solid var(--red)}.wait-bad{color:var(--red);font-weight:700}.wait-mid{color:var(--orange);font-weight:700}
 .ops-f{display:flex;flex-direction:column;gap:8px;font-size:14px}.ops-f label{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -457,6 +463,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div class="tab" data-p="ai">🤖 تحليل المكالمات</div>
   <div class="tab" data-p="eval">⭐ تقييم الموظفين</div>
   <div class="tab" data-p="ins">🧭 المشاكل وأسباب عدم الشراء</div>
+  <div class="tab" data-p="tg">🎯 التارجت</div>
   <div class="tab" data-p="cb">📞 الفائتة والمتابعات <span class="tcount" id="cbCount"></span></div>
   <div class="tab" data-p="train">🏋️ خطط التدريب</div>
   <div class="tab" data-p="appt">📅 طلبات تحديد موعد <span class="tcount" id="apCount"></span></div>
@@ -569,6 +576,36 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
   <div class="card" style="margin-top:14px"><h3>👤 مشاكل كل موظف في المكالمات <span class="muted" style="font-weight:400;font-size:13px">— عدد المرات</span></h3><div class="tw"><table id="iReps"></table></div></div>
   <div class="card" style="margin-top:14px"><h3>🎓 الدروس المستفادة<span class="sp"></span><button class="btn" id="iLessBtn" onclick="makeLessons()">🧠 استخرج الدروس المستفادة</button></h3><div id="iLessons"></div></div>
+</div>
+
+<div class="page" id="p-tg">
+  <div class="filters">
+    <div class="f"><label>من تاريخ</label><input type="date" id="tgFrom"></div>
+    <div class="f"><label>إلى تاريخ</label><input type="date" id="tgTo"></div>
+    <div class="f"><label>الموظف</label><select id="tgRep"></select></div>
+    <button class="btn" onclick="loadTg()">عرض</button>
+    <button class="btn o" onclick="tgDay(0)">النهارده</button><button class="btn o" onclick="tgDay(1)">بكرة</button>
+  </div>
+  <div class="tg-cards">
+    <div class="card"><h3 style="margin-top:0">➕ إضافة عميل</h3>
+      <div class="tg-form">
+        <select class="ap-in" id="tgARep"></select><input type="date" class="ap-in" id="tgADate">
+        <input class="ap-in" id="tgACust" placeholder="اسم العميل"><input class="ap-in ltr" id="tgANum" placeholder="05XXXXXXXX" inputmode="tel">
+        <input class="ap-in" id="tgANote" placeholder="ملاحظة (اختياري)" style="grid-column:1/-1">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button class="btn" onclick="tgAdd()">إضافة</button><span id="tgAMsg"></span></div></div>
+    <div class="card"><h3 style="margin-top:0">📥 رفع ملف Excel</h3>
+      <p class="muted" style="margin:0 0 8px;font-size:13px">أعمدة: <b>اسم العميل</b> و<b>رقم التليفون</b> (لازم)، و<b>التحويلة أو اسم الموظف</b> و<b>التاريخ</b> و<b>ملاحظة</b> (اختياري). <a href="#" onclick="tgTemplate();return false">⬇️ نزّل نموذج</a></p>
+      <input type="file" id="tgFile" accept=".xlsx,.xls,.csv" onchange="tgRead(this.files[0])">
+      <div class="tg-form" style="margin-top:8px">
+        <label class="muted" style="font-size:13px">لو الملف مفيهوش موظف، وزّعهم على:</label><select class="ap-in" id="tgDist"></select>
+        <label class="muted" style="font-size:13px">لو مفيهوش تاريخ:</label><input type="date" class="ap-in" id="tgUDate">
+      </div>
+      <div id="tgPrev"></div></div>
+  </div>
+  <div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0">📋 التارجت</h3><span id="tgSum" class="muted"></span>
+    <span class="sp" style="flex:1"></span><button class="btn sm o" id="tgDelBtn" onclick="tgDel()" hidden>🗑️ امسح المتعلّم</button></div>
+    <div id="tgReps" class="tg-reps"></div><div id="tgList"></div></div>
 </div>
 
 <div class="page" id="p-cb">
@@ -1156,6 +1193,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.p==='ins')loadIns();
   if(t.dataset.p==='train')loadTrain();
   if(t.dataset.p==='cb')loadCb();
+  if(t.dataset.p==='tg')loadTg();
   if(t.dataset.p==='set')opLoad();
 });
 loadConfig().then(()=>{fillSelects();refresh();initAI();}).catch(e=>{$('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل الإعدادات</div><div class="s">${e.message}</div></div>`});
@@ -1792,6 +1830,101 @@ async function opSave(){
 async function opTest(){ try{const r=await fetch(API_BASE+'/ops/test',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('opMsg').innerHTML='<span style="color:var(--green)">✔ الرسالة اتبعتت — شوف تليجرام</span>'}catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`} }
 async function opDigestSend(){ try{const r=await fetch(API_BASE+'/ops/digest-now',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('opMsg').innerHTML='<span style="color:var(--green)">✔ الملخص اتبعت — شوف تليجرام</span>'}catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`} }
 async function opDigest(){ try{const j=await (await fetch(API_BASE+'/digest',{cache:'no-store'})).json(); $('opDig').hidden=false; $('opDig').textContent=j.text;}catch(e){} }
+
+/* ===================== التارجت ===================== */
+let TG=[];
+function tgFill(){
+  const reps=(REPS||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ar'));
+  const opt=reps.map(r=>`<option value="${r.id}">${esc(r.name)} (${r.id})</option>`).join('');
+  if(!$('tgRep').options.length){$('tgRep').innerHTML='<option value="">كل الموظفين</option>'+opt; $('tgARep').innerHTML=opt;
+    $('tgDist').innerHTML='<option value="">— اختار —</option><option value="*">بالتساوي على كل الموظفين</option>'+(TEAMS||[]).map(t=>`<option value="t:${t.id}">بالتساوي على ${esc(t.name)}</option>`).join('')+reps.map(r=>`<option value="${r.id}">كلهم لـ ${esc(r.name)}</option>`).join('');}
+  const d=iso(new Date()); ['tgFrom','tgTo','tgADate','tgUDate'].forEach(k=>{if(!$(k).value)$(k).value=d});
+}
+function tgDay(n){const d=iso(new Date(Date.now()+n*864e5));$('tgFrom').value=d;$('tgTo').value=d;loadTg()}
+async function loadTg(){
+  tgFill();
+  try{const j=await (await fetch(`${API_BASE}/targets?date_from=${$('tgFrom').value}&date_to=${$('tgTo').value}`,{cache:'no-store'})).json(); TG=j.items||[]; renderTg();}
+  catch(e){$('tgList').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
+}
+function renderTg(){
+  const f=$('tgRep').value, by={};
+  TG.forEach(x=>{(by[x.ext]=by[x.ext]||{ext:x.ext,name:x.name,n:0,d:0}).n++; if(x.done)by[x.ext].d++;});
+  const tot=TG.length, dn=TG.filter(x=>x.done).length;
+  $('tgSum').textContent=tot?`${dn} من ${tot} اتكلّموا (${Math.round(dn*100/tot)}%)`:'';
+  $('tgReps').innerHTML=Object.values(by).sort((a,b)=>a.d/a.n-b.d/b.n).map(r=>{const p=Math.round(r.d*100/r.n);
+    return `<div class="tg-rep ${f===r.ext?'sel':''}" onclick="$('tgRep').value=$('tgRep').value==='${r.ext}'?'':'${r.ext}';renderTg()"><b>${esc(r.name)}</b> <span class="muted">${r.d}/${r.n}</span><div class="tg-bar"><b style="width:${p}%;background:${p<50?'var(--red)':p<80?'var(--orange)':'var(--green)'}"></b></div></div>`}).join('');
+  const L=TG.filter(x=>!f||x.ext===f);
+  $('tgList').innerHTML=L.length?`<table class="cb-t"><tr><th style="width:28px"><input type="checkbox" onchange="document.querySelectorAll('.tgc').forEach(c=>c.checked=this.checked);tgSel()"></th><th>العميل</th><th>الموظف</th><th>اليوم</th><th>الحالة</th><th>ملاحظة</th></tr>${L.map(x=>`<tr class="${x.done?'tg-done':''}">
+    <td><input type="checkbox" class="tgc" value="${x.id}" onchange="tgSel()"></td><td><b>${esc(x.customer)}</b> <span class="ltr muted">${esc(x.number)}</span></td><td>${esc(x.name)}</td><td>${x.date}</td>
+    <td>${x.done?'✅ اتكلّم'+(x.doneBy&&x.doneBy!==x.ext?` <span class="muted">(كلّمه ${esc(repOf(+x.doneBy).name)})</span>`:''):'<span class="wait-mid">لسه</span>'}</td><td style="font-size:13px">${esc(x.note||'')}${x.by&&x.by.startsWith('app:')?' <span class="muted">· ضافه بنفسه</span>':''}</td></tr>`).join('')}</table>`
+    :'<div class="muted">مفيش تارجت في الأيام دي — ضيف من فوق أو ارفع ملف Excel</div>';
+  tgSel();
+}
+function tgSel(){const n=document.querySelectorAll('.tgc:checked').length;$('tgDelBtn').hidden=!n;$('tgDelBtn').textContent=`🗑️ امسح (${n})`}
+async function tgPost(items){
+  const r=await fetch(API_BASE+'/targets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});
+  const j=await r.json(); if(!r.ok)throw new Error(j.detail||r.status); return j;
+}
+async function tgAdd(){
+  const it={ext:$('tgARep').value,date:$('tgADate').value,customer:$('tgACust').value.trim(),number:$('tgANum').value.trim(),note:$('tgANote').value.trim()};
+  if(!it.customer||!it.number){$('tgAMsg').innerHTML='<span style="color:var(--red)">اكتب اسم العميل ورقمه</span>';return}
+  try{const j=await tgPost([it]); $('tgAMsg').innerHTML=j.added?'<span style="color:var(--green)">✔ اتضاف</span>':'<span style="color:var(--orange)">موجود قبل كده</span>';
+    ['tgACust','tgANum','tgANote'].forEach(k=>$(k).value=''); $('tgACust').focus(); loadTg();}
+  catch(e){$('tgAMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+}
+async function tgDel(){
+  const ids=[...document.querySelectorAll('.tgc:checked')].map(c=>c.value); if(!ids.length||!confirm(`تمسح ${ids.length} عميل من التارجت؟`))return;
+  await fetch(API_BASE+'/targets/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})}); loadTg();
+}
+function tgTemplate(){
+  const rows=[['اسم العميل','رقم التليفون','التحويلة','التاريخ','ملاحظة'],['مؤسسة الريان','0533333333',(REPS[0]||{}).id||'101',iso(new Date()),'مهتم بنظام المخازن']];
+  const csv='﻿'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='نموذج-تارجت.csv'; a.click();
+}
+let TG_UP=null;
+function tgLib(){return window.XLSX?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=ok;s.onerror=()=>no(new Error('مش قادر أحمّل قارئ الإكسيل'));document.head.appendChild(s)})}
+async function tgRead(file){
+  if(!file)return; $('tgPrev').innerHTML='<div class="muted">بنقرا الملف…</div>';
+  try{
+    await tgLib(); const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,dateNF:'yyyy-mm-dd',defval:''}).filter(r=>r.some(v=>String(v).trim()));
+    if(rows.length<2)throw new Error('الملف فاضي');
+    const H=rows[0].map(h=>String(h).trim().toLowerCase()); const col={};
+    const find=(k,re,not)=>{const i=H.findIndex((h,i)=>re.test(h)&&!(not&&not.test(h))&&!Object.values(col).includes(i)); if(i>=0)col[k]=i;};
+    find('number',/رقم|تليفون|تلفون|جوال|موبايل|هاتف|phone|mobile|tel|number/,/تحويل|ext/);
+    find('ext',/تحويل|ext|مندوب|موظف|المسؤول|rep|agent|sales/);
+    find('date',/تاريخ|يوم|date|day/);
+    find('note',/ملاحظ|note|تفاصيل|comment/);
+    find('customer',/اسم|عميل|customer|client|name|شركة|مؤسسة|محل/);
+    if(col.number==null)throw new Error('مالقيتش عمود رقم التليفون — لازم يبقى اسمه "رقم التليفون" أو "جوال" أو "phone"');
+    const byName={}; (REPS||[]).forEach(r=>{byName[String(r.name).trim().toLowerCase()]=String(r.id);byName[String(r.id)]=String(r.id)});
+    const items=[], bad=[];
+    rows.slice(1).forEach((r,i)=>{const g=k=>col[k]==null?'':String(r[col[k]]??'').trim();
+      const num=g('number'); if(!num){return}
+      let ext=g('ext'); if(ext){ext=byName[ext.toLowerCase()]||byName[ext.replace(/\D/g,'')]||''; if(!ext){bad.push(`سطر ${i+2}: الموظف "${g('ext')}" مش معروف`);return}}
+      items.push({customer:g('customer'),number:num,ext,date:g('date'),note:g('note')});});
+    TG_UP={items,bad,hasExt:col.ext!=null};
+    tgPrev();
+  }catch(e){$('tgPrev').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`;TG_UP=null}
+}
+function tgPrev(){
+  const u=TG_UP; if(!u)return; const noExt=u.items.filter(x=>!x.ext).length;
+  $('tgPrev').innerHTML=`<div style="margin-top:10px"><b>${u.items.length} عميل</b>${noExt?` — <span class="wait-mid">${noExt} من غير موظف (اختار "وزّعهم على" فوق)</span>`:''}
+    ${u.bad.length?`<div class="ai-err" style="margin-top:6px">${u.bad.slice(0,5).map(esc).join('<br>')}${u.bad.length>5?`<br>و${u.bad.length-5} غيرهم`:''}</div>`:''}
+    <table class="cb-t" style="margin-top:6px">${u.items.slice(0,5).map(x=>`<tr><td>${esc(x.customer)}</td><td class="ltr">${esc(x.number)}</td><td>${x.ext?esc(repOf(+x.ext).name):'—'}</td><td>${esc(x.date||'')}</td></tr>`).join('')}</table>
+    ${u.items.length>5?`<div class="muted">و${u.items.length-5} كمان…</div>`:''}
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button class="btn" onclick="tgUpload()">✔ ضيف ${u.items.length} عميل</button><span id="tgUMsg"></span></div></div>`;
+}
+async function tgUpload(){
+  const u=TG_UP; if(!u)return; const dist=$('tgDist').value; let pool=[];
+  if(dist==='*')pool=(REPS||[]).map(r=>String(r.id)); else if(dist.startsWith('t:'))pool=(REPS||[]).filter(r=>r.team===dist.slice(2)).map(r=>String(r.id)); else if(dist)pool=[dist];
+  const need=u.items.filter(x=>!x.ext).length;
+  if(need&&!pool.length){$('tgUMsg').innerHTML='<span style="color:var(--red)">اختار توزّع العملاء اللي من غير موظف على مين</span>';return}
+  let k=0; const items=u.items.map(x=>({...x,ext:x.ext||pool[k++%pool.length],date:x.date||$('tgUDate').value}));
+  try{const j=await tgPost(items); $('tgPrev').innerHTML=`<div style="color:var(--green);margin-top:8px">✔ اتضاف ${j.added} عميل${j.skipped?` · ${j.skipped} كانوا موجودين قبل كده`:''}</div>`; $('tgFile').value=''; TG_UP=null; loadTg();}
+  catch(e){$('tgUMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+}
+$('tgRep')&&$('tgRep').addEventListener('change',renderTg);
 
 /* ===================== خطط التدريب: الشركة / الفرق / الموظفين / القادة ===================== */
 let TRP=null, TR_SEC='company', TR_POLL=null;

@@ -478,7 +478,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <div class="prog" id="tProg"><b style="width:0"></b></div>
     <button class="btn" id="dlStart" style="margin-top:12px" onclick="NQDialer.start()">▶️ اتصال متتالي</button>
   </div>
-  <div class="card" hidden>
+  <div class="card">
     <b>إضافة عميل للتارجت</b>
     <label class="lbl">اسم العميل</label>
     <input id="tName" placeholder="مثلًا: شركة الأفق — م. سامي">
@@ -1408,7 +1408,7 @@ const NQInbox = {
     });
   }
 };
-setTimeout(() => NQInbox.poll(), 4000);
+setTimeout(() => { NQInbox.poll(); NQTargets.sync(); }, 4000);
 setInterval(() => { if (document.visibilityState === "visible" || IS_APP) NQInbox.poll(); }, 60000);
 if (!IS_APP && window.Notification && Notification.permission === "default") document.addEventListener("click", () => { try { Notification.requestPermission(); } catch (e) {} }, { once: true });
 
@@ -1463,6 +1463,7 @@ const NQHistory = {
     h.push({ ...info, ext: NQPhone.ext });
     store.set("nq_history", h.slice(-5000));
     if (info.answered) NQTargets.markCalled(info.number, info.started);
+    setTimeout(() => NQTargets.sync(), 8000);   // السيرفر بيحسب "اتكلّم" من سجل السنترال
   },
   attachNote(n) {
     const h = this.all(); const e = h.find(x => x.started === n.started && x.number === n.number);
@@ -1534,12 +1535,25 @@ const NQLog = {
 
 /* ---------- targets ---------- */
 const NQTargets = {
-  all() { return store.get("nq_targets", []); },
-  save(t) { store.set("nq_targets", t); },
-  open() { if (!$("tDate").value) $("tDate").value = isoDay(new Date()); this.render(); show("scrTargets"); },
+  // عملاء الجهاز ده + العملاء اللي على السيرفر (من المدير أو اللي الموظف ضافهم)
+  local() { return store.get("nq_targets", []); },
+  srv() { const s = store.get("nq_srv_targets", null); return s && String(s.ext) === String(NQPhone.ext || (NQOwner.creds() || {}).ext) ? s.items : []; },
+  all() { return [...this.local(), ...this.srv().map(x => ({ ...x, id: "s:" + x.id, srv: true }))]; },
+  save(t) { store.set("nq_targets", t.filter(x => !x.srv)); },
+  open() { if (!$("tDate").value) $("tDate").value = isoDay(new Date()); this.render(); show("scrTargets"); this.sync(); },
+  async api(path, body) {
+    const c = NQOwner.creds(); if (!c) throw new Error("ادخل بحسابك الأول");
+    const r = await fetch(CONFIG.api + "/targets" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, ...body }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || "السيرفر مش راد"); return j;
+  },
+  async sync() {
+    try { const c = NQOwner.creds(); if (!c) return; const j = await this.api("", {}); store.set("nq_srv_targets", { ext: c.ext, items: j.items || [] });
+      if ($("scrTargets").classList.contains("on")) this.render(); } catch (e) {}
+  },
   editing: null,
   edit(id) {
     const x = this.all().find(y => y.id === id); if (!x) return;
+    if (x.srv) { toast(x.note ? "📝 " + x.note : "العميل ده على السيرفر — امسحه وضيفه تاني لو عايز تعدّله"); return; }
     this.editing = id; $("tName").value = x.customer; $("tPhone").value = x.number || "";
     $("tAddBtn").textContent = "حفظ التعديل"; $("tName").focus(); $("scrTargets").scrollTop = 0;
   },
@@ -1553,11 +1567,23 @@ const NQTargets = {
       this.editing = null; $("tAddBtn").textContent = "إضافة";
       this.save(t); $("tName").value = ""; $("tPhone").value = ""; this.render(); toast("اتعدّل ✓"); return;
     }
-    t.push({ id: Date.now() + "" + Math.random().toString(36).slice(2, 6), date: $("tDate").value || isoDay(new Date()), customer, number, done: false });
+    const date = $("tDate").value || isoDay(new Date());
+    if (number && NQOwner.creds()) {   // على السيرفر عشان المدير يشوفه
+      this.api("/add", { item: { customer, number, date } }).then(() => { $("tName").value = ""; $("tPhone").value = ""; toast("اتضاف ✓"); this.sync(); })
+        .catch(e => toast("✖ " + e.message));
+      return;
+    }
+    t.push({ id: Date.now() + "" + Math.random().toString(36).slice(2, 6), date, customer, number, done: false });
     this.save(t); $("tName").value = ""; $("tPhone").value = ""; this.render(); toast("اتضاف ✓");
   },
-  remove(id) { this.save(this.all().filter(x => x.id !== id)); this.render(); },
-  toggle(id) { const t = this.all(); const x = t.find(y => y.id === id); if (x) { x.done = !x.done; x.doneAt = x.done ? new Date().toISOString() : null; } this.save(t); this.render(); },
+  remove(id) {
+    if (id.startsWith("s:")) { this.api("/update", { id: id.slice(2), action: "delete" }).then(() => this.sync()).catch(e => toast("✖ " + e.message)); return; }
+    this.save(this.all().filter(x => x.id !== id)); this.render();
+  },
+  toggle(id) {
+    if (id.startsWith("s:")) { const x = this.all().find(y => y.id === id); this.api("/update", { id: id.slice(2), action: x && x.done ? "undone" : "done" }).then(() => this.sync()).catch(e => toast("✖ " + e.message)); return; }
+    const t = this.all(); const x = t.find(y => y.id === id); if (x) { x.done = !x.done; x.doneAt = x.done ? new Date().toISOString() : null; } this.save(t); this.render();
+  },
   findByNumber(num) {
     const d = digits9(num); if (!d) return null;
     const t = this.all().filter(x => digits9(x.number) === d);
@@ -1582,12 +1608,12 @@ const NQTargets = {
       const row = document.createElement("div"); row.className = "tgt" + (x.done ? " done" : "");
       const info = document.createElement("div"); info.className = "info"; info.onclick = () => this.edit(x.id); info.title = "اضغط للتعديل";
       const b = document.createElement("b"); b.textContent = x.customer;
-      const sm = document.createElement("small"); sm.textContent = (x.number || "") + "  ✎";
+      const sm = document.createElement("small"); sm.textContent = (x.number || "") + (x.srv ? (String(x.by || "").startsWith("app:") ? "" : "  · من المدير") + (x.note ? " · " + x.note : "") : "  ✎");
       info.append(b, sm);
       const pill = document.createElement("span"); pill.className = "pill" + (x.done ? "" : " wait"); pill.textContent = x.done ? "تم ✓" : "لسه"; pill.onclick = () => this.toggle(x.id);
       row.append(info, pill);
       if (x.number) { const c = document.createElement("button"); c.className = "mini call"; c.textContent = "📞"; c.onclick = () => { show("scrDial"); $("dialNum").textContent = x.number; NQPhone.call(x.number); }; row.append(c); }
-      const del = document.createElement("button"); del.className = "mini x"; del.textContent = "✕"; del.onclick = () => this.remove(x.id); row.append(del);
+      if (!x.srv || String(x.by || "").startsWith("app:")) { const del = document.createElement("button"); del.className = "mini x"; del.textContent = "✕"; del.onclick = () => this.remove(x.id); row.append(del); }
       box.append(row);
     });
   }

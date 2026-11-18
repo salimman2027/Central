@@ -1199,6 +1199,11 @@ OPS.CTX.update(dir=DATA_DIR, tz=TZ, trunk=TRUNK.split("/", 1)[1], query=query, s
                crm_get=lambda path, params: APPT._items(APPT._get_json(path, params)), crm_on=APPT.crm_configured,
                sales_ids=lambda: APPT.crm_settings()["salesIds"])
 OPS.start()
+import targets as TGT  # noqa: E402
+app.include_router(TGT.router)
+TGT.CTX.update(dir=DATA_DIR, tz=TZ, calls=lambda a, b: OPS.calls_c(a, b), scope=lambda: SCOPE.get(),
+               check_ext=lambda e, p: check_ext_password(e, p),
+               names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])})
 TRAIN.CTX.update(dir=DATA_DIR, tz=TZ, scope=lambda: SCOPE.get(), rubric=lambda: RUBRIC.load(), teams=_teams_file,
                  names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},
                  analysis=lambda a, b: unscoped(analysis, a, b), calls=lambda a, b: unscoped(calls, a, b),
