@@ -168,9 +168,12 @@ async def app_targets(request: Request):
 @router.post("/app/targets/add")
 async def app_targets_add(request: Request):
     b, ext = await _auth(request)
-    it = b.get("item") or {}
-    added = add_items([{**it, "ext": ext}], "app:" + ext)
-    return JSONResponse({"item": added[0] if added else None}, headers=HDR)
+    rows = b.get("items") if isinstance(b.get("items"), list) else [b.get("item") or {}]
+    if len(rows) > 1000:
+        raise HTTPException(400, "الملف كبير — 1000 عميل بالكتير مرة واحدة")
+    added = add_items([{**it, "ext": ext} for it in rows], "app:" + ext)
+    return JSONResponse({"item": added[0] if added else None, "added": len(added), "skipped": len(rows) - len(added)},
+                        headers=HDR)
 
 
 @router.post("/app/targets/update")
