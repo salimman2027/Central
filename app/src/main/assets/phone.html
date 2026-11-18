@@ -167,6 +167,21 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .opt { display:flex; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; margin-bottom:10px; text-align:right; font-size:16px; color:var(--fg); }
   .opt b { font-size:24px; } .opt small { display:block; color:var(--muted); font-size:12px; }
   .viachip { font-size:12px; padding:7px 10px; border-radius:16px; background:#e7f3f2; color:var(--pri); white-space:nowrap; }
+  .ibar { margin:6px 14px 0; display:flex; flex-direction:column; gap:6px; }
+  .ibar:empty { display:none; }
+  .ibar > div { border-radius:12px; padding:8px 12px; font-size:13.5px; display:flex; align-items:center; gap:8px; cursor:pointer; line-height:1.5; }
+  .ibar .bad { background:#fde8e7; color:#b4302c; border:1px solid #f3b9b6; }
+  .ibar .warn { background:#fff1e2; color:#a35d12; border:1px solid #f6d2a8; }
+  .ibar .todo { background:rgba(25,230,193,.12); color:var(--text); border:1px solid rgba(25,230,193,.45); font-weight:600; }
+  .ibar .todo:after { content:"‹"; margin-inline-start:auto; font-size:18px; opacity:.6; }
+  .ib-h { font-size:13px; color:var(--muted); margin:2px 0 6px; }
+  .ib-late { color:#d64541; font-weight:700; }
+  .dlbar { position:fixed; left:12px; right:12px; bottom:84px; z-index:60; background:#0f182b; color:#fff; border-radius:16px; padding:12px 14px; box-shadow:0 10px 30px rgba(0,0,0,.35); display:none; }
+  .dlbar.on { display:block; }
+  .dlbar .row { display:flex; gap:8px; margin-top:10px; }
+  .dlbar .row button { flex:1; border:0; border-radius:10px; padding:9px 0; font:inherit; font-size:14px; cursor:pointer; background:#22324d; color:#fff; }
+  .dlbar .row button.go { background:var(--pri,#19e6c1); color:#04201b; font-weight:700; }
+  .dlbar .cd { font-size:26px; font-weight:800; color:var(--pri,#19e6c1); }
   .logrow { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
   .logrow:last-child { border-bottom:0; }
   .logrow .ic { width:38px; height:38px; border-radius:50%; background:#eef2f5; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
@@ -304,6 +319,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <button class="iconbtn themebtn" onclick="toggleTheme()" aria-label="فاتح / غامق" title="فاتح / غامق"><span class="i-dark">🌙</span><span class="i-light">☀️</span></button>
     <button class="iconbtn" onclick="showSettings()" aria-label="الإعدادات">⚙</button>
   </div>
+  <div class="ibar" id="inboxBar"></div>
   <div class="display"><div id="dialNum" class="num"></div><div id="dialName" class="who-name"></div><div id="dialErr" class="err"></div>
     <button class="pastebtn" id="btnPaste" onclick="dialPaste()" aria-label="لصق رقم" title="لصق رقم (Ctrl+V)">📋 لصق</button></div>
   <div class="keypad" id="keypad"></div>
@@ -441,6 +457,12 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 </section>
 
 <!-- ================= call log ================= -->
+<section id="scrInbox" class="screen page">
+  <h2>📥 المطلوب مني</h2>
+  <div id="ibBody"></div>
+  <button class="btn ghost" onclick="show('scrDial')">رجوع</button>
+</section>
+
 <section id="scrLog" class="screen page">
   <h2>🕘 سجل المكالمات</h2>
   <div class="card" id="logList"></div>
@@ -454,6 +476,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <input id="tDate" type="date" class="ltr" onchange="NQTargets.render()">
     <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:14px"><span>المنجز</span><b id="tProgTxt">0 من 0</b></div>
     <div class="prog" id="tProg"><b style="width:0"></b></div>
+    <button class="btn" id="dlStart" style="margin-top:12px" onclick="NQDialer.start()">▶️ اتصال متتالي</button>
   </div>
   <div class="card" hidden>
     <b>إضافة عميل للتارجت</b>
@@ -586,6 +609,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 </nav>
 
 <div id="toast" class="toast"></div>
+<div class="dlbar" id="dlBar"></div>
 <audio id="remoteAudio" autoplay></audio>
 
 <script src="jssip.min.js"></script>
@@ -862,7 +886,7 @@ const NQPhone = {
       connection_recovery_min_interval: 2, connection_recovery_max_interval: 30
     });
     this.ua = ua;
-    ua.on("registered", () => { if (ua !== this.ua) return; this._err("متصل ✓"); this._reg(true); NQNotes.flush(); });
+    ua.on("registered", () => { if (ua !== this.ua) return; this._err("متصل ✓"); this._reg(true); NQNotes.flush(); NQInbox.poll(); });
     ua.on("unregistered", () => { if (ua === this.ua) this._reg(false); });
     ua.on("registrationFailed", e => { if (ua !== this.ua) return;
       this._reg(false);
@@ -889,8 +913,10 @@ const NQPhone = {
       if (last) { $("dialNum").textContent = last.number; $("dialErr").textContent = ""; }
       return;
     }
+    const isCode = /^[*#]/.test(number) || number.length < 6;   // كود سنترال (*741101) أو تحويلة داخلية
+    if (isCode) forceVia = "pbx";
     // العميل ده تبع مندوب تاني؟ (بنسأل السيرفر مرة واحدة قبل الاتصال)
-    if (!(this._ownOk && this._ownOk.n === number && Date.now() - this._ownOk.t < 120000)) {
+    if (!isCode && !(this._ownOk && this._ownOk.n === number && Date.now() - this._ownOk.t < 120000)) {
       return NQOwner.guard(number, () => { this._ownOk = { n: number, t: Date.now() }; this.call(number, forceVia); });
     }
     const pbxReady = !!(this.ua && this.ua.isRegistered());
@@ -900,6 +926,10 @@ const NQPhone = {
     if (via === "ask") return NQVia.open(number);
     if (via === "sim") return NQVia.simCall(number);
     if (!pbxReady) { $("dialErr").textContent = "السنترال مش متصل — اتصل من شريحتك"; return NQVia.open(number); }
+    if (!isCode && NQInbox.lineBlocked()) {   // الشريحة وصلت حدها النهارده عشان الشبكة متحظرش الرقم
+      $("dialErr").textContent = "خط السنترال بتاعك وصل حد المكالمات النهارده — اتصل من شريحتك";
+      return IS_APP ? NQVia.open(number) : undefined;
+    }
     if (this.session) return;
     if (window.Android) Android.onCallStateChanged(true);
     const out = pbxNumber(number);
@@ -991,7 +1021,7 @@ const NQPhone = {
         $("dialErr").textContent = /Media Access/i.test(info.cause || "") ? "المايك مش مسموح للتطبيق — اسمح بيه من الإعدادات وجرّب تاني"
           : "المكالمة مكملتش: " + (ar || info.cause || "") + (code ? ` (${code}${why ? " " + why : ""})` : "");
       }
-      if (!NQNotes.maybeAsk(info)) show("scrDial");
+      if (!NQNotes.maybeAsk(info)) { show("scrDial"); NQDialer.after(); }
     };
     s.on("ended", end); s.on("failed", end);
   },
@@ -1036,9 +1066,9 @@ const NQNotes = {
     if (!n.customer && !n.summary) { toast("اكتب اسم العميل أو ملخص المكالمة"); return; }
     const q = this.queue(); q.push(n); store.set("nq_notes_q", q);
     NQHistory.attachNote(n);
-    this.current = null; show("scrDial"); toast("اتحفظ ✓"); this.flush();
+    this.current = null; show("scrDial"); toast("اتحفظ ✓"); this.flush(); NQDialer.after();
   },
-  skip() { this.current = null; show("scrDial"); },
+  skip() { this.current = null; show("scrDial"); NQDialer.after(); },
   ai: null,
   rec: false, said: "",
   dictate() {
@@ -1183,7 +1213,7 @@ const NQVia = {
     p.duration = Math.max(0, Math.round((Date.now() - new Date(p.started)) / 1000) - 5);
     NQHistory.add(p);
     $("dialNum").textContent = "";
-    if (!NQNotes.maybeAsk(p)) show("scrDial");
+    if (!NQNotes.maybeAsk(p)) { show("scrDial"); NQDialer.after(); }
   }
 };
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && NQVia.pending) setTimeout(() => NQVia.back(), 600); });
@@ -1319,6 +1349,108 @@ const NQPerf = {
   }
 };
 document.querySelectorAll("#pSeg button").forEach(b => b.onclick = () => { NQPerf.period = b.dataset.p; NQPerf.load(); });
+
+
+/* ---------- المطلوب مني: فائتة لازم أرد عليها + متابعات + عملاء جدد + حالة الخط ---------- */
+const NQInbox = {
+  data: null, t: null,
+  lineBlocked() { const l = this.data && this.data.line; return !!(l && l.blocked); },
+  async poll() {
+    const c = NQOwner.creds(); if (!c) return;
+    try {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 8000);
+      const r = await fetch(CONFIG.api + "/inbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c), signal: ctl.signal });
+      clearTimeout(tm); if (!r.ok) return;
+      this.data = await r.json(); this.render(); this.notify();
+      if ($("scrInbox").classList.contains("on")) this.renderList();
+    } catch (e) {}
+  },
+  items() { const d = this.data || {}; return { cb: d.callbacks || [], fu: d.followups || [], ld: d.leads || [] }; },
+  render() {
+    const d = this.data; if (!d) return; const { cb, fu, ld } = this.items(); const parts = [];
+    if (d.gateway === "down") parts.push(`<div class="bad" onclick="NQInbox.open()">🔴 خط السنترال واقف دلوقتي — اتصل من شريحتك لحد ما يرجع</div>`);
+    const l = d.line || {};
+    if (l.blocked) parts.push(`<div class="bad">⛔ خطك عمل ${l.used} مكالمة النهارده ووصل الحد (${l.cap}) — كمّل من شريحتك عشان الرقم ميتحظرش</div>`);
+    else if (l.warn) parts.push(`<div class="warn">⚠️ خطك عمل ${l.used} من ${l.cap} مكالمة النهارده</div>`);
+    const n = [cb.length && `${cb.length} عميل اتصل بيك`, fu.length && `${fu.length} متابعة`, ld.length && `${ld.length} عميل جديد`].filter(Boolean);
+    if (n.length) parts.push(`<div class="todo" onclick="NQInbox.open()">📥 مطلوب منك: ${n.join(" · ")}</div>`);
+    $("inboxBar").innerHTML = parts.join("");
+  },
+  open() { this.renderList(); show("scrInbox"); this.poll(); },
+  renderList() {
+    const { cb, fu, ld } = this.items();
+    const row = (title, sub, num, late) => `<div class="logrow"><div class="info" style="flex:1;min-width:0"><b>${esc(title)}</b><small class="${late ? "ib-late" : ""}">${sub}</small></div>
+      <button class="mini call" onclick="NQInbox.call('${esc(num)}','${esc(title).replace(/'/g, "")}')">📞</button></div>`;
+    const wait = m => m < 60 ? `${m} دقيقة` : m < 1440 ? `${Math.floor(m / 60)} ساعة` : `${Math.floor(m / 1440)} يوم`;
+    let h = "";
+    h += `<div class="card"><b>📞 عملاء اتصلوا ومحدش رد (${cb.length})</b><div class="ib-h">رد عليهم بسرعة — بيختفوا أول ما حد يكلمهم ويردوا</div>` +
+      (cb.length ? cb.map(c => row(c.customer || c.number, `${c.customer ? `<span class="n">${esc(c.number)}</span> · ` : ""}اتصل ${c.missed} مرة · مستني من ${wait(c.waitMin)}${c.tries ? ` · حاولت ${c.tries} مرة` : ""}`, c.number, c.waitMin > 60)).join("") : `<div class="ib-h">👏 مفيش</div>`) + `</div>`;
+    h += `<div class="card"><b>🔔 متابعات ميعادها جه (${fu.length})</b>` +
+      (fu.length ? fu.map(f => row(f.customer || f.number, `${f.late > 0 ? `متأخرة ${f.late} يوم` : "النهارده"}${f.summary ? " · " + esc(f.summary.slice(0, 80)) : ""}`, f.number, f.late > 0)).join("") : `<div class="ib-h">مفيش</div>`) + `</div>`;
+    h += `<div class="card"><b>🆕 عملاء جدد ليك في الـ CRM (${ld.length})</b><div class="ib-h">اللي بيتكلّم في أول 5 دقايق نسبة إنه يقفل أعلى بكتير</div>` +
+      (ld.length ? ld.map(x => row(x.name || x.phone, `<span class="n">${esc(x.phone)}</span> · دخل من ${wait(x.ageMin)}`, x.phone, x.ageMin > 30)).join("") : `<div class="ib-h">مفيش</div>`) + `</div>`;
+    $("ibBody").innerHTML = h;
+  },
+  call(num, name) { show("scrDial"); $("dialNum").textContent = num; window._pickedName = name || ""; NQPhone.call(num); },
+  notify() {
+    const { cb, fu, ld } = this.items(); const seen = new Set(store.get("nq_ib_seen", [])); const fresh = [];
+    cb.forEach(c => { const k = "cb" + c.digits + c.first; if (!seen.has(k)) { seen.add(k); fresh.push(["📞 عميل اتصل بيك ومحدش رد", `${c.customer || c.number} — اتصل ${c.missed} مرة`]); } });
+    fu.forEach(f => { const k = "fu" + f.number + f.due; if (!seen.has(k)) { seen.add(k); fresh.push(["🔔 ميعاد متابعة", `${f.customer || f.number}${f.summary ? " — " + f.summary.slice(0, 80) : ""}`]); } });
+    ld.forEach(x => { const k = "ld" + x.id; if (!seen.has(k)) { seen.add(k); fresh.push(["🆕 عميل جديد ليك", `${x.name} ${x.phone} — كلّمه دلوقتي`]); } });
+    const gk = "gw" + (this.data.gateway === "down" ? "down" : "up");
+    if (this.data.gateway === "down" && !seen.has(gk)) { seen.add(gk); fresh.push(["🔴 خط السنترال واقف", "اتصل من شريحتك لحد ما يرجع"]); }
+    if (this.data.gateway === "up") seen.delete("gwdown");
+    store.set("nq_ib_seen", [...seen].slice(-400));
+    fresh.slice(0, 4).forEach(([t, b], i) => {
+      if (window.Android && Android.notify) try { Android.notify((Date.now() + i) % 60000, t, b); } catch (e) {}
+      else if (window.Notification && Notification.permission === "granted") try { new Notification(t, { body: b }); } catch (e) {}
+      else toast(t + ": " + b);
+    });
+  }
+};
+setTimeout(() => NQInbox.poll(), 4000);
+setInterval(() => { if (document.visibilityState === "visible" || IS_APP) NQInbox.poll(); }, 60000);
+if (!IS_APP && window.Notification && Notification.permission === "default") document.addEventListener("click", () => { try { Notification.requestPermission(); } catch (e) {} }, { once: true });
+
+/* ---------- الاتصال المتتالي: يكلّم التارجت واحد ورا التاني ---------- */
+const NQDialer = {
+  active: false, queue: [], t: null, sec: 0,
+  start() {
+    const day = $("tDate").value || isoDay(new Date());
+    this.queue = NQTargets.forDay(day).filter(x => !x.done && x.number).map(x => x.id);
+    if (!this.queue.length) { toast("مفيش عملاء لسه مااتكلموش في تارجت اليوم ده"); return; }
+    this.active = true; this.next(true);
+  },
+  cur() { const all = NQTargets.all(); while (this.queue.length) { const x = all.find(y => y.id === this.queue[0]); if (x && !x.done && x.number) return x; this.queue.shift(); } return null; },
+  next(now) {
+    clearInterval(this.t); const x = this.cur();
+    if (!x) { this.stop(); toast("🎉 خلّصت كل التارجت"); return; }
+    if (now) { this.queue.shift(); this.bar(""); NQTargets.render(); show("scrDial"); $("dialErr").textContent = ""; $("dialNum").textContent = x.number; window._pickedName = x.customer; NQPhone.call(x.number); return; }
+    this.sec = 6; this.paint(x);
+    this.t = setInterval(() => { if (--this.sec <= 0) { clearInterval(this.t); this.next(true); } else this.paint(x); }, 1000);
+  },
+  paint(x) {
+    this.bar(`<div style="display:flex;align-items:center;gap:12px"><span class="cd">${this.sec}</span><div style="min-width:0"><small style="opacity:.7">المكالمة الجاية (فاضل ${this.queue.length})</small><br><b>${esc(x.customer)}</b> <span class="ltr" style="opacity:.8">${esc(x.number)}</span></div></div>
+      <div class="row"><button class="go" onclick="NQDialer.next(true)">📞 اتصل دلوقتي</button><button onclick="NQDialer.pause()">⏸ استنى</button><button onclick="NQDialer.queue.shift();NQDialer.next()">⏭ تخطّى</button><button onclick="NQDialer.stop()">✕</button></div>`);
+  },
+  pause() { clearInterval(this.t); const x = this.cur(); if (!x) return this.stop();
+    this.bar(`<b>⏸ الاتصال المتتالي واقف</b> — الجاي: ${esc(x.customer)}<div class="row"><button class="go" onclick="NQDialer.next(true)">▶️ كمّل</button><button onclick="NQDialer.stop()">✕ خلّص</button></div>`); },
+  after() { if (!this.active || NQPhone.session) return; setTimeout(() => { if (this.active && !NQPhone.session && !$("scrNote").classList.contains("on")) this.next(); }, 400); },
+  stop() { clearInterval(this.t); this.active = false; this.queue = []; this.bar(""); },
+  bar(h) { $("dlBar").innerHTML = h; $("dlBar").classList.toggle("on", !!h); }
+};
+
+/* ---------- اللوحة على نفس اللاب: "اسمع / وشوش / ادخل" بيتصل من هنا ---------- */
+if (!IS_APP && "BroadcastChannel" in window) {
+  const bc = new BroadcastChannel("nq-phone"), me = Math.random().toString(36).slice(2);
+  bc.onmessage = e => {
+    const m = e.data || {}; if (!m.dial || !/^\*74[123]\d{2,6}$/.test(m.dial)) return;
+    if (!(NQPhone.ua && NQPhone.ua.isRegistered()) || NQPhone.session) return;
+    try { if (localStorage.getItem("nq_bc_" + m.id)) return; localStorage.setItem("nq_bc_" + m.id, me); } catch (er) {}
+    setTimeout(() => { try { if (localStorage.getItem("nq_bc_" + m.id) !== me) return; } catch (er) {}
+      bc.postMessage({ ack: m.id }); show("scrDial"); $("dialNum").textContent = m.dial; NQPhone.call(m.dial, "pbx"); }, 60);
+  };
+}
 
 /* ---------- call history (on this phone) ---------- */
 const digits9 = n => String(n || "").replace(/\D/g, "").slice(-9);

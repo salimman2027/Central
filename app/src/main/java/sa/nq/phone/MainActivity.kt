@@ -273,6 +273,7 @@ class MainActivity : Activity() {
             "answer" -> web.post { web.evaluateJavascript("NQPhone.answer()", null) }
             "reject" -> web.post { web.evaluateJavascript("NQPhone.hangup()", null) }
             "files" -> web.postDelayed({ web.evaluateJavascript("NQFiles.open(); NQFiles.setPane('inbox')", null) }, 600)
+            "inbox" -> web.postDelayed({ web.evaluateJavascript("NQInbox.open()", null) }, 600)
         }
         i?.removeExtra(EXTRA_ACTION)
     }
@@ -553,6 +554,20 @@ class MainActivity : Activity() {
             val uri = writeDownload(name, mime, android.util.Base64.decode(b64, android.util.Base64.DEFAULT))
             runOnUiThread { shareUri(uri, mime) }; true
         } catch (e: Exception) { false }
+        // تنبيه على الموبايل (عميل فاتك، متابعة، عميل جديد، الخط واقف)
+        @JavascriptInterface fun notify(id: Int, title: String, text: String) {
+            try {
+                val nm = getSystemService(android.app.NotificationManager::class.java)
+                nm.createNotificationChannel(android.app.NotificationChannel("inbox", "المطلوب مني", android.app.NotificationManager.IMPORTANCE_HIGH))
+                val open = android.app.PendingIntent.getActivity(this@MainActivity, 9, Intent(this@MainActivity, MainActivity::class.java)
+                    .putExtra(EXTRA_ACTION, "inbox").addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
+                nm.notify(1000 + (id and 0xffff), android.app.Notification.Builder(this@MainActivity, "inbox")
+                    .setSmallIcon(android.R.drawable.stat_notify_missed_call).setContentTitle(title).setContentText(text)
+                    .setStyle(android.app.Notification.BigTextStyle().bigText(text))
+                    .setContentIntent(open).setAutoCancel(true).build())
+            } catch (_: Exception) {}
+        }
         @JavascriptInterface fun shareText(text: String) = runOnUiThread {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
                 .putExtra(Intent.EXTRA_TEXT, text), "مشاركة"))

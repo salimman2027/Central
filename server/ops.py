@@ -51,6 +51,22 @@ def _jsave(name, data):
     tmp.replace(_p(name))
 
 
+_CC: dict = {}
+
+
+def calls_c(d1: dt.date, d2: dt.date) -> list:
+    """المكالمات مع كاش 30 ثانية (التطبيقات بتسأل كل دقيقة)"""
+    k = (d1, d2)
+    hit = _CC.get(k)
+    if hit and time.time() - hit[0] < 30:
+        return hit[1]
+    v = CTX["calls"](d1, d2)
+    if len(_CC) > 20:
+        _CC.clear()
+    _CC[k] = (time.time(), v)
+    return v
+
+
 def settings() -> dict:
     return {**DEFAULTS, **_jload("ops.json", {})}
 
@@ -207,7 +223,7 @@ def lines_today() -> dict:
     """المكالمات الطالعة النهارده لكل تحويلة (من السنترال) + الحد"""
     s = settings()
     d = now().date()
-    used = Counter(str(c["ext"]) for c in CTX["calls"](d, d) if c["dir"] == "out" and c.get("source") != "sim")
+    used = Counter(str(c["ext"]) for c in calls_c(d, d) if c["dir"] == "out" and c.get("source") != "sim")
     lines = CTX["lines"]()
     names = CTX["names"]()
     out = {}
@@ -223,7 +239,7 @@ def lines_today() -> dict:
 def callbacks(days: int | None = None) -> list:
     days = days or int(settings()["callbackDays"])
     d2 = now().date()
-    calls = sorted(CTX["calls"](d2 - dt.timedelta(days=days), d2), key=lambda c: c["time"])
+    calls = sorted(calls_c(d2 - dt.timedelta(days=days), d2), key=lambda c: c["time"])
     by_num: dict = {}
     for c in calls:
         d = digits(c.get("number"))
@@ -255,7 +271,7 @@ def callbacks(days: int | None = None) -> list:
 def followups(ext: str | None = None) -> list:
     today = now().date()
     notes = CTX["notes"](today - dt.timedelta(days=45), today + dt.timedelta(days=1))
-    calls = CTX["calls"](today - dt.timedelta(days=45), today)
+    calls = calls_c(today - dt.timedelta(days=45), today)
     later: dict = {}
     for c in calls:
         later.setdefault(digits(c.get("number")), []).append(c["time"])
@@ -324,7 +340,7 @@ def leads(ext: str | None = None, days=3) -> list:
     st = _jload("leads.json", {"items": []})
     cut = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
     today = now().date()
-    called = {digits(c.get("number")) for c in CTX["calls"](today - dt.timedelta(days=days), today)}
+    called = {digits(c.get("number")) for c in calls_c(today - dt.timedelta(days=days), today)}
     out = []
     for x in st["items"]:
         if _ts(x["at"]) < cut or (ext and x["ext"] != str(ext)):
@@ -417,7 +433,7 @@ def board(d1: dt.date, d2: dt.date) -> list:
         e = str(e)
         return rows.setdefault(e, {"ext": e, "name": names.get(e, e), "team": tnames.get(assign.get(e), ""),
                                    "calls": 0, "answered": 0, "talkMin": 0, "appts": 0, "_sc": []})
-    for c in CTX["calls"](d1, d2):
+    for c in calls_c(d1, d2):
         r = row(c["ext"])
         r["calls"] += 1
         if c["status"] == "تم الرد":
