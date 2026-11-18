@@ -352,13 +352,27 @@ PY
 fi
 if [[ "${1:-}" == google ]]; then
   command -v rclone >/dev/null || apt-get install -y -qq rclone >/dev/null
-  echo "على اللاب (ويندوز):"
-  echo "  1) نزّل rclone من https://rclone.org/downloads  (Windows - Intel/AMD 64 Bit) وفك الضغط"
-  echo "  2) افتح CMD جوه الفولدر ده واكتب:"
-  echo '     rclone authorize "drive"'
-  echo "  3) هيفتح المتصفح — اختار حساب جوجل ووافق"
-  echo "  4) هيطبعلك سطر طويل بين ---> و <--- انسخه كله"
-  read -rp "الصق السطر هنا: " TOK
+  echo "1) من الموبايل بس (رابط تفتحه وتوافق)"
+  echo "2) عندي سطر التوكن من rclone على اللاب"
+  read -rp "اختار 1 أو 2 [1]: " WAY
+  if [[ "${WAY:-1}" == 2 ]]; then
+    read -rp "الصق السطر هنا: " TOK
+  else
+    pkill -f "rclone authorize" 2>/dev/null; LOG=$(mktemp)
+    rclone authorize drive --auth-no-open-browser >"$LOG" 2>&1 & RP=$!
+    for i in $(seq 1 20); do LOCAL=$(grep -o 'http://127.0.0.1:53682/auth[^ ]*' "$LOG" | head -1); [[ -n "$LOCAL" ]] && break; sleep 0.5; done
+    GURL=$( [[ -n "$LOCAL" ]] && curl -s --noproxy '*' -o /dev/null -w '%{redirect_url}' "$LOCAL" )
+    [[ -n "$GURL" ]] || { kill $RP 2>/dev/null; echo "✖ rclone مش راضي يبدأ: $(tail -c 300 "$LOG")"; exit 1; }
+    echo; echo "① انسخ الرابط ده وافتحه في متصفح الموبايل:"; echo; echo "$GURL"; echo
+    echo "② اختار حساب جوجل ودوس Allow / سماح"
+    echo "③ هتلاقي صفحة فيها خطأ (ده طبيعي) — انسخ الرابط اللي فوق في شريط العنوان كله (بيبدأ بـ http://127.0.0.1:53682)"
+    read -rp "الصق الرابط هنا: " BACK
+    [[ "$BACK" == http://127.0.0.1:53682/* ]] || { kill $RP 2>/dev/null; echo "✖ الرابط لازم يبدأ بـ http://127.0.0.1:53682"; exit 1; }
+    curl -s --noproxy '*' -o /dev/null "$BACK"
+    for i in $(seq 1 30); do kill -0 $RP 2>/dev/null || break; sleep 0.5; done; kill $RP 2>/dev/null
+    TOK=$(tr -d '\n' < "$LOG" | grep -o '{"access_token"[^}]*}' | tail -1); rm -f "$LOG"
+    [[ -n "$TOK" ]] || { echo "✖ جوجل مارجّعش التوكن — جرّب تاني من الأول (الرابط بيخلص بسرعة)"; exit 1; }
+  fi
   TOK=$(printf '%s' "$TOK" | sed 's/^.*\({.*}\).*$/\1/')
   [[ "$TOK" == "{"*"}" ]] || { echo "✖ ده مش التوكن — لازم يبدأ بـ { ويخلص بـ }"; exit 1; }
   RC=/etc/nq-calls/rclone.conf; rm -f "$RC"
