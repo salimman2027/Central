@@ -59,6 +59,9 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .display { position:relative; }
   .pastebtn { position:absolute; inset-inline-end:12px; top:8px; border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:99px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
   #dialName:empty, #dialErr:empty { display:none; } #dialErr { min-height:0; margin-top:4px; }
+  .display .num span { cursor:text; }
+  .display .num .caret { display:inline-block; width:2px; height:.9em; vertical-align:-.08em; margin:0 1px; background:var(--pri,#19e6c1); border-radius:2px; animation:nqBlink 1s steps(1) infinite; }
+  @keyframes nqBlink { 50% { opacity:0; } }
   .display .num { font-size:clamp(26px, 5vh, 38px); letter-spacing:1px; direction:ltr; min-height:48px; font-weight:300; word-break:break-all; text-align:center; }
   .keypad, .dialrow, .incall-pad, .incbtns { direction:ltr; }
   .keypad { display:grid; grid-template-columns:repeat(3, var(--k)); justify-content:space-evenly; gap:1.4vh 0; padding:4px 20px 6px; max-width:420px; width:100%; margin:0 auto; --k:min(72px, 9.2vh, 22vw); }
@@ -663,11 +666,32 @@ function buildPad(el, onKey) {
     el.appendChild(b);
   });
 }
-function dialKey(d) {
+/* مؤشر الكتابة في الرقم: دوس على أي مكان في الرقم عشان تضيف أو تمسح من النص */
+let DC = null; // مكان المؤشر — null = آخر الرقم
+function dialCur() { const n = $("dialNum"); if (DC !== null && !n.querySelector(".caret")) DC = null; return DC === null ? n.textContent.length : Math.min(DC, n.textContent.length); }
+function dialRender(t, pos) {
   const n = $("dialNum");
-  n.textContent = n.textContent + d; window._pickedName = "";
+  DC = pos == null || pos >= t.length ? null : Math.max(0, pos);
+  if (DC === null) { n.textContent = t; return; }
+  n.innerHTML = [...t].map((c, i) => (i === DC ? '<i class="caret"></i>' : "") + `<span data-i="${i}">${esc(c)}</span>`).join("");
+}
+function dialMove(d) { const n = $("dialNum"); const p = dialCur() + d; if (p < 0) return; dialRender(n.textContent, p); }
+function dialKey(d) {
+  const n = $("dialNum"), t = n.textContent, p = dialCur();
+  dialRender(t.slice(0, p) + d + t.slice(p), DC === null ? null : p + 1); window._pickedName = "";
   $("dialErr").textContent = "";
 }
+document.getElementById("dialNum").addEventListener("click", e => {
+  const n = $("dialNum"), t = n.textContent; if (!t) return;
+  const sp = e.target.closest("span[data-i]");
+  if (!sp) { dialRender(t, null); return; }
+  const r = sp.getBoundingClientRect(), i = +sp.dataset.i;
+  dialRender(t, e.clientX > r.left + r.width / 2 ? i + 1 : i);
+});
+new MutationObserver(() => { const n = $("dialNum"); // أول ما الرقم يتكتب كنص عادي نخلّي كل رقم span عشان يتداس عليه
+  if (n.firstChild && n.firstChild.nodeType === 3 && n.childNodes.length === 1) { const t = n.textContent; DC = null;
+    n.innerHTML = [...t].map((c, i) => `<span data-i="${i}">${esc(c)}</span>`).join(""); }
+}).observe(document.getElementById("dialNum"), { childList: true });
 /* اسم صاحب الرقم: من مكالماتنا والـ CRM (السيرفر) ومن جهات الاتصال (التطبيق) */
 const NQWho = {
   cache: {}, t: null,
@@ -743,7 +767,7 @@ document.addEventListener("paste", e => {
   d.parentNode.onpointerdown = e => { if (e.target.id === "btnPaste") return; t = setTimeout(dialPaste, 600); };
   d.parentNode.onpointerup = d.parentNode.onpointerleave = () => clearTimeout(t);
 })();
-function dialDel() { const n = $("dialNum"); n.textContent = n.textContent.slice(0, -1); $("dialErr").textContent = ""; window._pickedName = ""; }
+function dialDel() { const n = $("dialNum"), t = n.textContent, p = dialCur(); if (p > 0) dialRender(t.slice(0, p - 1) + t.slice(p), DC === null ? null : p - 1); $("dialErr").textContent = ""; window._pickedName = ""; }
 (function () { // ضغطة = يمسح رقم، ضغطة طويلة = يمسح الكل
   const b = document.getElementById("btnDel"); let t = null, long = false;
   b.onpointerdown = () => { long = false; t = setTimeout(() => { long = true; $("dialNum").textContent = ""; }, 550); };
@@ -1219,6 +1243,10 @@ if (!IS_APP) {
     if (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && ae.closest(".screen.on, .sheet-bg.on")) return; // بيكتب في خانة ظاهرة
     if (/^[0-9*#+]$/.test(e.key)) { dialKey(e.key); e.preventDefault(); }
     else if (e.key === "Backspace") { dialDel(); e.preventDefault(); }
+    else if (e.key === "ArrowLeft" || e.key === "ArrowRight") { dialMove(e.key === "ArrowLeft" ? -1 : 1); e.preventDefault(); }
+    else if (e.key === "Home") { dialRender($("dialNum").textContent, 0); e.preventDefault(); }
+    else if (e.key === "End") { dialRender($("dialNum").textContent, null); e.preventDefault(); }
+    else if (e.key === "Delete") { const t = $("dialNum").textContent, p = dialCur(); if (p < t.length) dialRender(t.slice(0, p) + t.slice(p + 1), p); e.preventDefault(); }
     else if (e.key === "Enter") { $("callBtn") && $("callBtn").click(); e.preventDefault(); }
   });
   window.addEventListener("beforeunload", e => { if (NQPhone.ua) { e.preventDefault(); e.returnValue = ""; } });
