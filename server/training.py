@@ -218,10 +218,20 @@ def _generate(d1: dt.date, d2: dt.date, key: str):
         import anthropic
         client = anthropic.Anthropic(timeout=900)
         prompt = PROMPT.format(period=f["company"]["period"], data=json.dumps(f, ensure_ascii=False, indent=1))
-        msg = client.messages.create(model=os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5"), max_tokens=20000,
-                                     messages=[{"role": "user", "content": prompt}], tools=[TOOL],
-                                     tool_choice={"type": "tool", "name": "save_training"})
+        kw = dict(model=os.environ.get("NQ_CLAUDE_MODEL", "claude-sonnet-5-5"), max_tokens=20000,
+                  messages=[{"role": "user", "content": prompt}], tools=[TOOL])
+        try:   # بعض الموديلات مابتقبلش إجبار الأداة
+            msg = client.messages.create(tool_choice={"type": "tool", "name": "save_training"}, **kw)
+        except anthropic.BadRequestError:
+            msg = client.messages.create(tool_choice={"type": "auto"}, **kw)
         res = next((b.input for b in msg.content if getattr(b, "type", "") == "tool_use"), None)
+        if not isinstance(res, dict):   # لو رجّع JSON كنص بدل الأداة
+            raw = "".join(getattr(b, "text", "") for b in msg.content if getattr(b, "type", "") == "text")
+            try:
+                i, j = raw.find("{"), raw.rfind("}")
+                res = json.loads(raw[i:j + 1]) if i >= 0 < j else None
+            except ValueError:
+                res = None
         if not isinstance(res, dict):
             why = " (الرد اتقطع لأنه طويل)" if getattr(msg, "stop_reason", "") == "max_tokens" else ""
             raise RuntimeError("رد Claude مش مفهوم" + why + " — جرّب تاني")
