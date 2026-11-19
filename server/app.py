@@ -1228,7 +1228,7 @@ OWN.CTX.update(extra=_lookup_extra)
 TGT.CTX.update(dir=DATA_DIR, tz=TZ, calls=lambda a, b: OPS.calls_c(a, b), scope=lambda: SCOPE.get(),
                check_ext=lambda e, p: check_ext_password(e, p),
                names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])})
-TRAIN.CTX.update(dir=DATA_DIR, tz=TZ, scope=lambda: SCOPE.get(), rubric=lambda: RUBRIC.load(), teams=_teams_file,
+TRAIN.CTX.update(dir=DATA_DIR, tz=TZ, scope=lambda: SCOPE.get(), check_ext=lambda e, p: check_ext_password(e, p), rubric=lambda: RUBRIC.load(), teams=_teams_file,
                  names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},
                  analysis=lambda a, b: unscoped(analysis, a, b), calls=lambda a, b: unscoped(calls, a, b),
                  insights=lambda a, b: unscoped(insights, a, b))

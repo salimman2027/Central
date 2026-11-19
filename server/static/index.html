@@ -388,6 +388,8 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 .tr-weeks{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
 .tr-wk{border:1px solid var(--border);border-radius:12px;padding:10px 12px;border-top:3px solid var(--teal,#19e6c1)}
 .tr-wk b{display:block;margin-bottom:4px}.tr-wk ul{margin:0;padding-inline-start:18px;font-size:13.5px;line-height:1.75}
+.tr-todo{margin:0;padding:0;list-style:none;font-size:13.5px;line-height:1.7}.tr-todo li{padding:4px 0;border-top:1px dashed var(--border)}.tr-todo li:first-child{border-top:0}
+.tr-todo b{display:inline!important;margin:0!important}.tr-todo li.ok{color:var(--grey)}.tr-todo small{display:block;font-size:12px;color:var(--grey)}
 .tr-kpi{width:100%;border-collapse:collapse;font-size:13.5px}.tr-kpi td,.tr-kpi th{padding:5px 6px;border-bottom:1px solid var(--border);text-align:start}
 .tr-kpi .now{color:var(--orange,#e8a33c)}.tr-kpi .tg{color:var(--teal,#0f9e86);font-weight:700}
 .ls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
@@ -2009,7 +2011,9 @@ async function waSave(){
 let TRP=null, TR_SEC='company', TR_POLL=null;
 const trList=a=>(a||[]).length?`<ul>${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<div class="muted">—</div>';
 const trKpi=k=>(k||[]).length?`<table class="tr-kpi"><tr><th>المؤشر</th><th>دلوقتي</th><th>المستهدف</th></tr>${k.map(x=>`<tr><td>${esc(x.name)}</td><td class="now">${esc(x.now)}</td><td class="tg">${esc(x.target)}</td></tr>`).join('')}</table>`:'<div class="muted">—</div>';
-const trWeeks=w=>(w||[]).length?`<div class="tr-weeks">${w.map(x=>`<div class="tr-wk"><b>الأسبوع ${x.week}: ${esc(x.theme||x.goal||'')}</b>${trList(x.activities)}</div>`).join('')}</div>`:'';
+const trWeeks=(w,done,ev)=>(w||[]).length?`<div class="tr-weeks">${w.map((x,i)=>`<div class="tr-wk"><b>الأسبوع ${x.week}: ${esc(x.theme||x.goal||'')}</b>${done?trTodo(x,i,done,ev||{}):trList(x.activities)}</div>`).join('')}</div>`:'';
+function trTodo(x,i,done,ev){const wk=x.week||i+1;return `<ul class="tr-todo">${(x.activities||[]).map((a,k)=>{const id=`w${wk}-${k}`,d=done[id],e=ev[id];
+  return `<li class="${d?'ok':''}">${d?'✅':'⬜'} ${esc(a)}${d?`<small>خلّصه ${new Date(d).toLocaleDateString('ar-EG',{day:'numeric',month:'short'})}${e&&e.after!=null?` · من ساعتها <b>${e.after}</b>${e.before!=null?` (قبلها ${e.before}) <b style="color:${e.delta>=0?'var(--green)':'var(--red)'}">${e.delta>=0?'▲+':'▼'}${e.delta}</b>`:''} · ${e.n} مكالمة`:' · لسه مفيش مكالمات متحلّلة بعدها'}</small>`:''}</li>`}).join('')}</ul>`;}
 const trBox=(t,html)=>`<div class="tr-box"><h5>${t}</h5>${html}</div>`;
 function trPlan(id,title,tags,sum,inner,open){
   return `<details class="tr-plan" id="${id}"${open?' open':''}><summary><b>${title}</b>${tags.filter(Boolean).map(t=>`<span class="tr-tag">${esc(t)}</span>`).join('')}
@@ -2033,9 +2037,9 @@ function renderTrain(){
       `<div class="tr-g">${trBox('⚠️ فجوات الفريق',trList(t.gaps))}${trBox('📈 مؤشرات القياس',trKpi(t.kpis))}</div>
        <h4 style="margin:14px 0 4px">🗓️ خطة الـ 4 أسابيع</h4>${trWeeks(t.weeks)}
        ${(t.role_plays||[]).length?`<h4 style="margin:14px 0 4px">🎭 تمثيل أدوار</h4><div class="tr-g">${t.role_plays.map(r=>trBox('🎬 '+esc(r.scenario),`<div style="font-size:14px">🎯 ${esc(r.goal)}</div>`)).join('')}</div>`:''}`,(P.teams||[]).length===1)).join('');
-  if(TR_SEC==='reps')h=(P.reps||[]).slice().sort((a,b)=>(a.avg??999)-(b.avg??999)).map((r,i)=>trPlan('trp-r'+i,`👤 ${esc(r.name)} <span class="muted" style="font-weight:400">(${esc(r.ext)})</span>`,[r.team,r.level,r.avg!=null&&('التقييم '+r.avg)],r.summary,
+  if(TR_SEC==='reps')h=(P.reps||[]).slice().sort((a,b)=>(a.avg??999)-(b.avg??999)).map((r,i)=>trPlan('trp-r'+i,`👤 ${esc(r.name)} <span class="muted" style="font-weight:400">(${esc(r.ext)})</span>`,[r.team,r.level,r.avg!=null&&('التقييم '+r.avg),r.total&&`✅ خلّص ${Object.keys(r.done||{}).length} من ${r.total}`],r.summary,
       `<div class="tr-g">${trBox('💪 نقاط القوة',trList(r.strengths))}${trBox('⚠️ يشتغل على',trList(r.gaps))}${trBox('📈 مؤشرات القياس',trKpi(r.kpis))}</div>
-       <h4 style="margin:14px 0 4px">🗓️ خطة الـ 4 أسابيع</h4>${trWeeks(r.weeks)}
+       <h4 style="margin:14px 0 4px">🗓️ خطة الـ 4 أسابيع <span class="muted" style="font-weight:400;font-size:13px">— الموظف بيعلّم على اللي خلّصه من التطبيق</span></h4>${trWeeks(r.weeks,r.done||{},r.eval)}
        ${(r.scripts||[]).length?`<h4 style="margin:14px 0 4px">💬 جمل جاهزة</h4>${r.scripts.map(x=>`<div class="ls-script" style="margin-bottom:6px">"${esc(x)}"</div>`).join('')}`:''}`,false)).join('');
   if(TR_SEC==='leaders')h=(P.leaders||[]).map((x,i)=>trPlan('trp-l'+i,`🧑‍💼 ${esc(x.name)}`,[x.role==='manager'?'مدير':'قائد فريق',(x.teams||[]).join('، ')],x.summary,
       `<div class="tr-g">${trBox('🧠 مهارات يطوّرها',trList(x.skills))}${trBox('🔁 الروتين الثابت',(x.routines||[]).length?`<ul>${x.routines.map(r=>`<li><b>${esc(r.when)}:</b> ${esc(r.what)}</li>`).join('')}</ul>`:'—')}${trBox('📈 مؤشرات نجاحه كقائد',trKpi(x.kpis))}</div>
@@ -2047,8 +2051,9 @@ async function trProgress(){
   try{const j=await (await fetch(API_BASE+'/training/progress',{cache:'no-store'})).json(); const it=j.items||[];
     $('trBody').innerHTML=`<div class="card"><h3 style="margin-top:0">📈 تقييم كل موظف وقت عمل الخطة ← تقييمه من ساعتها</h3>
       <p class="muted">بيتحسب من المكالمات اللي اتحلّلت بعد الخطة. وكل خميس بيتبعت على تليجرام.</p>
-      ${it.length?`<table class="cb-t"><tr><th>الموظف</th><th>الفريق</th><th>قبل الخطة</th><th>دلوقتي</th><th>الفرق</th><th>مكالمات متحلّلة</th></tr>${it.map(x=>`<tr><td><b>${esc(x.name)}</b> <span class="muted">(${x.ext})</span></td><td>${esc(x.team||'')}</td><td>${x.before??'—'}</td><td>${x.now??'—'}</td>
-        <td style="font-weight:800;color:${x.delta==null?'inherit':x.delta>=0?'var(--green)':'var(--red)'}">${x.delta==null?'لسه مفيش مكالمات':(x.delta>=0?'▲ +':'▼ ')+x.delta}</td><td>${x.calls}</td></tr>`).join('')}</table>`:'<div class="muted">لسه مفيش خطة أو مكالمات متحلّلة بعدها</div>'}</div>`;
+      ${it.length?`<table class="cb-t"><tr><th>الموظف</th><th>الفريق</th><th>خلّص من الخطة</th><th>قبل الخطة</th><th>دلوقتي</th><th>الفرق</th><th>مكالمات متحلّلة</th></tr>${it.map(x=>{const rp=((TRP&&TRP.reps)||[]).find(r=>String(r.ext)===String(x.ext))||{},dn=Object.keys(rp.done||{}).length;return `<tr><td><b>${esc(x.name)}</b> <span class="muted">(${x.ext})</span></td><td>${esc(x.team||'')}</td>
+        <td>${rp.total?`<b>${dn}/${rp.total}</b><div class="tg-bar" style="width:90px"><b style="width:${Math.round(dn*100/rp.total)}%"></b></div>`:'—'}</td><td>${x.before??'—'}</td><td>${x.now??'—'}</td>
+        <td style="font-weight:800;color:${x.delta==null?'inherit':x.delta>=0?'var(--green)':'var(--red)'}">${x.delta==null?'لسه مفيش مكالمات':(x.delta>=0?'▲ +':'▼ ')+x.delta}</td><td>${x.calls}</td></tr>`}).join('')}</table>`:'<div class="muted">لسه مفيش خطة أو مكالمات متحلّلة بعدها</div>'}</div>`;
   }catch(e){$('trBody').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
 }
 function trNote(job){

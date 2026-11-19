@@ -171,6 +171,14 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .opt { display:flex; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; margin-bottom:10px; text-align:right; font-size:16px; color:var(--fg); }
   .opt b { font-size:24px; } .opt small { display:block; color:var(--muted); font-size:12px; }
   .viachip { font-size:12px; padding:7px 10px; border-radius:16px; background:#e7f3f2; color:var(--pri); white-space:nowrap; }
+  .todo-w { margin-top:10px; border:1px solid var(--line, rgba(127,127,127,.2)); border-radius:12px; padding:8px 10px; }
+  .todo-w summary { cursor:pointer; font-size:14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .todo-n { margin-inline-start:auto; font-size:12px; background:rgba(127,127,127,.15); border-radius:99px; padding:1px 8px; }
+  .todo-n.full { background:var(--ok); color:#fff; }
+  .todo { display:flex; gap:10px; align-items:flex-start; padding:8px 2px; border-top:1px dashed var(--line, rgba(127,127,127,.2)); font-size:14px; line-height:1.6; cursor:pointer; }
+  .todo input { width:20px; height:20px; flex-shrink:0; margin-top:2px; accent-color:var(--ok); }
+  .todo small { display:block; color:var(--muted); font-size:12.5px; } .todo small .up { color:var(--ok); } .todo small .down { color:var(--bad); }
+  .todo.done .t { color:var(--muted); text-decoration:line-through; }
   .missed-box { border:1.5px solid #f3b9b6; background:linear-gradient(180deg, rgba(214,69,65,.07), transparent); }
   .missed-box > b { display:block; color:#d64541; margin-bottom:4px; }
   .ibar { margin:6px 14px 0; display:flex; flex-direction:column; gap:6px; }
@@ -1341,6 +1349,33 @@ const NQPerf = {
   when(s) { return s ? new Date(s).toLocaleString("ar-EG", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""; },
   sc(v) { return v == null ? "" : `<span class="score ${v >= 75 ? "hi" : v >= 55 ? "mid" : "lo"}">${v}</span>`; },
   list(items, empty, fmt) { return items && items.length ? items.map(fmt).join("") : `<div class="pf-sub">${empty}</div>`; },
+  // خطة التدريب كقايمة مهام: يعلّم على اللي خلّصه، والسيستم بيقيّمه من يومها
+  todo(T) {
+    const done = T.done || {}, ev = T.eval || {}, n = Object.keys(done).length, tot = T.total || 0;
+    const ago = t => { const d = Math.floor((Date.now() - new Date(t)) / 864e5); return d < 1 ? "النهارده" : d === 1 ? "امبارح" : `من ${d} يوم`; };
+    const firstOpen = (T.weeks || []).findIndex((w, i) => (w.activities || []).some((_, k) => !done[`w${w.week || i + 1}-${k}`]));
+    let h = `<div style="margin-top:12px"><div style="display:flex;font-size:13.5px"><b>✅ خلّصت ${n} من ${tot}</b><span style="margin-inline-start:auto;color:var(--muted)">${tot ? Math.round(n * 100 / tot) : 0}%</span></div>
+      <div class="pf-bar"><i style="width:${tot ? Math.max(3, n * 100 / tot) : 0}%"></i></div></div>`;
+    h += (T.weeks || []).map((w, i) => {
+      const wk = w.week || i + 1, acts = w.activities || [], wd = acts.filter((_, k) => done[`w${wk}-${k}`]).length;
+      return `<details class="todo-w" ${i === firstOpen ? "open" : ""}><summary><b>الأسبوع ${wk}:</b> ${esc(w.theme || "")} <span class="todo-n ${wd === acts.length ? "full" : ""}">${wd}/${acts.length}</span></summary>` +
+        acts.map((a, k) => { const id = `w${wk}-${k}`, d = done[id], e = ev[id];
+          let sub = "";
+          if (d) sub = e && e.after != null ? `خلّصته ${ago(d)} · تقييم مكالماتك من ساعتها <b>${e.after}</b>${e.before != null ? ` (قبلها ${e.before}) <b class="${e.delta >= 0 ? "up" : "down"}">${e.delta >= 0 ? "▲ +" : "▼ "}${e.delta}</b>` : ""} · ${e.n} مكالمة`
+            : `خلّصته ${ago(d)} · السيستم هيقيّمك من مكالماتك الجاية`;
+          return `<label class="todo ${d ? "done" : ""}"><input type="checkbox" ${d ? "checked" : ""} onchange="NQPerf.check('${id}',this.checked,this)"><span><span class="t">${esc(a)}</span>${sub ? `<small>${sub}</small>` : ""}</span></label>`; }).join("") + `</details>`;
+    }).join("");
+    return h;
+  },
+  async check(id, on, el) {
+    const c = NQOwner.creds(); if (!c) return; el.disabled = true;
+    try {
+      const r = await fetch(CONFIG.api + "/training/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, item: id, done: on }) });
+      const j = await r.json(); if (!r.ok) throw new Error(j.detail || r.status);
+      this.data.training.done = j.done; this.data.training.eval = j.eval; this.render(this.data);
+      if (on) toast("✔ برافو — السيستم هيتابع تقييم مكالماتك من النهارده");
+    } catch (e) { el.checked = !on; el.disabled = false; toast("✖ " + e.message); }
+  },
   render(j) {
     const S = j.summary, mm = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
     const st = { pending: ["⏳ مستني", "wait"], approved: ["✔ اتوافق", "ok"], rejected: ["✖ اترفض", "bad"], confirmed: ["✔ اتأكد", "ok"] };
@@ -1361,7 +1396,7 @@ const NQPerf = {
         ${T.summary ? `<div style="line-height:1.8">${esc(T.summary)}</div>` : ""}
         ${(T.gaps || []).length ? `<div class="pf-sub" style="margin-top:8px">⚠️ أشتغل على:</div>${ul(T.gaps)}` : ""}
         ${(T.kpis || []).map(k => `<div style="display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:3px 0;border-bottom:1px solid var(--line,rgba(127,127,127,.2))"><span>${esc(k.name)}</span><span><span style="color:#e8a33c">${esc(k.now)}</span> ← <b style="color:var(--pri)">${esc(k.target)}</b></span></div>`).join("")}
-        ${(T.weeks || []).map(w => `<details style="margin-top:8px"><summary style="cursor:pointer"><b>الأسبوع ${w.week}:</b> ${esc(w.theme || "")}</summary>${ul(w.activities)}</details>`).join("")}
+        ${this.todo(T)}
         ${(T.scripts || []).map(x => `<div style="margin-top:8px;padding:8px 10px;border-inline-start:3px solid var(--pri);background:rgba(25,230,193,.08);border-radius:8px;font-size:13.5px">💬 "${esc(x)}"</div>`).join("")}
       </div>`);
     }

@@ -8,11 +8,13 @@
 import datetime as dt
 import json
 import os
+import re
 import threading
 from collections import Counter
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 LOCK = threading.Lock()
@@ -20,7 +22,7 @@ JOB = {"running": False, "key": "", "error": "", "started": None}
 # بتتظبط من app.py
 CTX = {"dir": Path("/var/lib/nq-calls"), "analysis": None, "calls": None, "insights": None,
        "names": lambda: {}, "teams": lambda: {}, "rubric": lambda: [], "scope": lambda: None,
-       "tz": dt.timezone(dt.timedelta(hours=3))}
+       "tz": dt.timezone(dt.timedelta(hours=3)), "check_ext": lambda e, p: False}
 
 
 def _file() -> Path:
@@ -34,14 +36,91 @@ def load_all() -> dict:
         return {}
 
 
-def latest_for_ext(ext: str):
-    """خطة الموظف ده من آخر خطة اتعملت (للتطبيق)"""
+def latest_for_ext(ext: str, evaluate: bool = True):
+    """خطة الموظف ده من آخر خطة اتعملت (للتطبيق) + اللي علّم عليه خلص + تقييمه من ساعتها"""
     allp = load_all()
     for key in sorted(allp, key=lambda k: allp[k].get("generated", ""), reverse=True):
         hit = next((r for r in allp[key].get("reps") or [] if str(r.get("ext")) == str(ext)), None)
         if hit:
-            return {**hit, "period": key.replace("|", " → "), "generated": allp[key].get("generated")}
+            gen = allp[key].get("generated")
+            done = done_for(ext, gen)
+            out = {**hit, "period": key.replace("|", " → "), "generated": gen, "done": done,
+                   "total": sum(len(w.get("activities") or []) for w in hit.get("weeks") or [])}
+            if evaluate and done:
+                out["eval"] = evaluate_done(ext, done)
+            return out
     return None
+
+
+# ------------------------------------------------------------------ قايمة المهام: الموظف بيعلّم على اللي خلّصه
+def _done_file() -> Path:
+    return CTX["dir"] / "training_done.json"
+
+
+def done_all() -> dict:
+    try:
+        return json.loads(_done_file().read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def done_for(ext: str, generated: str) -> dict:
+    d = done_all().get(str(ext)) or {}
+    return d.get("items", {}) if d.get("plan") == generated else {}
+
+
+def set_done(ext: str, item: str, on: bool) -> dict:
+    p = latest_for_ext(ext, evaluate=False)
+    if not p:
+        raise HTTPException(404, "مفيش خطة تدريب ليك لسه")
+    m = re.fullmatch(r"w(\d+)-(\d+)", item)
+    weeks = {int(w.get("week", i + 1)): w for i, w in enumerate(p.get("weeks") or [])}
+    if not m or int(m.group(1)) not in weeks or int(m.group(2)) >= len(weeks[int(m.group(1))].get("activities") or []):
+        raise HTTPException(400, "البند ده مش في خطتك")
+    with LOCK:
+        allx = done_all()
+        cur = allx.get(str(ext)) or {}
+        if cur.get("plan") != p["generated"]:
+            cur = {"plan": p["generated"], "items": {}}
+        if on:
+            cur["items"].setdefault(item, dt.datetime.now(dt.timezone.utc).isoformat())
+        else:
+            cur["items"].pop(item, None)
+        allx[str(ext)] = cur
+        _done_file().write_text(json.dumps(allx, ensure_ascii=False), encoding="utf-8")
+    return cur["items"]
+
+
+def _ts(s):
+    t = dt.datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    return t if t.tzinfo else t.replace(tzinfo=dt.timezone.utc)
+
+
+def evaluate_done(ext: str, done: dict) -> dict:
+    """لكل بند خلص: متوسط تقييم مكالماته في الأسبوعين اللي قبله ← من يوم ما علّم لحد النهارده"""
+    if not done or not CTX["analysis"]:
+        return {}
+    first = min(_ts(v) for v in done.values())
+    d1 = (first - dt.timedelta(days=14)).astimezone(CTX["tz"]).date()
+    rows = []
+    for x in CTX["analysis"](d1, dt.datetime.now(CTX["tz"]).date()):
+        a = x.get("analysis") or {}
+        if str(x["call"].get("ext")) != str(ext) or not isinstance(a.get("agent_score"), (int, float)):
+            continue
+        try:
+            rows.append((_ts(x["call"]["time"]), a["agent_score"]))
+        except (KeyError, ValueError):
+            pass
+    out = {}
+    for item, at in done.items():
+        t = _ts(at)
+        before = [s for ts, s in rows if t - dt.timedelta(days=14) <= ts < t]
+        after = [s for ts, s in rows if ts >= t]
+        b = round(sum(before) / len(before), 1) if before else None
+        a = round(sum(after) / len(after), 1) if after else None
+        out[item] = {"before": b, "after": a, "n": len(after),
+                     "delta": round(a - b, 1) if a is not None and b is not None else None}
+    return out
 
 
 # ------------------------------------------------------------------ الأرقام اللي بتتبعت للـ AI
@@ -287,7 +366,25 @@ def get_training(date_from: dt.date = Query(alias="from"), date_to: dt.date = Qu
         allp = load_all()
         if allp:
             plan = allp[max(allp, key=lambda k: allp[k].get("generated", ""))]
-    return {"plan": _filter(plan, CTX["scope"]()), "job": {**JOB, "mine": JOB["key"] == key}}
+    plan = _filter(plan, CTX["scope"]())
+    if plan:
+        reps = []
+        for r in plan.get("reps") or []:
+            done = done_for(str(r.get("ext")), plan.get("generated"))
+            reps.append({**r, "done": done, "eval": evaluate_done(str(r.get("ext")), done) if done else {},
+                         "total": sum(len(w.get("activities") or []) for w in r.get("weeks") or [])})
+        plan = {**plan, "reps": reps}
+    return {"plan": plan, "job": {**JOB, "mine": JOB["key"] == key}}
+
+
+@router.post("/app/training/check")
+async def app_check(request: Request):
+    b = await request.json()
+    ext, pw = str(b.get("ext") or ""), str(b.get("password") or "")
+    if not CTX["check_ext"](ext, pw):
+        raise HTTPException(401, "سجّل دخول تاني")
+    done = set_done(ext, str(b.get("item") or ""), bool(b.get("done")))
+    return JSONResponse({"done": done, "eval": evaluate_done(ext, done)}, headers={"Access-Control-Allow-Origin": "*"})
 
 
 @router.post("/api/training")

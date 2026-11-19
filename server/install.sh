@@ -175,6 +175,8 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/targets http://127.0.0.1:8090/app/targets
   ProxyPass        /calls-app/wa http://127.0.0.1:8090/app/wa
   ProxyPassReverse /calls-app/wa http://127.0.0.1:8090/app/wa
+  ProxyPass        /calls-app/training http://127.0.0.1:8090/app/training
+  ProxyPassReverse /calls-app/training http://127.0.0.1:8090/app/training
   ProxyPass        /calls-app/password http://127.0.0.1:8090/app/password
   ProxyPassReverse /calls-app/password http://127.0.0.1:8090/app/password
 
