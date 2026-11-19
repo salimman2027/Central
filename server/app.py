@@ -67,7 +67,7 @@ import contextvars  # noqa: E402
 
 SCOPE = contextvars.ContextVar("nq_scope", default=None)   # None = المدير (يشوف كله)
 HTPASSWD = Path(os.environ.get("NQ_CONF", "/etc/nq-calls")) / "htpasswd"
-LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings|ops/|wa\b)")
+LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings|ops/|wa\b|eng\b)")
 
 
 def _teams_file() -> dict:
@@ -1225,6 +1225,9 @@ app.include_router(WA.router)
 WA.CTX.update(dir=DATA_DIR, host=os.environ.get("NQ_HOST", "3.89.245.93.sslip.io"), check_ext=lambda e, p: check_ext_password(e, p),
               names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])})
 OWN.CTX.update(extra=_lookup_extra)
+import eng as ENG  # noqa: E402
+app.include_router(ENG.router)
+ENG.CTX.update(dir=DATA_DIR, tz=TZ, check_ext=lambda e, p: check_ext_password(e, p), get_json=APPT._get_json, items=APPT._items)
 TGT.CTX.update(dir=DATA_DIR, tz=TZ, calls=lambda a, b: OPS.calls_c(a, b), scope=lambda: SCOPE.get(),
                check_ext=lambda e, p: check_ext_password(e, p),
                names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])})

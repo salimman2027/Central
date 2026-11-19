@@ -171,6 +171,13 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .opt { display:flex; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; margin-bottom:10px; text-align:right; font-size:16px; color:var(--fg); }
   .opt b { font-size:24px; } .opt small { display:block; color:var(--muted); font-size:12px; }
   .viachip { font-size:12px; padding:7px 10px; border-radius:16px; background:#e7f3f2; color:var(--pri); white-space:nowrap; }
+  .eng-chips, .eng-days { display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; padding-bottom:2px; }
+  .eng-chips button, .eng-days button { flex-shrink:0; border:1px solid var(--line, rgba(127,127,127,.25)); background:var(--card, transparent); color:var(--text); border-radius:12px; padding:7px 12px; font:inherit; font-size:13.5px; cursor:pointer; }
+  .eng-days button { display:flex; flex-direction:column; align-items:center; min-width:54px; padding:6px 8px; } .eng-days button small { font-size:11px; color:var(--muted); }
+  .eng-chips button.sel, .eng-days button.sel { background:var(--pri, #19e6c1); color:#04201b; border-color:transparent; font-weight:700; } .eng-days button.sel small { color:#04201b; }
+  .eng-sl { display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px dashed var(--line, rgba(127,127,127,.2)); font-size:14.5px; }
+  .eng-sl:first-of-type { border-top:0; } .eng-sl b { font-variant-numeric:tabular-nums; direction:ltr; unicode-bidi:isolate; display:inline-block; min-width:110px; text-align:right; }
+  .eng-sl.free b { color:var(--ok); } .eng-sl.busy b { color:var(--bad); } .eng-sl small { color:var(--muted); font-size:12.5px; }
   .todo-w { margin-top:10px; border:1px solid var(--line, rgba(127,127,127,.2)); border-radius:12px; padding:8px 10px; }
   .todo-w summary { cursor:pointer; font-size:14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
   .todo-n { margin-inline-start:auto; font-size:12px; background:rgba(127,127,127,.15); border-radius:99px; padding:1px 8px; }
@@ -474,6 +481,14 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 </section>
 
 <!-- ================= call log ================= -->
+<section id="scrEng" class="screen page">
+  <h2>📅 مواعيد المهندسين</h2>
+  <div class="eng-chips" id="engChips"></div>
+  <div class="eng-days" id="engDays"></div>
+  <div class="card" id="engBody"></div>
+  <button class="btn ghost" onclick="NQTargets.open()">رجوع</button>
+</section>
+
 <section id="scrInbox" class="screen page">
   <h2>📥 المطلوب مني</h2>
   <div id="ibBody"></div>
@@ -489,6 +504,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 <!-- ================= targets ================= -->
 <section id="scrTargets" class="screen page">
   <h2>🎯 تارجت الاتصال</h2>
+  <button class="btn ghost" id="engBtn" hidden style="margin-bottom:12px" onclick="NQEng.open()">📅 مواعيد المهندسين</button>
   <div class="card">
     <label class="lbl" style="margin-top:0">اليوم</label>
     <input id="tDate" type="date" class="ltr" onchange="NQTargets.render()">
@@ -652,7 +668,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
    - وضع CRM: بعد المكالمة يسأل عن العميل والملخص ويبعته للسيرفر
    =================================================================== */
 const $ = id => document.getElementById(id);
-const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrPerf", "scrFiles"];
+const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrPerf", "scrFiles", "scrEng"];
 function show(id) {
   // خانة كتابة في شاشة اتقفلت (زي الباسورد) متفضلش واخدة الكيبورد
   const ae = document.activeElement; if (ae && ae !== document.body && ae.closest && !ae.closest("#" + id)) try { ae.blur(); } catch (e) {}
@@ -1538,6 +1554,43 @@ const NQWA = {
 };
 setTimeout(() => NQWA.load(), 6000);
 
+/* ---------- مواعيد المهندسين من الـ CRM (اللي المدير سمحلي أشوفهم) ---------- */
+const NQEng = {
+  list: store.get("nq_eng", []), eid: null, date: null,
+  async api(body) {
+    const c = NQOwner.creds(); if (!c) throw new Error("ادخل بحسابك الأول");
+    const r = await fetch(CONFIG.api + "/eng", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, ...body }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || "السيرفر مش راد"); return j;
+  },
+  async refresh() { try { const j = await this.api({}); this.list = j.engineers || []; store.set("nq_eng", this.list); } catch (e) {} $("engBtn").hidden = !this.list.length; },
+  open() {
+    if (!this.list.length) return toast("مفيش مهندسين مسموحلك تشوفهم");
+    if (!this.list.some(e => e.id === this.eid)) this.eid = this.list[0].id;
+    this.date = this.date || isoDay(new Date());
+    show("scrEng"); this.paint(); this.load();
+  },
+  paint() {
+    $("engChips").innerHTML = this.list.length > 1 ? this.list.map(e => `<button class="${e.id === this.eid ? "sel" : ""}" onclick="NQEng.eid=${e.id};NQEng.paint();NQEng.load()">👷 ${esc(e.name)}</button>`).join("") : `<b style="padding:4px 2px">👷 ${esc(this.list[0].name)}</b>`;
+    const days = ["الأحد", "الاتنين", "التلات", "الأربع", "الخميس", "الجمعة", "السبت"];
+    let h = ""; for (let i = 0; i < 10; i++) { const d = new Date(Date.now() + i * 864e5), k = isoDay(d);
+      h += `<button class="${k === this.date ? "sel" : ""}" onclick="NQEng.date='${k}';NQEng.paint();NQEng.load()"><small>${i === 0 ? "النهارده" : i === 1 ? "بكرة" : days[d.getDay()]}</small>${d.getDate()}/${d.getMonth() + 1}</button>`; }
+    $("engDays").innerHTML = h;
+  },
+  async load() {
+    $("engBody").innerHTML = `<div style="color:var(--muted)">بنجيب من الـ CRM…</div>`;
+    const want = this.eid + this.date;
+    try {
+      const d = await this.api({ eid: this.eid, date: this.date }); if (want !== this.eid + this.date) return;
+      if (d.off) { $("engBody").innerHTML = `<div style="color:var(--muted)">🏖️ المهندس مش شغال اليوم ده</div>`; return; }
+      const rows = [...d.busy.map(b => ({ ...b, k: "busy" })), ...d.free.map(f => ({ ...f, k: "free" }))].sort((a, b) => a.from.localeCompare(b.from));
+      $("engBody").innerHTML = `<div style="color:var(--muted);font-size:13px;margin-bottom:4px">🕘 ساعات العمل: ${d.workingHours.map(w => `<bdi dir="ltr">${w.from} — ${w.to}</bdi>`).join("، ")}</div>` +
+        (rows.length ? rows.map(r => `<div class="eng-sl ${r.k}"><b>${r.from} — ${r.to}</b><span>${r.k === "free" ? "✅ فاضي" : "⛔ محجوز"}${r.code || r.customer || r.reason ? `<small><br>${[r.code, r.customer, r.reason].filter(Boolean).map(esc).join(" · ")}</small>` : ""}</span></div>`).join("")
+          : `<div style="color:var(--muted)">اليوم كله فاضي</div>`);
+    } catch (e) { $("engBody").innerHTML = `<div>✖ ${esc(e.message)}</div>`; }
+  }
+};
+setTimeout(() => NQEng.refresh(), 5000);
+
 /* ---------- الاتصال المتتالي: يكلّم التارجت واحد ورا التاني ---------- */
 const NQDialer = {
   active: false, queue: [], t: null, sec: 0,
@@ -1668,7 +1721,7 @@ const NQTargets = {
   srv() { const s = store.get("nq_srv_targets", null); return s && String(s.ext) === String(NQPhone.ext || (NQOwner.creds() || {}).ext) ? s.items : []; },
   all() { return [...this.local(), ...this.srv().map(x => ({ ...x, id: "s:" + x.id, srv: true }))]; },
   save(t) { store.set("nq_targets", t.filter(x => !x.srv)); },
-  open() { if (!$("tDate").value) $("tDate").value = isoDay(new Date()); this.render(); show("scrTargets"); this.sync(); },
+  open() { if (!$("tDate").value) $("tDate").value = isoDay(new Date()); this.render(); show("scrTargets"); this.sync(); $("engBtn").hidden = !NQEng.list.length; NQEng.refresh(); },
   async api(path, body) {
     const c = NQOwner.creds(); if (!c) throw new Error("ادخل بحسابك الأول");
     const r = await fetch(CONFIG.api + "/targets" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, ...body }) });

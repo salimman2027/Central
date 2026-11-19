@@ -355,6 +355,10 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 .tg-rep{border:1px solid var(--border);border-radius:12px;padding:8px 10px;font-size:13.5px;cursor:pointer}.tg-rep.sel{border-color:var(--teal);background:rgba(25,230,193,.08)}
 .tg-bar{height:7px;border-radius:9px;background:rgba(127,127,127,.18);margin-top:6px;overflow:hidden}.tg-bar b{display:block;height:100%;background:var(--green)}
 .tg-done td{opacity:.6}.tg-done td:nth-child(2) b{text-decoration:line-through}
+.eng-it{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.eng-reps{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.eng-reps label{border:1px solid var(--border);border-radius:99px;padding:3px 10px;font-size:13px;cursor:pointer;display:flex;gap:5px;align-items:center}
+.eng-reps label:has(input:checked){border-color:var(--teal);background:rgba(25,230,193,.1)}
+.eng-day{display:flex;flex-direction:column;gap:4px;font-size:13.5px}.eng-day .b{color:var(--red)}.eng-day .f{color:var(--green)}
 .wa-it{border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
 .wa-it textarea{min-height:110px;resize:vertical;font:inherit;line-height:1.6}
 .cb-t{width:100%;border-collapse:collapse;font-size:14px}.cb-t th,.cb-t td{padding:8px 6px;border-bottom:1px solid var(--border);text-align:start;vertical-align:top}
@@ -762,6 +766,9 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="card set-c"><h3>🔗 الربط مع الـ CRM</h3>
       <p class="muted">رابط حجز الاجتماعات، التوكن، مدة الاجتماع، الشروط، والعميل الافتراضي.</p>
       <button class="btn" onclick="openCrm()">إعدادات الربط</button></div>
+    <div class="card set-c"><h3>📅 مواعيد المهندسين للمناديب</h3>
+      <p class="muted">اختار مهندس (أي موظف في الـ CRM) وحدد مين من المناديب يشوف يومه في التطبيق — فاضي إمتى ومحجوز إمتى — عشان يحدد مع العميل ميعاد مناسب.</p>
+      <button class="btn" onclick="engOpen()">تعديل</button></div>
     <div class="card set-c"><h3>💬 رسايل واتساب</h3>
       <p class="muted">قوالب الرسايل اللي الموظف بيبعتها للعميل بعد المكالمة بزرار واحد — وممكن تحط معاها ملف (كتالوج، عرض سعر، بروفايل الشركة) والعميل بيفتحه من رابط.</p>
       <button class="btn" onclick="waOpen()">تعديل القوالب</button></div>
@@ -849,6 +856,17 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
 </div>
 
+<div class="modal" id="engModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="mbox" style="max-width:820px;width:96vw;max-height:90vh;overflow:auto">
+    <h3 style="margin-top:0">📅 مواعيد المهندسين للمناديب</h3>
+    <div id="engItems"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
+      <select id="engPick" class="ap-in" style="min-width:260px"><option value="">— بنحمّل موظفين الـ CRM… —</option></select>
+      <button class="btn o" onclick="engAdd()">➕ ضيف مهندس</button></div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" onclick="engSave()">💾 حفظ</button><span id="engMsg"></span></div>
+    <div id="engPrev" style="margin-top:12px"></div>
+  </div>
+</div>
 <div class="modal" id="waModal" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="mbox" style="max-width:760px;width:96vw;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">💬 قوالب واتساب</h3>
@@ -1976,6 +1994,45 @@ async function tgUpload(){
   catch(e){$('tgUMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
 $('tgRep')&&$('tgRep').addEventListener('change',renderTg);
+
+/* ===================== مواعيد المهندسين ===================== */
+let ENG=[];
+async function engOpen(){
+  $('engModal').classList.add('show'); $('engMsg').textContent=''; $('engPrev').innerHTML='';
+  try{ENG=(await (await fetch(API_BASE+'/eng',{cache:'no-store'})).json()).engineers||[]; engRender();}catch(e){}
+  try{const j=await (await fetch(API_BASE+'/eng/people',{cache:'no-store'})).json(); if(j.detail)throw new Error(j.detail);
+    $('engPick').innerHTML='<option value="">— اختار المهندس من الـ CRM —</option>'+(j.items||[]).map(p=>`<option value="${p.id}" data-n="${esc(p.name)}">${esc(p.name)}${p.job?' · '+esc(p.job):''}</option>`).join('');}
+  catch(e){$('engPick').innerHTML=`<option value="">✖ مش قادر أجيب الموظفين من الـ CRM</option>`}
+}
+function engRead(){document.querySelectorAll('.eng-it').forEach((el,i)=>{const all=el.querySelector('.eng-all').checked;
+  ENG[i].viewers=all?['*']:[...el.querySelectorAll('.eng-r:checked')].map(c=>c.value); ENG[i].details=el.querySelector('.eng-d').checked;})}
+function engRender(){
+  const reps=(REPS||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ar'));
+  $('engItems').innerHTML=ENG.length?ENG.map((e,i)=>{const all=(e.viewers||[]).includes('*');return `<div class="eng-it"><div style="display:flex;gap:8px;align-items:center"><b style="flex:1">👷 ${esc(e.name)} <span class="muted" style="font-weight:400">(#${e.id})</span></b>
+      <button class="btn sm o" onclick="engPreview(${i})">👁️ شوف النهارده</button><button class="btn sm o" onclick="engRead();ENG.splice(${i},1);engRender()">🗑️</button></div>
+    <div class="muted" style="font-size:13px;margin-top:6px">مين يشوف مواعيده؟</div>
+    <div class="eng-reps"><label><input type="checkbox" class="eng-all" ${all?'checked':''} onchange="engRead();engRender()"> كل المناديب</label>
+      ${all?'':reps.map(r=>`<label><input type="checkbox" class="eng-r" value="${r.id}" ${(e.viewers||[]).includes(String(r.id))?'checked':''}> ${esc(r.name)}</label>`).join('')}</div>
+    <label style="font-size:13.5px;display:flex;gap:6px;align-items:center"><input type="checkbox" class="eng-d" ${e.details?'checked':''} style="width:auto"> يشوفوا تفاصيل الميعاد (الكود والعميل والسبب) — من غيرها بيشوفوا "محجوز" بس</label></div>`}).join('')
+    :'<div class="muted" style="margin-bottom:10px">لسه مفيش مهندسين — اختار من تحت</div>';
+}
+function engAdd(){const o=$('engPick').selectedOptions[0]; if(!o||!o.value)return; engRead();
+  if(ENG.some(e=>String(e.id)===o.value))return; ENG.push({id:+o.value,name:o.dataset.n,viewers:['*'],details:false}); engRender();}
+async function engSave(){
+  engRead();
+  try{const r=await fetch(API_BASE+'/eng',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({engineers:ENG})});const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||r.status); ENG=j.engineers; engRender(); $('engMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ — المناديب هيشوفوه في التطبيق</span>';}
+  catch(e){$('engMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+}
+async function engPreview(i){
+  const e=ENG[i]; $('engPrev').innerHTML='<div class="muted">بنجيب من الـ CRM…</div>';
+  try{const r=await fetch(`${API_BASE}/eng/day?eid=${e.id}&date=${iso(new Date())}`,{cache:'no-store'});const d=await r.json(); if(!r.ok)throw new Error(d.detail||r.status);
+    $('engPrev').innerHTML=`<div class="card" style="margin:0"><b>👷 ${esc(e.name)} — النهارده</b><div class="eng-day" style="margin-top:8px">${d.off?'<span class="muted">مش شغال النهارده (مفيش ساعات عمل)</span>':''}
+      ${d.workingHours.map(w=>`<span class="muted">🕘 ساعات العمل <bdi dir="ltr">${w.from} — ${w.to}</bdi></span>`).join('')}
+      ${d.busy.map(b=>`<span class="b">⛔ <bdi dir="ltr">${b.from} — ${b.to}</bdi> محجوز${b.code?' · '+esc(b.code):''}${b.customer?' · '+esc(b.customer):''}${b.reason?' · '+esc(b.reason):''}</span>`).join('')}
+      ${d.free.map(f=>`<span class="f">✅ <bdi dir="ltr">${f.from} — ${f.to}</bdi> فاضي</span>`).join('')}</div></div>`;}
+  catch(err){$('engPrev').innerHTML=`<div class="ai-err">✖ ${esc(err.message)}</div>`}
+}
 
 /* ===================== قوالب واتساب ===================== */
 let WAI=[];
