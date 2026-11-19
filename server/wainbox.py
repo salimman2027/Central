@@ -477,7 +477,7 @@ async def app_send(request: Request):
 @router.post("/app/wai/upload")
 async def app_upload(request: Request):
     q = request.query_params
-    ext, pw = str(q.get("ext") or ""), str(q.get("password") or "")
+    ext, pw = request.headers.get("x-ext", ""), urllib.parse.unquote(request.headers.get("x-pass", ""))
     if not CTX["check_ext"](ext, pw):
         raise HTTPException(401, "سجّل دخول تاني")
     phone = digits(q.get("phone"))

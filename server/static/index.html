@@ -373,6 +373,20 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 #mSpeed button{border-color:var(--border)}.pb-speed button.on{background:#19e6c1;color:#04201b;border-color:transparent;font-weight:800}
 .tr .tl[data-t]:not([data-t=""]){cursor:pointer;border-radius:6px}.tr .tl[data-t]:not([data-t=""]):hover{background:rgba(25,230,193,.12)}
 .tr .tl.now{background:rgba(25,230,193,.2)}
+.wai{display:grid;grid-template-columns:340px 1fr;gap:14px;height:calc(100vh - 210px);min-height:480px}
+.wai .card{margin:0;display:flex;flex-direction:column;min-height:0}
+.wai-list{overflow:auto;flex:1}.wai-it{padding:10px 8px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:10px}
+.wai-it:hover{background:rgba(25,230,193,.07)}.wai-it.sel{background:rgba(25,230,193,.15)}
+.wai-it b{display:flex;justify-content:space-between;gap:6px}.wai-it small{display:block;color:var(--grey);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wai-it .rp{font-size:11.5px;color:var(--teal,#0f9e86)}.wai-u{background:#25d366;color:#fff;border-radius:99px;padding:0 7px;font-size:12px}
+.wai-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.wai-msgs{flex:1;overflow:auto;padding:12px 6px;display:flex;flex-direction:column;gap:6px;background:rgba(127,127,127,.05);border-radius:12px;margin:10px 0}
+.wb{max-width:72%;padding:7px 11px 5px;border-radius:12px;white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.55}
+.wb.in{align-self:flex-start;background:var(--glass,#fff);border:1px solid var(--border)}.wb.out{align-self:flex-end;background:rgba(37,211,102,.16)}
+.wb .m{display:block;font-size:11px;color:var(--grey);margin-top:3px}.wb .by{display:block;font-size:11.5px;color:var(--teal,#0f9e86);font-weight:700}
+.wb img{max-width:260px;border-radius:8px;display:block;margin-bottom:4px}.wb a{color:inherit}
+.wai-c{display:flex;gap:8px;align-items:flex-end}.wai-c textarea{flex:1;resize:vertical}
+@media(max-width:900px){.wai{grid-template-columns:1fr;height:auto}.wai-list{max-height:40vh}}
 .cb-t{width:100%;border-collapse:collapse;font-size:14px}.cb-t th,.cb-t td{padding:8px 6px;border-bottom:1px solid var(--border);text-align:start;vertical-align:top}
 .cb-t tr.late td:first-child{border-inline-start:4px solid var(--red)}.wait-bad{color:var(--red);font-weight:700}.wait-mid{color:var(--orange);font-weight:700}
 .ops-f{display:flex;flex-direction:column;gap:8px;font-size:14px}.ops-f label{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -499,6 +513,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div class="tgrp"><div class="tgbtn">📞 المكالمات <span class="tcount gcount"></span><small class="tsub"></small> ▾</div><div class="tmenu">
     <div class="tab" data-p="log">📞 سجل المكالمات والتسجيلات</div>
     <div class="tab" data-p="cb">🔔 الفائتة والمتابعات <span class="tcount" id="cbCount"></span></div>
+    <div class="tab" data-p="wai">💬 واتساب الشركة <span class="tcount" id="waiCount"></span></div>
     <div class="tab" data-p="report">🖨️ تقرير عدد المكالمات</div>
   </div></div>
   <div class="tgrp"><div class="tgbtn">💼 المبيعات <span class="tcount gcount"></span><small class="tsub"></small> ▾</div><div class="tmenu">
@@ -621,6 +636,25 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
   <div class="card" style="margin-top:14px"><h3>👤 مشاكل كل موظف في المكالمات <span class="muted" style="font-weight:400;font-size:13px">— عدد المرات</span></h3><div class="tw"><table id="iReps"></table></div></div>
   <div class="card" style="margin-top:14px"><h3>🎓 الدروس المستفادة<span class="sp"></span><button class="btn" id="iLessBtn" onclick="makeLessons()">🧠 استخرج الدروس المستفادة</button></h3><div id="iLessons"></div></div>
+</div>
+
+<div class="page" id="p-wai">
+  <div id="waiOff" class="card" hidden></div>
+  <div class="wai" id="waiBox">
+    <div class="wai-l card">
+      <div style="display:flex;gap:6px;margin-bottom:8px"><input id="waiQ" class="ap-in" placeholder="بحث بالاسم أو الرقم أو الكلام" style="flex:1" oninput="clearTimeout(window._wq);window._wq=setTimeout(waiLoad,400)">
+        <select id="waiRep" class="ap-in" style="width:130px" onchange="waiLoad()"></select></div>
+      <div id="waiList" class="wai-list"></div>
+    </div>
+    <div class="wai-r card">
+      <div class="wai-h" id="waiHead"><span class="muted">اختار محادثة</span></div>
+      <div class="wai-msgs" id="waiMsgs"></div>
+      <div class="wai-c" id="waiComp" hidden>
+        <textarea id="waiText" class="ap-in" rows="2" placeholder="ردّ كإدارة (بيتبعت من رقم الشركة)"></textarea>
+        <button class="btn" onclick="waiSend()">إرسال</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="page" id="p-tg">
@@ -1296,6 +1330,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.p==='train')loadTrain();
   if(t.dataset.p==='cb')loadCb();
   if(t.dataset.p==='tg')loadTg();
+  if(t.dataset.p==='wai')waiLoad();
   if(t.dataset.p==='set')opLoad();
 });
 loadConfig().then(()=>{fillSelects();refresh();initAI();}).catch(e=>{$('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل الإعدادات</div><div class="s">${e.message}</div></div>`});
@@ -2057,6 +2092,39 @@ async function tgUpload(){
   catch(e){$('tgUMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
 $('tgRep')&&$('tgRep').addEventListener('change',renderTg);
+
+/* ===================== واتساب الشركة (كل المحادثات — المدير يراجع ويرد ويوزّع) ===================== */
+let WAI_ITEMS=[], WAI_CUR=null, WAI_T=null;
+async function waiLoad(){
+  if(!$('waiRep').options.length) $('waiRep').innerHTML='<option value="">كل المناديب</option><option value="-">من غير مندوب</option>'+(REPS||[]).map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');
+  try{const j=await (await fetch(`${API_BASE}/wai/convs?q=${encodeURIComponent($('waiQ').value.trim())}&ext=${$('waiRep').value}`,{cache:'no-store'})).json();
+    $('waiOff').hidden=!!j.ready; $('waiBox').style.display=j.ready?'':'none';
+    if(!j.ready){$('waiOff').innerHTML='<h3 style="margin-top:0">💬 واتساب الشركة لسه مش متربط</h3><p>محتاج حساب <b>WhatsApp Business API</b> من Meta. بعد ما تجهّزه، على السيرفر: <code>sudo nq-setkey whatsapp</code> — وبعدها كل محادثات المناديب مع العملاء هتبقى هنا ومتسجلة، ومحدش يقدر يمسحها.</p>';return}
+    WAI_ITEMS=j.items||[]; const n=WAI_ITEMS.reduce((a,x)=>a+(x.adminUnread||0),0); $('waiCount').textContent=n||'';
+    $('waiList').innerHTML=WAI_ITEMS.length?WAI_ITEMS.map(x=>`<div class="wai-it ${x.phone===WAI_CUR?'sel':''}" onclick="waiOpen('${x.phone}')"><b><span>${esc(x.name||x.local)}</span><span class="muted" style="font-weight:400;font-size:11.5px">${x.lastAt?new Date(x.lastAt).toLocaleString('ar-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):''}</span></b>
+      <small>${esc(x.lastText||'')}</small><span class="rp">${x.ext?'👤 '+esc(x.rep):'⚠️ من غير مندوب'}${x.name?' · <span class="ltr">'+esc(x.local)+'</span>':''}</span> ${x.adminUnread?`<span class="wai-u">${x.adminUnread}</span>`:''}</div>`).join(''):'<div class="muted">مفيش محادثات</div>';
+  }catch(e){$('waiList').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
+}
+async function waiOpen(phone){
+  WAI_CUR=phone; clearInterval(WAI_T); await waiThread(true); waiLoad();
+  WAI_T=setInterval(()=>{if($('p-wai').classList.contains('active')&&document.visibilityState==='visible')waiThread();else clearInterval(WAI_T)},6000);
+}
+async function waiThread(first){
+  const ph=WAI_CUR; if(!ph)return;
+  try{const j=await (await fetch(`${API_BASE}/wai/msgs?phone=${ph}`,{cache:'no-store'})).json(); if(ph!==WAI_CUR)return; const c=j.conv;
+    $('waiHead').innerHTML=`<b style="font-size:16px">${esc(c.name||c.local)}</b><span class="ltr muted">${esc(c.local)}</span>${c.window?'<span class="tr-tag">🟢 النافذة مفتوحة (رد عادي)</span>':'<span class="tr-tag" style="background:rgba(233,139,42,.15);color:var(--orange)">⏳ محتاج قالب</span>'}
+      <span class="sp" style="flex:1"></span><label class="muted" style="font-size:13px">المندوب: <select class="ap-in" style="width:150px" onchange="waiAssign(this.value)"><option value="">— من غير —</option>${(REPS||[]).map(r=>`<option value="${r.id}" ${String(r.id)===c.ext?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label>`;
+    const box=$('waiMsgs'), bottom=first||box.scrollHeight-box.scrollTop-box.clientHeight<80;
+    const tick=m=>m.dir!=='out'?'':({sent:'✓',delivered:'✓✓',read:'<span style="color:#53bdeb">✓✓</span>',failed:`<span style="color:var(--red)" title="${esc(m.error)}">⚠ ماوصلتش</span>`}[m.status]||'🕓');
+    box.innerHTML=j.items.map(m=>`<div class="wb ${m.dir}">${m.dir==='out'?`<span class="by">${esc(m.by||'الإدارة')}</span>`:''}${(m.type==='image'||m.type==='sticker')&&m.hasFile?`<a href="${API_BASE}/wai/media/${m.id}" target="_blank"><img src="${API_BASE}/wai/media/${m.id}" loading="lazy"></a>`:''}${['document','audio','video'].includes(m.type)?(m.hasFile?`<a href="${API_BASE}/wai/media/${m.id}" target="_blank">${{document:'📎',audio:'🎤',video:'🎬'}[m.type]} ${esc(m.filename||'ملف')}</a><br>`:'📎 (بيتحمّل)<br>'):''}${m.type==='template'?'📋 ':''}${esc(m.body||'')}<span class="m">${new Date(m.at).toLocaleString('ar-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} ${tick(m)}</span></div>`).join('')||'<div class="muted">مفيش رسايل</div>';
+    if(bottom)box.scrollTop=box.scrollHeight;
+    $('waiComp').hidden=!(ROLE==='admin'&&c.window);
+  }catch(e){$('waiMsgs').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
+}
+async function waiAssign(ext){ try{const r=await fetch(API_BASE+'/wai/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:WAI_CUR,ext})});const j=await r.json();if(!r.ok)throw new Error(j.detail);toast('✔ المحادثة اتحوّلت');waiLoad();}catch(e){toast('✖ '+e.message)} }
+async function waiSend(){ const t=$('waiText').value.trim(); if(!t)return;
+  try{const r=await fetch(API_BASE+'/wai/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:WAI_CUR,text:t})});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('waiText').value='';waiThread();}catch(e){toast('✖ '+e.message)} }
+setTimeout(()=>fetch(API_BASE+'/wai/convs',{cache:'no-store'}).then(r=>r.json()).then(j=>{if(j.ready)$('waiCount').textContent=(j.items||[]).reduce((a,x)=>a+(x.adminUnread||0),0)||''}).catch(()=>{}),3000);
 
 /* ===================== مواعيد المهندسين ===================== */
 let ENG=[];

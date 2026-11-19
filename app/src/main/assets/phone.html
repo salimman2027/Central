@@ -180,6 +180,37 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .t-add[open] summary:after { content:"▴"; }
   .t-or { text-align:center; color:var(--muted); font-size:12.5px; margin:14px 0 8px; display:flex; align-items:center; gap:8px; }
   .t-or:before, .t-or:after { content:""; flex:1; height:1px; background:var(--line, rgba(127,127,127,.25)); }
+  .tabbar button { font-size:11px; } .tabbar button b { font-size:19px; }
+  .ch-row { display:flex; gap:10px; align-items:center; padding:11px 4px; border-top:1px solid var(--line, rgba(127,127,127,.18)); cursor:pointer; }
+  .ch-row:first-child { border-top:0; } .ch-row .av { width:42px; height:42px; border-radius:50%; background:#25d366; color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0; }
+  .ch-row .mid { flex:1; min-width:0; } .ch-row .mid b { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ch-row .mid small { display:block; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12.5px; }
+  .ch-row .end { text-align:left; font-size:11.5px; color:var(--muted); display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+  .ch-row .ub { background:#25d366; color:#fff; border-radius:99px; min-width:20px; padding:0 6px; font-weight:800; text-align:center; }
+  .chat-scr { padding:0 !important; flex-direction:column; height:100%; }
+  .chat-scr.on { display:flex !important; }
+  .ch-top { display:flex; align-items:center; gap:10px; padding:10px 12px; background:#075e54; color:#fff; flex-shrink:0; }
+  .ch-top button { background:none; border:0; color:#fff; font-size:22px; cursor:pointer; padding:4px 8px; }
+  .ch-who { flex:1; min-width:0; } .ch-who b { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .ch-who small { opacity:.8; direction:ltr; display:block; text-align:right; }
+  .ch-msgs { flex:1; overflow-y:auto; padding:12px 10px; background:#efeae2; display:flex; flex-direction:column; gap:6px; }
+  html[data-theme=dark] .ch-msgs, body.dark .ch-msgs { background:#0b141a; }
+  .bub { max-width:80%; padding:7px 10px 5px; border-radius:10px; font-size:14.5px; line-height:1.55; white-space:pre-wrap; word-break:break-word; box-shadow:0 1px 1px rgba(0,0,0,.12); color:#111; }
+  .bub.in { align-self:flex-start; background:#fff; border-top-right-radius:3px; }
+  .bub.out { align-self:flex-end; background:#d9fdd3; border-top-left-radius:3px; }
+  .bub .meta { display:block; font-size:10.5px; color:#667781; text-align:left; margin-top:2px; }
+  .bub .meta .rd { color:#53bdeb; } .bub .meta .fl { color:#d64541; }
+  .bub img { max-width:100%; border-radius:8px; display:block; margin-bottom:4px; cursor:pointer; }
+  .bub .doc { display:flex; gap:8px; align-items:center; background:rgba(0,0,0,.05); border-radius:8px; padding:8px; cursor:pointer; margin-bottom:4px; }
+  .bub .by { display:block; font-size:11px; color:#0e9f87; font-weight:700; }
+  .ch-day { align-self:center; background:#fff8; color:#54656f; font-size:11.5px; border-radius:8px; padding:3px 10px; margin:6px 0; }
+  .ch-bar { display:flex; gap:6px; align-items:flex-end; padding:8px; background:var(--card, #fff); border-top:1px solid var(--line, #ddd); flex-shrink:0; }
+  .ch-bar textarea { flex:1; resize:none; border-radius:20px; padding:9px 14px; min-height:42px; max-height:120px; font:inherit; font-size:15px; }
+  .ch-att { background:none; border:0; font-size:22px; cursor:pointer; padding:8px 4px; }
+  .ch-send { width:44px; height:44px; border-radius:50%; border:0; background:#00a884; color:#fff; font-size:18px; cursor:pointer; flex-shrink:0; transform:scaleX(-1); }
+  .ch-tpl { padding:10px; background:#fff8e1; border-top:1px solid #f3d27a; font-size:13.5px; max-height:45vh; overflow:auto; flex-shrink:0; color:#3a2a00; }
+  .ch-tpl .tp { border:1px solid #f0d58a; background:#fff; border-radius:10px; padding:8px 10px; margin-top:8px; }
+  .ch-tpl .tp input { margin-top:6px; padding:8px 10px; font-size:14px; }
+  .ch-tpl .tp button { margin-top:8px; }
   .eng-chips, .eng-days { display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; padding-bottom:2px; }
   .eng-chips button, .eng-days button { flex-shrink:0; border:1px solid var(--line, rgba(127,127,127,.25)); background:var(--card, transparent); color:var(--text); border-radius:12px; padding:7px 12px; font:inherit; font-size:13.5px; cursor:pointer; }
   .eng-days button { display:flex; flex-direction:column; align-items:center; min-width:54px; padding:6px 8px; } .eng-days button small { font-size:11px; color:var(--muted); }
@@ -498,6 +529,26 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   <button class="btn ghost" onclick="NQTargets.open()">رجوع</button>
 </section>
 
+<section id="scrChats" class="screen page">
+  <h2>💬 واتساب الشركة</h2>
+  <div style="display:flex;gap:8px;margin-bottom:10px"><input id="chQ" placeholder="بحث بالاسم أو الرقم" oninput="NQChat.filter()"><button class="btn ghost sm-btn" onclick="NQChat.newChat()">＋ جديد</button></div>
+  <div class="card" id="chList"></div>
+</section>
+
+<section id="scrChat" class="screen chat-scr">
+  <div class="ch-top"><button class="ch-back" onclick="NQChat.list()">→</button>
+    <div class="ch-who"><b id="chName"></b><small id="chNum"></small></div>
+    <button class="ch-call" onclick="NQChat.call()">📞</button></div>
+  <div class="ch-msgs" id="chMsgs"></div>
+  <div class="ch-tpl" id="chTpl" hidden></div>
+  <div class="ch-bar" id="chBar">
+    <label class="ch-att" title="صورة أو ملف">📎<input type="file" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="NQChat.upload(this.files[0]);this.value=''"></label>
+    <button class="ch-att" title="كتالوج / ملف الشركة" onclick="NQChat.docs()">📄</button>
+    <textarea id="chText" rows="1" placeholder="اكتب رسالة…" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+    <button class="ch-send" onclick="NQChat.send()">➤</button>
+  </div>
+</section>
+
 <section id="scrInbox" class="screen page">
   <h2>📥 المطلوب مني</h2>
   <div id="ibBody"></div>
@@ -662,6 +713,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   <button data-s="scrTargets" onclick="NQTargets.open()"><b>🎯</b>التارجت</button>
   <button data-s="scrStats" onclick="NQStats.open()"><b>📊</b>إنجازي</button>
   <button data-s="scrPerf" onclick="NQPerf.open()"><b>🧠</b>أدائي<i class="tbadge" id="pBadge"></i></button>
+  <button data-s="scrChats" id="waTab" hidden onclick="NQChat.list()"><b>💬</b>واتساب<i class="tbadge" id="waBadge"></i></button>
   <button data-s="scrFiles" onclick="NQFiles.open()"><b>📁</b>الملفات<i class="tbadge" id="tBadge"></i></button>
 </nav>
 
@@ -679,7 +731,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
    - وضع CRM: بعد المكالمة يسأل عن العميل والملخص ويبعته للسيرفر
    =================================================================== */
 const $ = id => document.getElementById(id);
-const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrPerf", "scrFiles", "scrEng"];
+const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrPerf", "scrFiles", "scrEng", "scrChats"];
 function show(id) {
   // خانة كتابة في شاشة اتقفلت (زي الباسورد) متفضلش واخدة الكيبورد
   const ae = document.activeElement; if (ae && ae !== document.body && ae.closest && !ae.closest("#" + id)) try { ae.blur(); } catch (e) {}
@@ -1483,6 +1535,9 @@ const NQInbox = {
       const r = await fetch(CONFIG.api + "/inbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c), signal: ctl.signal });
       clearTimeout(tm); if (!r.ok) return;
       this.data = await r.json(); this.render(); this.notify(); this.missed();
+      if (this.data.waUnread != null) { $("waBadge").textContent = this.data.waUnread || ""; const pv = store.get("nq_wa_unread", 0);
+        if (this.data.waUnread > pv) { if (window.Android && Android.notify) try { Android.notify(4242, "💬 رسالة واتساب جديدة", "عندك " + this.data.waUnread + " رسالة مش مقروءة"); } catch (e) {} else toast("💬 رسالة واتساب جديدة"); }
+        store.set("nq_wa_unread", this.data.waUnread); if ($("scrChats").classList.contains("on")) NQChat.list(); }
       if ($("scrInbox").classList.contains("on")) this.renderList();
     } catch (e) {}
   },
@@ -1560,6 +1615,7 @@ const NQWA = {
   },
   open(number, customer) {
     if (!number) { toast("مفيش رقم"); return; }
+    if (NQChat.ready) { NQChat.open(number, customer || ""); return; }   // واتساب الشركة متربط: المحادثة من جوه السيستم
     this.num = number; this.cust = customer || ""; $("waNum").textContent = (customer ? customer + " · " : "") + number;
     this.render(); $("waSheet").classList.add("on"); this.load().then(() => this.render());
   },
@@ -1620,6 +1676,114 @@ const NQEng = {
   }
 };
 setTimeout(() => NQEng.refresh(), 5000);
+
+/* ---------- واتساب الشركة: المحادثات من هنا (مش من واتساب الموظف) — كله متسجل على السيرفر ---------- */
+const NQChat = {
+  ready: false, items: [], cur: null, conv: null, msgs: [], tpls: null, t: null, lt: null, blobs: {},
+  async api(path, body) {
+    const c = NQOwner.creds(); if (!c) throw new Error("ادخل بحسابك الأول");
+    const r = await fetch(CONFIG.api + "/wai/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, ...body }) });
+    if (path === "media") { if (!r.ok) throw new Error("الملف مش جاهز"); return r.blob(); }
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || "السيرفر مش راد"); return j;
+  },
+  async probe() { try { const j = await this.api("convs", {}); this.ready = !!j.ready; this.items = j.items || []; } catch (e) {} $("waTab").hidden = !this.ready; },
+  async list() {
+    clearInterval(this.t); this.cur = null; show("scrChats"); this.paint();
+    try { const j = await this.api("convs", { tpl: !this.tpls }); this.ready = j.ready; this.items = j.items || []; if (j.templates) this.tpls = j.templates; this.paint(); } catch (e) { $("chList").innerHTML = `<div>✖ ${esc(e.message)}</div>`; }
+    clearInterval(this.lt); this.lt = setInterval(() => { if ($("scrChats").classList.contains("on")) this.api("convs", {}).then(j => { this.items = j.items || []; this.paint(); }).catch(() => {}); else clearInterval(this.lt); }, 15000);
+  },
+  filter() { this.paint(); },
+  when(t) { const d = new Date(t), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("ar-EG", { day: "numeric", month: "short" }); },
+  paint() {
+    if (!this.ready) { $("chList").innerHTML = `<div style="color:var(--muted)">واتساب الشركة لسه مش متربط — كلّم المدير</div>`; return; }
+    const q = $("chQ").value.trim(), L = this.items.filter(x => !q || (x.name + x.local + x.lastText).includes(q));
+    $("chList").innerHTML = L.length ? L.map(x => `<div class="ch-row" onclick="NQChat.open('${x.phone}','${esc(x.name).replace(/'/g, "")}')"><div class="av">${esc((x.name || "؟").trim()[0] || "؟")}</div>
+      <div class="mid"><b>${esc(x.name || x.local)}</b><small>${esc(x.lastText || "")}</small></div><div class="end"><span>${x.lastAt ? this.when(x.lastAt) : ""}</span>${x.unread ? `<span class="ub">${x.unread}</span>` : ""}</div></div>`).join("")
+      : `<div style="color:var(--muted);padding:8px">مفيش محادثات لسه — دوس "＋ جديد" أو 💬 جنب أي مكالمة</div>`;
+    const n = this.items.reduce((a, x) => a + (x.unread || 0), 0); $("waBadge").textContent = n || "";
+  },
+  newChat() { const n = prompt("رقم العميل (05XXXXXXXX)"); if (n && n.replace(/\D/g, "").length >= 9) this.open(n, ""); },
+  async open(phone, name) {
+    this.cur = phone; this.name = name || ""; this.msgs = []; this.blobs = {};
+    $("chName").textContent = name || phone; $("chNum").textContent = ""; $("chMsgs").innerHTML = ""; $("chTpl").hidden = true; show("scrChat");
+    await this.load(true);
+    clearInterval(this.t); this.t = setInterval(() => { if ($("scrChat").classList.contains("on")) this.load(); else clearInterval(this.t); }, 5000);
+  },
+  async load(first) {
+    const want = this.cur;
+    try {
+      const j = await this.api("msgs", { phone: want }); if (want !== this.cur) return;
+      this.conv = j.conv; $("chName").textContent = j.conv.name || this.name || j.conv.local; $("chNum").textContent = j.conv.local || "";
+      const changed = JSON.stringify(j.items.map(m => [m.id, m.status, m.hasFile])) !== JSON.stringify(this.msgs.map(m => [m.id, m.status, m.hasFile]));
+      this.msgs = j.items; if (changed || first) this.paintMsgs();
+      this.composer();
+    } catch (e) { if (first) $("chMsgs").innerHTML = `<div class="ch-day">✖ ${esc(e.message)}</div>`; }
+  },
+  tick(m) { if (m.dir !== "out") return ""; return { sent: "✓", delivered: "✓✓", read: '<span class="rd">✓✓</span>', failed: `<span class="fl" title="${esc(m.error)}">⚠ ماوصلتش</span>` }[m.status] || "🕓"; },
+  paintMsgs() {
+    const box = $("chMsgs"), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80; let day = "", h = "";
+    for (const m of this.msgs) {
+      const d = new Date(m.at).toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "short" }); if (d !== day) { day = d; h += `<div class="ch-day">${d}</div>`; }
+      let inner = "";
+      if (m.type === "image" || m.type === "sticker") inner = m.hasFile ? `<img data-mid="${m.id}" alt="📷" onclick="NQChat.openFile(${m.id})">` : "📷 صورة (بتتحمّل…)";
+      else if (["document", "audio", "video"].includes(m.type)) inner = `<div class="doc" onclick="NQChat.openFile(${m.id})">${{ document: "📎", audio: "🎤", video: "🎬" }[m.type]} <span>${esc(m.filename || { document: "ملف", audio: "رسالة صوتية", video: "فيديو" }[m.type])}</span></div>`;
+      if (m.type === "template") inner = "📋 ";
+      h += `<div class="bub ${m.dir}">${m.dir === "out" && m.by ? `<span class="by">${esc(m.by)}</span>` : ""}${inner}${m.body ? esc(m.body) : ""}<span class="meta">${new Date(m.at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })} ${this.tick(m)}</span></div>`;
+    }
+    box.innerHTML = h || `<div class="ch-day">ابدأ المحادثة</div>`;
+    box.querySelectorAll("img[data-mid]").forEach(img => this.blob(+img.dataset.mid).then(u => { img.src = u; }).catch(() => {}));
+    if (atBottom || !this._painted) box.scrollTop = box.scrollHeight; this._painted = true;
+  },
+  async blob(id) { if (!this.blobs[id]) this.blobs[id] = this.api("media", { id }).then(b => URL.createObjectURL(b)); return this.blobs[id]; },
+  async openFile(id) {
+    const m = this.msgs.find(x => x.id === id); if (!m || !m.hasFile) return toast("الملف لسه بيتحمّل");
+    try {
+      const b = await this.api("media", { id });
+      if (IS_APP && Android.saveAndOpen) { const r = new FileReader(); r.onload = () => Android.saveAndOpen(m.filename || ("wa-" + id + (m.type === "image" ? ".jpg" : "")), b.type || m.mime || "application/octet-stream", String(r.result).split(",")[1]); r.readAsDataURL(b); }
+      else window.open(URL.createObjectURL(b), "_blank");
+    } catch (e) { toast("✖ " + e.message); }
+  },
+  composer() {
+    const open = this.conv && this.conv.window;
+    $("chBar").style.display = open ? "" : "none";
+    const box = $("chTpl"); if (open) { box.hidden = true; return; }
+    if (!box.hidden && box.dataset.for === this.cur) return;
+    box.dataset.for = this.cur; box.hidden = false;
+    const me = (store.get("nq_user", null) || {}).name || "";
+    const T = this.tpls || [];
+    box.innerHTML = `<b>⏳ العميل مابعتش من أكتر من 24 ساعة</b><br>واتساب بيسمح تبدأ برسالة من القوالب المعتمدة بس — أول ما يرد تقدر تكتب عادي.` +
+      (T.length ? T.map((t, i) => `<div class="tp"><b>${esc(t.name)}</b><div style="white-space:pre-wrap;margin-top:4px">${esc(t.body)}</div>
+        ${Array.from({ length: t.params }, (_, k) => `<input class="tpp" data-i="${i}" placeholder="{{${k + 1}}}" value="${esc(k === 0 ? (this.name || "") : k === 1 ? me : "")}">`).join("")}
+        <button class="btn" onclick="NQChat.sendTpl(${i})">إرسال القالب</button></div>`).join("") : `<div class="tp">مفيش قوالب معتمدة — المدير يعملها من Meta Business</div>`);
+  },
+  async sendTpl(i) {
+    const t = this.tpls[i], params = [...document.querySelectorAll(`.tpp[data-i="${i}"]`)].map(x => x.value.trim());
+    if (params.some(p => !p)) return toast("املا كل الخانات");
+    try { await this.api("send", { phone: this.cur, name: this.name, template: { name: t.name, lang: t.lang, params } }); $("chTpl").hidden = true; toast("✔ اتبعت"); this.load(); } catch (e) { toast("✖ " + e.message); }
+  },
+  async send() {
+    const el = $("chText"), text = el.value.trim(); if (!text) return;
+    el.value = ""; el.style.height = "auto";
+    this.msgs.push({ id: -1, dir: "out", type: "text", body: text, at: new Date().toISOString(), status: "" }); this.paintMsgs();
+    try { await this.api("send", { phone: this.cur, name: this.name, text }); this.load(); } catch (e) { toast("✖ " + e.message); el.value = text; this.load(); }
+  },
+  async upload(f) {
+    if (!f) return; const c = NQOwner.creds(); toast("بيترفع…");
+    try {
+      const r = await fetch(`${CONFIG.api}/wai/upload?phone=${encodeURIComponent(this.cur)}&caption=${encodeURIComponent($("chText").value.trim())}`,
+        { method: "POST", headers: { "X-Name": encodeURIComponent(f.name), "X-Ext": c.ext, "X-Pass": encodeURIComponent(c.password), "Content-Type": f.type || "application/octet-stream" }, body: f });
+      const j = await r.json(); if (!r.ok) throw new Error(j.detail || r.status); $("chText").value = ""; this.load();
+    } catch (e) { toast("✖ " + e.message); }
+  },
+  docs() {   // ملفات الشركة (من قوالب واتساب في اللوحة) كرابط/مستند
+    const items = ((NQWA.data && NQWA.data.items) || []).filter(t => t.url);
+    if (!items.length) return toast("مفيش ملفات — المدير يضيفها من الإعدادات ← رسايل واتساب");
+    const i = prompt("ابعت أنهي ملف؟\n" + items.map((t, k) => `${k + 1}) ${t.title}`).join("\n"), "1"); const t = items[(+i || 0) - 1]; if (!t) return;
+    this.api("send", { phone: this.cur, doc: { url: t.url, filename: (t.file && t.file.name) || "NQ.pdf" }, text: t.title }).then(() => this.load()).catch(e => toast("✖ " + e.message));
+  },
+  call() { if (!this.conv) return; show("scrDial"); $("dialNum").textContent = this.conv.local; window._pickedName = this.conv.name || ""; NQPhone.call(this.conv.local); }
+};
+setTimeout(() => NQChat.probe(), 3000);
 
 /* ---------- الاتصال المتتالي: يكلّم التارجت واحد ورا التاني ---------- */
 const NQDialer = {
