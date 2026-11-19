@@ -363,6 +363,16 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 .wa-it{border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
 .wa-it textarea{min-height:110px;resize:vertical;font:inherit;line-height:1.6}
 .sim-tag{font-size:11.5px;color:var(--teal,#0f9e86);margin-top:3px;white-space:nowrap}
+.pbar{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:150;width:min(980px,calc(100vw - 24px));display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:#0f182b;color:#eaf4f4;border-radius:16px;padding:10px 16px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+.pbar[hidden]{display:none}.pb-info{display:flex;flex-direction:column;min-width:140px;max-width:220px;overflow:hidden}.pb-info b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pb-info .muted{color:#9fb3c4;font-size:12px}
+.pb-ctl{display:flex;gap:6px;align-items:center;direction:ltr}.pb-ctl button,.pb-x{background:#1b2a44;color:#fff;border:0;border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;cursor:pointer}
+.pb-ctl .pb-play{background:linear-gradient(135deg,#19e6c1,#5aa8ff);color:#04201b;font-weight:800;min-width:46px;font-size:15px}
+.pb-seek{flex:1;min-width:220px;display:flex;align-items:center;gap:8px;direction:ltr;font-variant-numeric:tabular-nums;font-size:12.5px}.pb-seek input{flex:1;accent-color:#19e6c1}
+.pb-speed{display:flex;gap:4px;direction:ltr}.pb-speed button{border:1px solid #2a4458;background:transparent;color:inherit;border-radius:99px;padding:4px 9px;font:inherit;font-size:12.5px;cursor:pointer}
+#mSpeed button{border-color:var(--border)}.pb-speed button.on{background:#19e6c1;color:#04201b;border-color:transparent;font-weight:800}
+.tr .tl[data-t]:not([data-t=""]){cursor:pointer;border-radius:6px}.tr .tl[data-t]:not([data-t=""]):hover{background:rgba(25,230,193,.12)}
+.tr .tl.now{background:rgba(25,230,193,.2)}
 .cb-t{width:100%;border-collapse:collapse;font-size:14px}.cb-t th,.cb-t td{padding:8px 6px;border-bottom:1px solid var(--border);text-align:start;vertical-align:top}
 .cb-t tr.late td:first-child{border-inline-start:4px solid var(--red)}.wait-bad{color:var(--red);font-weight:700}.wait-mid{color:var(--orange);font-weight:700}
 .ops-f{display:flex;flex-direction:column;gap:8px;font-size:14px}.ops-f label{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -845,12 +855,26 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
 </div>
 </div>
 
+<!-- مشغّل التسجيلات: سرعة + تقديم/ترجيع + شريط -->
+<div class="pbar" id="pbar" hidden>
+  <div class="pb-info"><b id="pbName">—</b><span class="muted" id="pbSub"></span></div>
+  <div class="pb-ctl">
+    <button onclick="pbSkip(-10)" title="رجّع 10 ثواني (←)">↺ 10</button>
+    <button class="pb-play" id="pbPlay" onclick="pbToggle()">❚❚</button>
+    <button onclick="pbSkip(10)" title="قدّم 10 ثواني (→)">10 ↻</button>
+  </div>
+  <div class="pb-seek"><span id="pbCur">0:00</span><input type="range" id="pbRange" min="0" max="1000" value="0"><span id="pbDur">0:00</span></div>
+  <div class="pb-speed" id="pbSpeed"></div>
+  <button class="pb-x" onclick="pbClose()" title="قفل">✕</button>
+</div>
+
 <!-- player modal -->
 <div class="modal" id="modal" onclick="if(event.target===this)closeRec()">
   <div class="mbox">
     <h3 style="margin:0;color:var(--teal-d)">🎧 تشغيل التسجيل</h3>
     <div class="muted" id="mInfo" style="margin-top:6px"></div>
-    <audio id="player" controls style="width:100%;margin:14px 0"></audio>
+    <audio id="player" controls style="width:100%;margin:14px 0 6px"></audio>
+    <div class="pb-speed" id="mSpeed" style="margin-bottom:12px"></div>
     <div style="display:flex;gap:8px;align-items:center">
       <a class="btn o" id="dl" style="text-decoration:none" href="#">⬇ تحميل</a>
       <div class="sp" style="flex:1"></div><button class="btn o" onclick="closeRec()">إغلاق</button>
@@ -1232,7 +1256,7 @@ function renderAI(){
     }
     const chk=(a.checklist||[]).map(k=>`<li class="${k.done?'ok':'no'}">${k.done?'✔':'✖'} ${esc(k.item)}${k.evidence?` <span class="muted">— ${esc(k.evidence)}</span>`:''}</li>`).join('');
     const tasks=(a.follow_up_tasks||[]).map(k=>`<li>${esc(k.task)}${k.due?' — '+esc(k.due):''}</li>`).join('')||'<li>—</li>';
-    const tr=(x.transcript||[]).map(l=>`<div><span>${l.start!=null?l.start+"s":"•"}</span> ${esc(l.text)}</div>`).join('');
+    const tr=(x.transcript||[]).map(l=>`<div class="tl" data-t="${l.start??''}" title="${l.start!=null?'اسمع من هنا':''}"><span>${l.start!=null?ms(Math.floor(l.start)):"•"}</span> ${esc(l.text)}</div>`).join('');
     return `<div class="ai-card" id="row-${esc(c.id)}">${head}
       <p style="margin:0 0 10px">${esc(a.summary||'')}</p>
       ${(a.criteria||[]).length?critBlock(a)+`<div class="ai-cols" style="margin-top:10px"><div><b class="muted">💡 نصيحة للمندوب</b><p style="margin:4px 0">${esc(a.coaching_tip||'')}</p></div><div><b class="muted">📅 مهام متابعة</b><ul style="margin:4px 0">${tasks}</ul></div></div>`:`
@@ -1294,9 +1318,39 @@ function callActs(id,o={}){
     ${o.noAi?'':`<button class="a-btn ${o.ai?'has':''}" title="تحليل المكالمة" onclick="callPanel('${q}','ai')">🤖</button>`}
     <button class="a-btn ${o.sup?'has':''}" title="ملاحظة المدير" onclick="callPanel('${q}','note')">💬</button></div>`;
 }
+/* ---------- سرعة التشغيل + شريط التشغيل ---------- */
+const SPEEDS=[1,1.25,1.5,1.75,2]; let PB_RATE=1; try{PB_RATE=+localStorage.getItem('nq_rate')||1}catch(e){}
+function pbSpeeds(){const h=SPEEDS.map(r=>`<button class="${r===PB_RATE?'on':''}" onclick="pbRate(${r})">${r}×</button>`).join('');$('pbSpeed').innerHTML=h;$('mSpeed').innerHTML=h;}
+function pbRate(r){PB_RATE=r;try{localStorage.setItem('nq_rate',r)}catch(e){} IP.playbackRate=r; $('player').playbackRate=r; pbSpeeds();}
+function pbToggle(){if(!IP_ID)return; IP.paused?IP.play():IP.pause();}
+function pbSkip(s){if(!IP.duration)return; IP.currentTime=Math.max(0,Math.min(IP.duration-0.2,IP.currentTime+s));}
+function pbClose(){IP.pause();$('pbar').hidden=true;}
+function pbInfo(id){const c=CALLS.find(x=>String(x.id)===String(id))||{}, a=(AI_ROWS.find(x=>String(x.call.id)===String(id))||{}).call||{};
+  const num=c.num||a.number||'', cust=c.cust&&c.cust!=='—'?c.cust:'', rep=repOf(+(c.rep||a.ext||0)).name||'';
+  $('pbName').textContent=cust||num||'تسجيل'; $('pbSub').textContent=[rep,cust?num:'',c.t?c.t.toLocaleString('ar-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):''].filter(Boolean).join(' · ');}
+let PB_DRAG=false;
+$('pbRange').addEventListener('input',()=>{PB_DRAG=true;if(IP.duration)$('pbCur').textContent=ms(Math.floor($('pbRange').value/1000*IP.duration))});
+$('pbRange').addEventListener('change',()=>{if(IP.duration)IP.currentTime=$('pbRange').value/1000*IP.duration;PB_DRAG=false});
+IP.addEventListener('timeupdate',()=>{if(!IP.duration)return; if(!PB_DRAG){$('pbRange').value=Math.round(IP.currentTime/IP.duration*1000);$('pbCur').textContent=ms(Math.floor(IP.currentTime));}
+  $('pbDur').textContent=ms(Math.floor(IP.duration));
+  document.querySelectorAll('.tr .tl.now').forEach(x=>x.classList.remove('now'));
+  const box=document.getElementById('pnl-'+IP_ID)||document.getElementById('row-'+IP_ID); if(box){let cur=null;box.querySelectorAll('.tr .tl[data-t]').forEach(l=>{const t=parseFloat(l.dataset.t);if(!isNaN(t)&&t<=IP.currentTime)cur=l});cur&&cur.classList.add('now');}});
+IP.addEventListener('play',()=>{$('pbPlay').textContent='❚❚';$('pbar').hidden=false;IP.playbackRate=PB_RATE;});
+IP.addEventListener('pause',()=>$('pbPlay').textContent='▶');
+IP.addEventListener('loadedmetadata',()=>{IP.playbackRate=PB_RATE;});
+$('player').addEventListener('play',()=>{$('player').playbackRate=PB_RATE;});
+// دوس على سطر في نص المكالمة → يسمع من الثانية دي
+document.addEventListener('click',e=>{const l=e.target.closest('.tr .tl[data-t]'); if(!l||l.dataset.t==='')return;
+  const t=parseFloat(l.dataset.t); const host=l.closest('[id^="pnl-"],[id^="row-"]'); const id=host?host.id.replace(/^(pnl|row)-/,''):IP_ID;
+  if($('modal').classList.contains('show')&&l.closest('#modal')){$('player').currentTime=t;$('player').play();return}
+  if(!id)return; if(IP_ID!==id){IP.src=recUrl(id);IP_ID=id;pbInfo(id);}
+  const go=()=>{IP.currentTime=t;IP.play().catch(()=>{})}; IP.readyState>=1?go():IP.addEventListener('loadedmetadata',go,{once:true});});
+document.addEventListener('keydown',e=>{if($('pbar').hidden||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;
+  if(e.code==='Space'){e.preventDefault();pbToggle()} else if(e.key==='ArrowRight'){pbSkip(5)} else if(e.key==='ArrowLeft'){pbSkip(-5)}});
+pbSpeeds();
 function playInline(id){
   if(IP_ID===id&&!IP.paused){IP.pause();return}
-  if(IP_ID!==id){IP.src=recUrl(id);IP_ID=id;}
+  if(IP_ID!==id){IP.src=recUrl(id);IP_ID=id;pbInfo(id);}
   IP.play().catch(e=>alert('تعذّر تشغيل التسجيل: '+e.message));
 }
 function panelHost(id){
@@ -1325,7 +1379,7 @@ async function callPanel(id,kind){
     return;
   }
   if(kind==='text'){
-    if(d.transcript&&d.transcript.length){p.innerHTML=`${x}<b>📝 نص المكالمة</b><div class="tr" style="margin-top:8px">${d.transcript.map(l=>`<div><span>${l.start!=null?l.start+"s":"•"}</span> ${esc(l.text)}</div>`).join('')}</div>
+    if(d.transcript&&d.transcript.length){p.innerHTML=`${x}<b>📝 نص المكالمة</b><div class="tr" style="margin-top:8px">${d.transcript.map(l=>`<div class="tl" data-t="${l.start??''}" title="${l.start!=null?'اسمع من هنا':''}"><span>${l.start!=null?ms(Math.floor(l.start)):"•"}</span> ${esc(l.text)}</div>`).join('')}</div>
       <div class="pnl-btns"><button class="btn o" onclick="callJob('${esc(id)}','ai')">🤖 حلّل المكالمة</button></div>`;return}
     p.innerHTML=`${x}<b>📝 نص المكالمة</b><div class="pnl-btns"><span class="muted">لسه متحوّلتش لنص.</span><button class="btn" onclick="callJob('${esc(id)}','transcript')">⚡ حوّل لنص دلوقتي</button></div>`;
     return;
@@ -1340,7 +1394,7 @@ function aiBlock(a,tr){
     <div><span class="badge b-out">${esc(a.outcome||'')}</span> <span class="badge ${a.customer_sentiment==='متضايق'?'b-miss':a.customer_sentiment==='راضي'?'b-ans':'b-no'}">${esc(a.customer_sentiment||'')}</span></div></div>
     <p>${esc(a.summary||'')}</p>${(a.criteria||[]).length?critBlock(a)+`<p class="muted" style="margin:8px 0 0">💡 ${esc(a.coaching_tip||'')}</p>`:`<div class="ai-cols"><div><b class="muted">نقط التقييم</b><ul class="ai-chk">${chk}</ul></div>
     <div><b class="muted">نصيحة للمندوب</b><p style="margin:4px 0 10px">${esc(a.coaching_tip||'')}</p><b class="muted">مهام متابعة</b><ul>${tasks}</ul></div></div>`}
-    ${tr&&tr.length?`<details><summary class="muted" style="cursor:pointer">نص المكالمة</summary><div class="tr">${tr.map(l=>`<div><span>${l.start!=null?l.start+"s":"•"}</span> ${esc(l.text)}</div>`).join('')}</div></details>`:''}`;
+    ${tr&&tr.length?`<details><summary class="muted" style="cursor:pointer">نص المكالمة</summary><div class="tr">${tr.map(l=>`<div class="tl" data-t="${l.start??''}" title="${l.start!=null?'اسمع من هنا':''}"><span>${l.start!=null?ms(Math.floor(l.start)):"•"}</span> ${esc(l.text)}</div>`).join('')}</div></details>`:''}`;
 }
 async function callJob(id,kind){
   const p=document.getElementById('pnl-'+id); if(!p) return;
