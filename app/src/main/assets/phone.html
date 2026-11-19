@@ -171,6 +171,15 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .opt { display:flex; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; margin-bottom:10px; text-align:right; font-size:16px; color:var(--fg); }
   .opt b { font-size:24px; } .opt small { display:block; color:var(--muted); font-size:12px; }
   .viachip { font-size:12px; padding:7px 10px; border-radius:16px; background:#e7f3f2; color:var(--pri); white-space:nowrap; }
+  .btn.ghost, html .btn.ghost { background:transparent !important; color:#0e9f87 !important; border:1.5px solid rgba(25,200,170,.55) !important; box-shadow:none !important; font-weight:700; }
+  .btn.ghost:active { background:color-mix(in srgb, var(--pri, #19e6c1) 12%, transparent); }
+  .btn.sm-btn { width:auto; flex-shrink:0; padding:0 16px; height:46px; font-size:14px; }
+  .t-add summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; }
+  .t-add summary::-webkit-details-marker { display:none; }
+  .t-add summary span { color:var(--muted); font-size:13px; } .t-add summary:after { content:"▾"; margin-inline-start:auto; color:var(--muted); }
+  .t-add[open] summary:after { content:"▴"; }
+  .t-or { text-align:center; color:var(--muted); font-size:12.5px; margin:14px 0 8px; display:flex; align-items:center; gap:8px; }
+  .t-or:before, .t-or:after { content:""; flex:1; height:1px; background:var(--line, rgba(127,127,127,.25)); }
   .eng-chips, .eng-days { display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; padding-bottom:2px; }
   .eng-chips button, .eng-days button { flex-shrink:0; border:1px solid var(--line, rgba(127,127,127,.25)); background:var(--card, transparent); color:var(--text); border-radius:12px; padding:7px 12px; font:inherit; font-size:13.5px; cursor:pointer; }
   .eng-days button { display:flex; flex-direction:column; align-items:center; min-width:54px; padding:6px 8px; } .eng-days button small { font-size:11px; color:var(--muted); }
@@ -504,28 +513,30 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 <!-- ================= targets ================= -->
 <section id="scrTargets" class="screen page">
   <h2>🎯 تارجت الاتصال</h2>
-  <button class="btn ghost" id="engBtn" hidden style="margin-bottom:12px" onclick="NQEng.open()">📅 مواعيد المهندسين</button>
   <div class="card">
-    <label class="lbl" style="margin-top:0">اليوم</label>
-    <input id="tDate" type="date" class="ltr" onchange="NQTargets.render()">
+    <div style="display:flex;gap:10px;align-items:center">
+      <input id="tDate" type="date" class="ltr" style="flex:1" onchange="NQTargets.render()">
+      <button class="btn sm-btn" id="dlStart" onclick="NQDialer.start()">▶️ اتصال متتالي</button>
+    </div>
     <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:14px"><span>المنجز</span><b id="tProgTxt">0 من 0</b></div>
     <div class="prog" id="tProg"><b style="width:0"></b></div>
-    <button class="btn" id="dlStart" style="margin-top:12px" onclick="NQDialer.start()">▶️ اتصال متتالي</button>
   </div>
-  <div class="card">
-    <b>إضافة عميل للتارجت</b>
+  <button class="btn ghost" id="engBtn" hidden style="margin-bottom:12px" onclick="NQEng.open()">📅 مواعيد المهندسين</button>
+  <div class="card" id="tList"></div>
+  <details class="card t-add" id="tAdd">
+    <summary onclick="this.parentNode.dataset.user = this.parentNode.open ? '0' : '1'"><b>➕ إضافة عملاء</b><span>عميل واحد أو ملف Excel</span></summary>
     <label class="lbl">اسم العميل</label>
     <input id="tName" placeholder="مثلًا: شركة الأفق — م. سامي">
     <label class="lbl">رقم التليفون</label>
     <div style="display:flex;gap:8px"><input id="tPhone" class="ltr" inputmode="tel" placeholder="05XXXXXXXX"><button class="iconbtn app-only" style="flex-shrink:0;width:48px;height:48px" onclick="window._pickForTarget=true;pickContact()" aria-label="من جهات الاتصال">👥</button></div>
-    <div style="height:12px"></div>
-    <button class="btn" id="tAddBtn" onclick="NQTargets.add()">إضافة</button>
-    <div style="height:10px"></div>
-    <label class="btn ghost" style="display:block;text-align:center;cursor:pointer">📥 رفع ملف Excel<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="NQTargets.upload(this.files[0]);this.value=''"></label>
-    <button class="btn ghost" style="margin-top:8px" onclick="NQTargets.template()">⬇️ نزّل نموذج Excel</button>
-    <div class="pf-sub" style="margin-top:6px;font-size:12.5px;color:var(--muted)">نزّل النموذج، املاه بأسماء العملاء وأرقامهم، وارفعه — هيتضافوا لليوم اللي مختاره فوق (أو التاريخ اللي في الملف)</div>
-  </div>
-  <div class="card" id="tList"></div>
+    <button class="btn" id="tAddBtn" style="margin-top:12px" onclick="NQTargets.add()">إضافة</button>
+    <div class="t-or">أو من ملف Excel</div>
+    <div style="display:flex;gap:8px">
+      <label class="btn ghost" style="flex:1;text-align:center;cursor:pointer;margin:0">📥 رفع ملف<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="NQTargets.upload(this.files[0]);this.value=''"></label>
+      <button class="btn ghost" style="flex:1;margin:0" onclick="NQTargets.template()">⬇️ النموذج</button>
+    </div>
+    <div style="margin-top:8px;font-size:12.5px;color:var(--muted);line-height:1.6">نزّل النموذج، املاه بأسماء العملاء وأرقامهم، وارفعه — هيتضافوا لليوم اللي مختاره فوق (أو التاريخ اللي في الملف)</div>
+  </details>
 </section>
 
 <!-- ================= my stats + report ================= -->
@@ -1736,7 +1747,7 @@ const NQTargets = {
     const x = this.all().find(y => y.id === id); if (!x) return;
     if (x.srv) { toast(x.note ? "📝 " + x.note : "العميل ده على السيرفر — امسحه وضيفه تاني لو عايز تعدّله"); return; }
     this.editing = id; $("tName").value = x.customer; $("tPhone").value = x.number || "";
-    $("tAddBtn").textContent = "حفظ التعديل"; $("tName").focus(); $("scrTargets").scrollTop = 0;
+    $("tAddBtn").textContent = "حفظ التعديل"; $("tAdd").open = true; $("tAdd").scrollIntoView({ block: "center" }); $("tName").focus();
   },
   add() {
     const customer = $("tName").value.trim(), number = $("tPhone").value.trim();
@@ -1820,7 +1831,8 @@ const NQTargets = {
     $("tProg").className = "prog" + (pct < 50 ? " low" : pct < 80 ? " mid" : "");
     $("tProg").firstElementChild.style.width = pct + "%";
     const box = $("tList"); box.innerHTML = "";
-    if (!list.length) { box.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px">مفيش عملاء في تارجت اليوم ده.</div>'; return; }
+    $("tAdd").open = !list.length || !!this.editing || $("tAdd").dataset.user === "1";
+    if (!list.length) { box.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px">مفيش عملاء في تارجت اليوم ده — ضيف من تحت ⬇️</div>'; $("tAdd").open = true; return; }
     list.forEach(x => {
       const row = document.createElement("div"); row.className = "tgt" + (x.done ? " done" : "");
       const info = document.createElement("div"); info.className = "info"; info.onclick = () => this.edit(x.id); info.title = "اضغط للتعديل";
