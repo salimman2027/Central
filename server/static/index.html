@@ -863,6 +863,12 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
       <select id="engPick" class="ap-in" style="min-width:260px"><option value="">— بنحمّل موظفين الـ CRM… —</option></select>
       <button class="btn o" onclick="engAdd()">➕ ضيف مهندس</button></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:13.5px">
+      <span class="muted">مش لاقيه؟ اكتب رقمه في الـ CRM:</span>
+      <input id="engId" class="ap-in ltr" placeholder="رقم الموظف (ID)" style="width:140px" inputmode="numeric">
+      <input id="engName" class="ap-in" placeholder="الاسم — مثلاً م. أحمد" style="width:170px">
+      <button class="btn sm o" onclick="engAddManual()">➕ ضيف</button></div>
+    <div id="engNote" class="muted" style="font-size:12.5px;margin-top:6px"></div>
     <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" onclick="engSave()">💾 حفظ</button><span id="engMsg"></span></div>
     <div id="engPrev" style="margin-top:12px"></div>
   </div>
@@ -2001,7 +2007,8 @@ async function engOpen(){
   $('engModal').classList.add('show'); $('engMsg').textContent=''; $('engPrev').innerHTML='';
   try{ENG=(await (await fetch(API_BASE+'/eng',{cache:'no-store'})).json()).engineers||[]; engRender();}catch(e){}
   try{const j=await (await fetch(API_BASE+'/eng/people',{cache:'no-store'})).json(); if(j.detail)throw new Error(j.detail);
-    $('engPick').innerHTML='<option value="">— اختار المهندس من الـ CRM —</option>'+(j.items||[]).map(p=>`<option value="${p.id}" data-n="${esc(p.name)}">${esc(p.name)}${p.job?' · '+esc(p.job):''}</option>`).join('');}
+    $('engPick').innerHTML=((j.items||[]).length?'<option value="">— اختار المهندس من الـ CRM ('+j.items.length+' موظف) —</option>':'<option value="">— الـ CRM مرجّعش موظفين — اكتب الرقم تحت —</option>')+(j.items||[]).map(p=>`<option value="${p.id}" data-n="${esc(p.name)}">${esc(p.name)}${p.job?' · '+esc(p.job):''} (#${p.id})</option>`).join('');
+    $('engNote').textContent=(j.items||[]).length?'':'اللي جرّبناه في الـ CRM: '+(j.tried||[]).join(' · ');}
   catch(e){$('engPick').innerHTML=`<option value="">✖ مش قادر أجيب الموظفين من الـ CRM</option>`}
 }
 function engRead(){document.querySelectorAll('.eng-it').forEach((el,i)=>{const all=el.querySelector('.eng-all').checked;
@@ -2018,6 +2025,9 @@ function engRender(){
 }
 function engAdd(){const o=$('engPick').selectedOptions[0]; if(!o||!o.value)return; engRead();
   if(ENG.some(e=>String(e.id)===o.value))return; ENG.push({id:+o.value,name:o.dataset.n,viewers:['*'],details:false}); engRender();}
+function engAddManual(){const id=+$('engId').value.trim(), nm=$('engName').value.trim(); if(!id){$('engId').focus();return}
+  engRead(); if(ENG.some(e=>e.id===id))return; ENG.push({id,name:nm||('#'+id),viewers:['*'],details:false}); engRender(); $('engId').value='';$('engName').value='';
+  engPreview(ENG.length-1);}
 async function engSave(){
   engRead();
   try{const r=await fetch(API_BASE+'/eng',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({engineers:ENG})});const j=await r.json();

@@ -112,15 +112,27 @@ async def put_eng(request: Request):
 
 @router.get("/api/eng/people")
 def eng_people(q: str = ""):
-    """كل الموظفين في الـ CRM (مش المبيعات بس) عشان تختار المهندس"""
-    out, seen = [], set()
-    for e in CTX["items"](CTX["get_json"]("/api/v1/employees", {"q": q, "PageSize": 500})):
-        eid = e.get("id") or e.get("employeeId")
-        if eid and eid not in seen:
-            seen.add(eid)
-            out.append({"id": eid, "name": e.get("name") or e.get("arName") or e.get("employeeName") or str(eid),
-                        "job": e.get("jobTitle") or e.get("position") or e.get("departmentName") or ""})
-    return {"items": out}
+    """كل الموظفين في الـ CRM عشان تختار المهندس — بنجرّب كذا شاشة ونجمع منهم"""
+    out, seen, tried = [], set(), []
+    base = {"PageSize": 500, "PageNumber": 1, **({"q": q} if q else {})}
+    for path, params in (("/api/v1/employees", base), ("/api/v1/employees", {**base, "IsSales": "false"}),
+                         ("/api/v1/employees", {**base, "IsSales": "true"}), ("/api/v1/sales-people", base)):
+        try:
+            items = CTX["items"](CTX["get_json"](path, params))
+        except HTTPException as e:
+            tried.append(f"{path}: {e.detail}"[:160])
+            continue
+        tried.append(f"{path} {params.get('IsSales', '')}: {len(items)}")
+        for e in items:
+            if not isinstance(e, dict):
+                continue
+            eid = e.get("id") or e.get("employeeId")
+            if eid and eid not in seen:
+                seen.add(eid)
+                out.append({"id": eid, "name": e.get("name") or e.get("arName") or e.get("enName") or e.get("employeeName") or e.get("fullName") or str(eid),
+                            "job": e.get("jobTitle") or e.get("position") or e.get("jobName") or e.get("departmentName") or ""})
+    out.sort(key=lambda x: str(x["name"]))
+    return {"items": out, "tried": tried}
 
 
 @router.get("/api/eng/day")
