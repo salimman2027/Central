@@ -362,6 +362,7 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 .eng-day{display:flex;flex-direction:column;gap:4px;font-size:13.5px}.eng-day .b{color:var(--red)}.eng-day .f{color:var(--green)}
 .wa-it{border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
 .wa-it textarea{min-height:110px;resize:vertical;font:inherit;line-height:1.6}
+.sim-tag{font-size:11.5px;color:var(--teal,#0f9e86);margin-top:3px;white-space:nowrap}
 .cb-t{width:100%;border-collapse:collapse;font-size:14px}.cb-t th,.cb-t td{padding:8px 6px;border-bottom:1px solid var(--border);text-align:start;vertical-align:top}
 .cb-t tr.late td:first-child{border-inline-start:4px solid var(--red)}.wait-bad{color:var(--red);font-weight:700}.wait-mid{color:var(--orange);font-weight:700}
 .ops-f{display:flex;flex-direction:column;gap:8px;font-size:14px}.ops-f label{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -707,6 +708,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
       <thead><tr><th>التحويلة</th><th>رقم الخط</th><th>الموظف (من الـ CRM)</th><th>الفريق</th><th>اسم الدخول</th><th>كلمة السر</th><th></th></tr></thead>
       <tbody id="crmSales"></tbody></table></div>
     <button class="btn o sm" style="margin-top:6px" onclick="crmAddRow(undefined,'',true)">＋ تحويلة جديدة</button>
+    <button class="btn o sm" style="margin-top:6px" onclick="crmAddSim()" title="لموظف بيتصل من شريحته بس — ملوش تحويلة في السنترال">📱 موظف بالشريحة بس</button>
     </section>
     <section id="org-teams" class="org-sec"><h4>👥 الفرق</h4>
       <div class="muted" style="font-size:12px">الفريق بيتختار لكل موظف في جدول الموظفين فوق، أو من <b>＋ ضيف تحويلة</b> هنا. قائد الفريق بيدخل اللوحة بيوزره ويشوف فريقه بس.</div>
@@ -2195,10 +2197,16 @@ function crmRepName(ext){return (REPS.find(r=>String(r.id)===String(ext))||{}).n
 let CRM_REMOVED=new Set();
 function crmDelRow(b){const tr=b.closest('tr'), e=tr.querySelector('.crm-e').value.trim(); if(e)CRM_REMOVED.add(e); tr.remove();
   $('orgMsg').innerHTML='<span class="muted">دوس 💾 حفظ عشان المسح يتسجّل</span>';}
-function crmAddRow(ext,val,focusNew){
+function crmAddSim(){   // موظف بيتصل من شريحته بس: بنديله كود من 901 (مش تحويلة في السنترال)
+  const used=new Set([...document.querySelectorAll('#crmSales .crm-e')].map(i=>i.value.trim()).concat((REPS||[]).map(r=>String(r.id))));
+  let c=901; while(used.has(String(c)))c++; crmAddRow(String(c),'',true,true);
+  const tr=$('crmSales').lastElementChild; tr.classList.add('crm-new'); setTimeout(()=>{tr.scrollIntoView({block:'center',behavior:'smooth'});tr.querySelector('.crm-u').focus()},120);
+}
+function crmAddRow(ext,val,focusNew,sim){
   const tr=document.createElement('tr'); const isNew=ext===undefined;
+  sim=sim||!!(REPS.find(r=>String(r.id)===String(ext))||{}).simOnly; if(sim)tr.dataset.sim='1';
   const line=(REPS.find(r=>String(r.id)===String(ext))||{}).line||'';
-  tr.innerHTML=`<td><input class="crm-e" inputmode="numeric" value="${esc(ext||'')}" placeholder="مثلًا 108" ${isNew?'':'readonly'}></td>
+  tr.innerHTML=`<td><input class="crm-e" inputmode="numeric" value="${esc(ext||'')}" placeholder="مثلًا 108" ${isNew&&!sim?'':'readonly'}>${sim?'<div class="sim-tag">📱 شريحة بس — الكود للسيستم</div>':''}</td>
     <td><input class="crm-line" inputmode="tel" dir="ltr" value="${esc(line)}" placeholder="05xxxxxxxx"></td>
     <td>${crmEmpField(val)}<div class="crm-n muted">${crmRepName(ext)?'عندنا دلوقتي: '+esc(crmRepName(ext)):''}</div></td>
     <td><select class="crm-t" onchange="orgTeamChanged(this)">${crmTeamOpts((TM.reps.find(r=>r.ext===String(ext))||{}).team||'')}</select></td>
@@ -2245,6 +2253,9 @@ async function orgSave(){
     const v=tr.querySelector('.crm-v').value; if(v){salesIds[e]=v; const emp=(CRM_EMP||[]).find(x=>String(x.id)===String(v)); if(emp&&emp.name)repNames[e]=emp.name;}});
   if(dup)return msg(`<span style="color:var(--red)">✖ التحويلة ${esc(dup)} متكررة — سيب سطر واحد بس</span>`);
   if(TM.teams.some(t=>!t.name))return msg('<span style="color:var(--red)">✖ اكتب اسم كل فريق</span>');
+  const noAcc=[...document.querySelectorAll('#crmSales tr[data-sim="1"]')].find(tr=>{const e=tr.querySelector('.crm-e').value.trim();
+    return !tr.querySelector('.crm-u').value.trim()||(!tr.querySelector('.crm-p').value&&!(LOGINS[e]||{}).hasPassword)});
+  if(noAcc)return msg(`<span style="color:var(--red)">✖ موظف الشريحة (${esc(noAcc.querySelector('.crm-e').value)}) لازم يبقى ليه اسم مستخدم وكلمة سر — بيدخل بيهم على التطبيق</span>`);
   const assign={}; document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(),t=tr.querySelector('.crm-t').value; if(e&&t)assign[e]=t});
   const logins={}; document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(); if(!e)return;
     const u=tr.querySelector('.crm-u').value.trim(), p=tr.querySelector('.crm-p').value; if(u||LOGINS[e])logins[e]={username:u,password:p};});
@@ -2254,7 +2265,8 @@ async function orgSave(){
   try{
     LOGINS=await put('/logins',logins);                       // الأول: لو في اسم دخول غلط مايتحفظش حاجة تانية
     TM=await put('/teams',{teams:TM.teams,assign,managers:TM.managers||[]});
-    await put('/crm/settings',{salesIds,repNames,lines,exts,removed:[...CRM_REMOVED].filter(e=>!seen.has(e))});
+    const simOnly=[...document.querySelectorAll('#crmSales tr[data-sim="1"] .crm-e')].map(i=>i.value.trim()).filter(Boolean);
+    await put('/crm/settings',{salesIds,repNames,lines,exts,simOnly,removed:[...CRM_REMOVED].filter(e=>!seen.has(e))});
     TM.teams.forEach(t=>delete t.leaderPassword); (TM.managers||[]).forEach(m=>delete m.password);
     msg('<span style="color:var(--green)">✔ اتحفظ كله</span>');
     await loadConfig(); try{fillSelects()}catch(e){} loadedRange=''; refresh(); loadAppt();

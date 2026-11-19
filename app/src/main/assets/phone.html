@@ -920,7 +920,7 @@ const NQAuth = {
     if (r && r.ok && j.ext) {
       store.set("nq_user", { username: j.username || user, name: j.name || "" });
       $("pwd").value = ""; $("pwd").placeholder = "متسجّل ✓"; $("ext").value = j.username || user;
-      return NQPhone.login(String(j.ext), j.password);
+      return NQPhone.login(String(j.ext), j.password, !!j.simOnly);
     }
     // سيرفر قديم أو مش متاح: الدخول برقم التحويلة وباسوردها زي الأول
     if ((!r || r.status === 404) && /^\d{2,6}$/.test(user)) return NQPhone.login(user, pass);
@@ -943,8 +943,17 @@ const NQAuth = {
 const NQPhone = {
   ua: null, session: null, muted: false, speaker: false, callStart: null, direction: null, peer: null, timer: null, ext: null, pass: null,
 
-  login(ext, password) {
+  login(ext, password, simOnly) {
     if (!ext || !password) return this._err("اكتب رقم التحويلة والباسورد");
+    if (simOnly) {   // موظف بالشريحة بس: مفيش سنترال — كل حاجة تانية شغالة (التارجت، الملخصات، التسجيلات…)
+      store.set("nq_login", { ext, password, simOnly: true });
+      if (IS_APP && Android.setCreds) Android.setCreds(NQSettings.load().host, ext, password);
+      if (this.ua) { try { this.ua.stop(); } catch (e) {} this.ua = null; }
+      this.ext = ext; this.pass = password; this.simOnly = true;
+      if (IS_APP) { NQPrefs.set("callVia", "sim"); NQVia.chip(); if (!NQPrefs.get("simUpload", false)) { NQPrefs.set("simUpload", true); NQSim.cfg(true); } }
+      this._err("✓ دخلت — مكالماتك من شريحتك"); this._reg(true); NQNotes.flush(); NQInbox.poll(); return;
+    }
+    this.simOnly = false;
     if (typeof JsSIP === "undefined") return this._err("مكتبة الاتصال مش محمّلة");
     this._err("جاري الاتصال بالسنترال…");
     store.set("nq_login", { ext, password });
@@ -973,6 +982,7 @@ const NQPhone = {
   },
 
   logout() {
+    this.simOnly = false;
     store.del("nq_login"); store.del("nq_user");
     if (this.ua) { try { this.ua.stop(); } catch (e) {} } this.ua = null;
     this.ext = null; $("pwd").value = "";
@@ -991,6 +1001,12 @@ const NQPhone = {
     // العميل ده تبع مندوب تاني؟ (بنسأل السيرفر مرة واحدة قبل الاتصال)
     if (!isCode && !(this._ownOk && this._ownOk.n === number && Date.now() - this._ownOk.t < 120000)) {
       return NQOwner.guard(number, () => { this._ownOk = { n: number, t: Date.now() }; this.call(number, forceVia); });
+    }
+    if (this.simOnly) {   // مفيش سنترال: الشريحة على طول (واللاب مايقدرش يتصل)
+      if (!IS_APP) { $("dialErr").textContent = "حسابك بالشريحة بس — اتصل من التطبيق على موبايلك"; return; }
+      if (isCode) { $("dialErr").textContent = "الأكواد دي للسنترال بس"; return; }
+      if (!forceVia) this.callName = window._pickedName || "";
+      return NQVia.simCall(number);
     }
     const pbxReady = !!(this.ua && this.ua.isRegistered());
     let via = IS_APP ? (forceVia || NQPrefs.get("callVia", "ask")) : "pbx"; // اللابتوب: السنترال بس
@@ -1105,6 +1121,8 @@ const NQPhone = {
   _reg(on) {
     $("regDot").classList.toggle("off", !on);
     if (!this.ext) { $("whoExt").textContent = "NQ Phone"; $("whoSt").textContent = "غير مربوط بالسنترال"; $("regDot").classList.add("off"); return; }
+    const nm = (store.get("nq_user", null) || {}).name;
+    if (this.simOnly) { $("regDot").classList.remove("off"); $("whoExt").textContent = nm || ("كود " + this.ext); $("whoSt").textContent = "📱 بيتصل من شريحته"; return; }
     $("whoExt").textContent = "تحويلة " + this.ext;
     $("whoSt").textContent = on ? "متصل بالسنترال" : "غير متصل بالسنترال — بيحاول تاني…";
   }
@@ -1257,6 +1275,7 @@ const NQVia = {
   num: "",
   chip() { $("viaChip").textContent = VIA_LABEL[NQPrefs.get("callVia", "ask")] || VIA_LABEL.ask; },
   cycle() {
+    if (NQPhone.simOnly) { toast("حسابك بالشريحة بس"); return; }
     const order = ["ask", "pbx", "sim"]; const cur = NQPrefs.get("callVia", "ask");
     const next = order[(order.indexOf(cur) + 1) % order.length];
     NQPrefs.set("callVia", next); this.chip();
@@ -2162,7 +2181,7 @@ NQSettings.apply(NQSettings.load());
   const s = store.get("nq_login", null);
   show("scrDial"); NQVia.chip();
   if (s && s.ext && s.password) { const u = store.get("nq_user", null); $("ext").value = (u && u.username) || s.ext; $("pwd").value = ""; $("pwd").placeholder = "متسجّل ✓";
-    NQPhone.ext = s.ext; NQPhone._reg(false); NQPhone.login(s.ext, s.password); }
+    NQPhone.ext = s.ext; NQPhone._reg(false); NQPhone.login(s.ext, s.password, !!s.simOnly); }
   else NQPhone._reg(false);
   if (IS_APP && Android.setCreds && s && s.ext) Android.setCreds(NQSettings.load().host, s.ext, s.password);
   if ($("simUp")) { $("simUp").checked = !!NQPrefs.get("simUpload", false); if ($("simUp").checked) NQSim.cfg(true); NQSim.refresh(); }

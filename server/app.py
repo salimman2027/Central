@@ -383,9 +383,15 @@ def config():
     for ext in sorted((extra | set(lines)) - have, key=lambda x: int(x) if x.isdigit() else 0):
         if ext.isdigit():
             reps.setdefault("reps", []).append({"id": int(ext), "name": over.get(ext) or ext, "team": ""})
+    so = sim_only()
+    for ext in sorted(so - {str(r.get("id")) for r in reps.get("reps", [])}):
+        if ext.isdigit():
+            reps.setdefault("reps", []).append({"id": int(ext), "name": over.get(ext) or ext, "team": ""})
     for r in reps.get("reps", []):
         if lines.get(str(r.get("id"))):
             r["line"] = lines[str(r.get("id"))]
+        if str(r.get("id")) in so:
+            r["simOnly"] = True
     try:   # الفرق وربطها بالتحويلات من شاشة الإعدادات
         tm = json.loads((DATA_DIR / "teams.json").read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
@@ -456,6 +462,22 @@ def match_note(notes: list, ext: int, number: str, t: dt.datetime):
 FAILS: dict = {}
 
 
+def sim_only() -> set:
+    """موظفين بيتصلوا من شرايحهم بس (ملهمش تحويلة في السنترال) — ليهم كود من جدول الموظفين"""
+    try:
+        return {str(x) for x in json.loads((DATA_DIR / "sim_only.json").read_text(encoding="utf-8"))}
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def _app_token(ext: str) -> str:
+    try:
+        u = json.loads((DATA_DIR / "app_users.json").read_text(encoding="utf-8")).get(str(ext)) or {}
+    except Exception:  # noqa: BLE001
+        u = {}
+    return str(u.get("token") or "")
+
+
 def check_ext_password(ext: str, password: str) -> bool:
     if not re.fullmatch(r"\d{2,6}", ext or ""):
         return False
@@ -463,6 +485,12 @@ def check_ext_password(ext: str, password: str) -> bool:
     FAILS[ext] = [t for t in FAILS.get(ext, []) if now - t < 900]
     if len(FAILS[ext]) >= 10:
         raise HTTPException(429, "محاولات كتير، حاول بعد شوية")
+    if ext in sim_only():   # موظف شريحة: بيدخل بتوكن من حساب التطبيق مش باسورد السنترال
+        tok = _app_token(ext)
+        ok = bool(tok) and hmac.compare_digest(tok, password or "")
+        if not ok:
+            FAILS[ext].append(now)
+        return ok
     rows = query("SELECT data FROM sip WHERE id=%s AND keyword='secret' LIMIT 1", (ext,),
                  database=os.environ.get("NQ_PBX_DB", "asterisk"))
     ok = bool(rows) and hmac.compare_digest(str(rows[0]["data"]), password or "")
@@ -1186,6 +1214,7 @@ PORTAL.CTX.update(dir=DATA_DIR, sip_secret=_sip_secret, check_ext=lambda e, p: c
                   rubric=lambda: RUBRIC.load(), lessons=lambda: _lessons_cache(),
                   appointments=lambda: APPT._load(), conflicts=lambda: OWN._jload("conflicts.json", []), tz=TZ)
 PORTAL.CTX.update(training=lambda ext: TRAIN.latest_for_ext(ext))
+PORTAL.CTX.update(sim_only=sim_only)
 import ops as OPS  # noqa: E402
 app.include_router(OPS.router)
 OPS.CTX.update(dir=DATA_DIR, tz=TZ, trunk=TRUNK.split("/", 1)[1], query=query, scope=lambda: SCOPE.get(),

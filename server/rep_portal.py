@@ -26,7 +26,7 @@ FAILS: dict = {}
 # بتتظبط من app.py
 CTX = {"dir": Path("/var/lib/nq-calls"), "sip_secret": None, "check_ext": None, "names": lambda: {},
        "analysis": None, "calls": None, "rubric": lambda: [], "lessons": lambda: {},
-       "appointments": lambda: [], "conflicts": lambda: [], "training": lambda e: None, "tz": dt.timezone(dt.timedelta(hours=3))}
+       "appointments": lambda: [], "conflicts": lambda: [], "training": lambda e: None, "sim_only": lambda: set(), "tz": dt.timezone(dt.timedelta(hours=3))}
 
 
 # ------------------------------------------------------------------ تخزين الحسابات
@@ -93,6 +93,7 @@ async def put_logins(request: Request):
                 rec["salt"] = secrets.token_hex(16)
                 rec["hash"] = _hash(pw, rec["salt"])
                 rec["changed"] = dt.datetime.now(dt.timezone.utc).isoformat()
+                rec.pop("token", None)   # موظف الشريحة: باسورد جديد = يدخل تاني
             if not rec.get("hash"):
                 raise HTTPException(400, f"اكتب كلمة سر للتحويلة {ext}")
             cur[ext] = rec
@@ -136,6 +137,17 @@ async def app_login(request: Request):
         if user.isdigit() and user in users:
             raise HTTPException(401, "التحويلة دي ليها اسم مستخدم — ادخل بيه")
         raise HTTPException(401, "اسم المستخدم أو كلمة السر غلط")
+    if str(ext) in CTX["sim_only"]():   # موظف شريحة بس: مفيش سنترال — بنديله توكن ثابت للتطبيق
+        if ext not in users:
+            raise HTTPException(401, "الموظف ده لازم يدخل باسم مستخدم — اعمله حساب من شاشة الموظفين")
+        with LOCK:
+            users = _users()
+            tok = users[ext].get("token") or secrets.token_urlsafe(24)
+            if users[ext].get("token") != tok:
+                users[ext]["token"] = tok
+                _save(users)
+        return JSONResponse({"ext": ext, "password": tok, "simOnly": True, "username": users[ext].get("username", ext),
+                             "name": CTX["names"]().get(ext, "")}, headers=HDR)
     secret = CTX["sip_secret"](ext)
     if not secret:
         raise HTTPException(404, "التحويلة مش موجودة في السنترال")
