@@ -499,6 +499,40 @@ def search_customers(q: str, limit: int = 20) -> list:
     return [x for x in out if x["id"]]
 
 
+def crm_full(number: str) -> dict | None:
+    """العميل في الـ CRM برقمه مع اسم الشركة والمندوب المسؤول (لبوابة الشركاء)"""
+    d = _digits(number)
+    if len(d) < 7:
+        return None
+    rep_keys = ("salesPersonName", "salesManName", "salesName", "employeeName", "responsibleEmployeeName",
+                "responsibleName", "assignedToName", "ownerName", "createdByName", "userName")
+    co_keys = ("companyName", "company", "commercialName", "tradeName", "facilityName", "organizationName")
+    for path, pot in (("/api/v1/customers", False), ("/api/v1/customers-potential", True)):
+        try:
+            items = _items(_get_json(path, {"q": d, "PageNumber": 1, "PageSize": 20}))
+        except HTTPException:
+            continue
+        for c in items:
+            phones = [c.get(k) for k in ("phoneNumber", "mobile", "phone", "phone2", "mobile2", "otherPhone") if c.get(k)]
+            if not any(_digits(x) == d for x in phones):
+                continue
+            def pick(keys):
+                for k in keys:
+                    v = c.get(k)
+                    if isinstance(v, dict):
+                        v = v.get("name") or v.get("arName")
+                    if v and str(v).strip():
+                        return str(v).strip()
+                return ""
+            name = c.get("name") or c.get("arName") or c.get("customerName") or c.get("enName") or ""
+            sp = c.get("salesPerson") if isinstance(c.get("salesPerson"), dict) else {}
+            return {"id": c.get("customersPotentialId") or c.get("id"), "potential": pot, "name": str(name).strip(),
+                    "company": pick(co_keys) or str(name).strip(), "contact": str(c.get("contactPerson") or c.get("contactName") or "").strip(),
+                    "rep": pick(rep_keys) or str(sp.get("name") or sp.get("arName") or "").strip(),
+                    "created": str(c.get("createdAt") or c.get("creationDate") or c.get("createdDate") or "")[:10]}
+    return None
+
+
 def match_client(number: str) -> dict | None:
     """بيدوّر على العميل في الـ CRM برقم تليفونه"""
     d = _digits(number)

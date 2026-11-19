@@ -179,6 +179,8 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/training http://127.0.0.1:8090/app/training
   ProxyPass        /calls-app/eng http://127.0.0.1:8090/app/eng
   ProxyPassReverse /calls-app/eng http://127.0.0.1:8090/app/eng
+  ProxyPass        /calls-app/partner-check http://127.0.0.1:8090/app/partner-check
+  ProxyPassReverse /calls-app/partner-check http://127.0.0.1:8090/app/partner-check
   ProxyPass        /calls-app/password http://127.0.0.1:8090/app/password
   ProxyPassReverse /calls-app/password http://127.0.0.1:8090/app/password
 
@@ -296,6 +298,7 @@ cat > /usr/local/bin/nq-setkey <<'KEY'
 # sudo nq-setkey telegram -> بوت تليجرام للتنبيهات والملخص اليومي
 # sudo nq-setkey backup   -> bucket على S3 للنسخة الاحتياطية
 # sudo nq-setkey google   -> النسخة الاحتياطية على Google Drive
+# sudo nq-setkey partner  -> مفتاح بوابة الشركاء (فحص الرقم في الـ CRM والسنترال)
 set -e
 F=/etc/nq-calls/env
 setv() { local n=$1 v=$2; grep -v "^$n=" "$F" > "$F.tmp" || true; printf '%s=%s\n' "$n" "$v" >> "$F.tmp"; cat "$F.tmp" > "$F"; rm -f "$F.tmp"; }
@@ -356,6 +359,16 @@ PY
 ) || { echo "✖ اتلغى"; exit 1; }
   setv NQ_TG_TOKEN "$T"; setv NQ_TG_CHAT "$OUT"; systemctl restart nq-calls
   echo "✔ التنبيهات هتوصل هنا من دلوقتي"
+  exit 0
+fi
+if [[ "${1:-}" == partner ]]; then
+  K=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))")
+  setv NQ_PARTNER_KEY "$K"; systemctl restart nq-calls
+  echo "✔ مفتاح بوابة الشركاء اتعمل. انسخ السطر ده وحطه في GitHub (مستودع newCustomer):"
+  echo "   Settings → Secrets and variables → Actions → New repository secret"
+  echo "   الاسم:  CENTRAL_KEY"
+  echo "   القيمة: $K"
+  echo "(لو عملت الأمر ده تاني المفتاح القديم هيبطل)"
   exit 0
 fi
 if [[ "${1:-}" == google ]]; then

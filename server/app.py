@@ -1254,6 +1254,52 @@ app.include_router(WA.router)
 WA.CTX.update(dir=DATA_DIR, host=os.environ.get("NQ_HOST", "3.89.245.93.sslip.io"), check_ext=lambda e, p: check_ext_password(e, p),
               names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])})
 OWN.CTX.update(extra=_lookup_extra)
+
+
+_PC: dict = {}
+
+
+@app.get("/app/partner-check")
+def partner_check(request: Request, phone: str = ""):
+    """لبوابة الشركاء (nqcustomers): الرقم ده مسجّل عندنا؟ في الـ CRM أو اتكلّم من السنترال — ومين المندوب"""
+    key = os.environ.get("NQ_PARTNER_KEY", "")
+    if not key or not hmac.compare_digest(request.headers.get("x-partner-key", ""), key):
+        raise HTTPException(401, "unauthorized")
+    d = _digits(phone)
+    if len(d) < 7:
+        return {"found": False, "invalid": True}
+    hit = _PC.get(d)
+    if hit and time.time() - hit[0] < 60:
+        return hit[1]
+    out: dict = {"found": False}
+    try:
+        c = APPT.crm_full(d)
+    except Exception as e:  # noqa: BLE001
+        c, out["crmError"] = None, str(e)[:120]
+    if c:
+        out.update(found=True, source="crm", crm=c)
+    names = {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])}
+    own = OWN.owner_of(d) or {}
+    today = dt.datetime.now(TZ).date()
+    hist = [x for x in unscoped(calls, today - dt.timedelta(days=180), today) if _digits(x.get("number")) == d]
+    if hist:
+        last = max(hist, key=lambda x: x["time"])
+        talked = [x for x in hist if x.get("status") == "تم الرد"]
+        lt = max(talked, key=lambda x: x["time"]) if talked else last
+        days = (today - dt.datetime.fromisoformat(lt["time"].replace("Z", "+00:00")).astimezone(TZ).date()).days
+        note = next((x.get("note") for x in sorted(hist, key=lambda x: x["time"], reverse=True) if x.get("note")), None) or {}
+        out["calls"] = {"count": len(hist), "answered": len(talked), "lastContact": lt["time"], "days": days,
+                        "rep": names.get(str(lt["ext"]), str(lt["ext"])), "customer": note.get("customer") or ""}
+        out["found"] = True
+        out.setdefault("source", "calls")
+    if own.get("ext"):
+        out["owner"] = names.get(str(own["ext"]), str(own["ext"]))
+    out["rep"] = (c or {}).get("rep") or out.get("owner") or (out.get("calls") or {}).get("rep") or ""
+    out["company"] = (c or {}).get("company") or (out.get("calls") or {}).get("customer") or ""
+    _PC[d] = (time.time(), out)
+    if len(_PC) > 500:
+        _PC.clear()
+    return out
 import eng as ENG  # noqa: E402
 app.include_router(ENG.router)
 ENG.CTX.update(dir=DATA_DIR, tz=TZ, check_ext=lambda e, p: check_ext_password(e, p), get_json=APPT._get_json, items=APPT._items)
