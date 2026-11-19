@@ -358,6 +358,7 @@ html[data-theme=light] .ap-when input,html[data-theme=light] .ap-in{background:#
 .eng-it{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:10px}
 .eng-reps{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.eng-reps label{border:1px solid var(--border);border-radius:99px;padding:3px 10px;font-size:13px;cursor:pointer;display:flex;gap:5px;align-items:center}
 .eng-reps label:has(input:checked){border-color:var(--teal);background:rgba(25,230,193,.1)}
+.eng-t{display:inline-block;direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
 .eng-day{display:flex;flex-direction:column;gap:4px;font-size:13.5px}.eng-day .b{color:var(--red)}.eng-day .f{color:var(--green)}
 .wa-it{border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
 .wa-it textarea{min-height:110px;resize:vertical;font:inherit;line-height:1.6}
@@ -2012,21 +2013,22 @@ async function engOpen(){
   catch(e){$('engPick').innerHTML=`<option value="">✖ مش قادر أجيب الموظفين من الـ CRM</option>`}
 }
 function engRead(){document.querySelectorAll('.eng-it').forEach((el,i)=>{const all=el.querySelector('.eng-all').checked;
-  ENG[i].viewers=all?['*']:[...el.querySelectorAll('.eng-r:checked')].map(c=>c.value); ENG[i].details=el.querySelector('.eng-d').checked;})}
+  ENG[i].viewers=all?['*']:[...el.querySelectorAll('.eng-r:checked:not(:disabled)')].map(c=>c.value); ENG[i].details=el.querySelector('.eng-d').checked;})}
 function engRender(){
   const reps=(REPS||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ar'));
   $('engItems').innerHTML=ENG.length?ENG.map((e,i)=>{const all=(e.viewers||[]).includes('*');return `<div class="eng-it"><div style="display:flex;gap:8px;align-items:center"><b style="flex:1">👷 ${esc(e.name)} <span class="muted" style="font-weight:400">(#${e.id})</span></b>
       <button class="btn sm o" onclick="engPreview(${i})">👁️ شوف النهارده</button><button class="btn sm o" onclick="engRead();ENG.splice(${i},1);engRender()">🗑️</button></div>
     <div class="muted" style="font-size:13px;margin-top:6px">مين يشوف مواعيده؟</div>
     <div class="eng-reps"><label><input type="checkbox" class="eng-all" ${all?'checked':''} onchange="engRead();engRender()"> كل المناديب</label>
-      ${all?'':reps.map(r=>`<label><input type="checkbox" class="eng-r" value="${r.id}" ${(e.viewers||[]).includes(String(r.id))?'checked':''}> ${esc(r.name)}</label>`).join('')}</div>
+      ${reps.length?reps.map(r=>`<label style="${all?'opacity:.55':''}"><input type="checkbox" class="eng-r" value="${r.id}" ${all||(e.viewers||[]).includes(String(r.id))?'checked':''} ${all?'disabled':''}> ${esc(r.name)} <span class="muted">(${r.id})</span></label>`).join(''):'<span class="muted">مفيش مناديب متحمّلين — حدّث الصفحة</span>'}</div>
+    <div class="muted" style="font-size:12px">${all?'شيل علامة "كل المناديب" عشان تختار ناس معيّنة':''}</div>
     <label style="font-size:13.5px;display:flex;gap:6px;align-items:center"><input type="checkbox" class="eng-d" ${e.details?'checked':''} style="width:auto"> يشوفوا تفاصيل الميعاد (الكود والعميل والسبب) — من غيرها بيشوفوا "محجوز" بس</label></div>`}).join('')
     :'<div class="muted" style="margin-bottom:10px">لسه مفيش مهندسين — اختار من تحت</div>';
 }
 function engAdd(){const o=$('engPick').selectedOptions[0]; if(!o||!o.value)return; engRead();
-  if(ENG.some(e=>String(e.id)===o.value))return; ENG.push({id:+o.value,name:o.dataset.n,viewers:['*'],details:false}); engRender();}
+  if(ENG.some(e=>String(e.id)===o.value))return; ENG.push({id:+o.value,name:o.dataset.n,viewers:[],details:false}); engRender();}
 function engAddManual(){const id=+$('engId').value.trim(), nm=$('engName').value.trim(); if(!id){$('engId').focus();return}
-  engRead(); if(ENG.some(e=>e.id===id))return; ENG.push({id,name:nm||('#'+id),viewers:['*'],details:false}); engRender(); $('engId').value='';$('engName').value='';
+  engRead(); if(ENG.some(e=>e.id===id))return; ENG.push({id,name:nm||('#'+id),viewers:[],details:false}); engRender(); $('engId').value='';$('engName').value='';
   engPreview(ENG.length-1);}
 async function engSave(){
   engRead();
@@ -2037,10 +2039,11 @@ async function engSave(){
 async function engPreview(i){
   const e=ENG[i]; $('engPrev').innerHTML='<div class="muted">بنجيب من الـ CRM…</div>';
   try{const r=await fetch(`${API_BASE}/eng/day?eid=${e.id}&date=${iso(new Date())}`,{cache:'no-store'});const d=await r.json(); if(!r.ok)throw new Error(d.detail||r.status);
-    $('engPrev').innerHTML=`<div class="card" style="margin:0"><b>👷 ${esc(e.name)} — النهارده</b><div class="eng-day" style="margin-top:8px">${d.off?'<span class="muted">مش شغال النهارده (مفيش ساعات عمل)</span>':''}
-      ${d.workingHours.map(w=>`<span class="muted">🕘 ساعات العمل <bdi dir="ltr">${w.from} — ${w.to}</bdi></span>`).join('')}
-      ${d.busy.map(b=>`<span class="b">⛔ <bdi dir="ltr">${b.from} — ${b.to}</bdi> محجوز${b.code?' · '+esc(b.code):''}${b.customer?' · '+esc(b.customer):''}${b.reason?' · '+esc(b.reason):''}</span>`).join('')}
-      ${d.free.map(f=>`<span class="f">✅ <bdi dir="ltr">${f.from} — ${f.to}</bdi> فاضي</span>`).join('')}</div></div>`;}
+    const rows=[...d.busy.map(b=>({...b,k:'b'})),...d.free.map(f=>({...f,k:'f'}))].sort((a,b)=>a.from.localeCompare(b.from));
+    $('engPrev').innerHTML=`<div class="card" style="margin:0"><b>👷 ${esc(e.name)} — النهارده</b>
+      <div class="muted" style="font-size:13px;margin:6px 0">${d.off?'مش شغال النهارده (مفيش ساعات عمل)':'🕘 ساعات العمل: '+d.workingHours.map(w=>`<span class="eng-t">${w.from} — ${w.to}</span>`).join('، ')}</div>
+      <table class="cb-t">${rows.map(r=>`<tr><td style="width:130px"><span class="eng-t" style="color:${r.k==='b'?'var(--red)':'var(--green)'};font-weight:700">${r.from} — ${r.to}</span></td>
+        <td>${r.k==='b'?'⛔ محجوز':'✅ فاضي'}${r.code||r.customer||r.reason?` <span class="muted">· ${[r.code,r.customer,r.reason].filter(Boolean).map(esc).join(' · ')}</span>`:''}</td></tr>`).join('')}</table></div>`;}
   catch(err){$('engPrev').innerHTML=`<div class="ai-err">✖ ${esc(err.message)}</div>`}
 }
 
