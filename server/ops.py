@@ -673,7 +673,12 @@ async def app_inbox(request: Request):
     if not CTX["check_ext"](ext, pw):
         return JSONResponse({"detail": "unauthorized"}, 401, headers=HDR)
     ln = lines_today().get(ext) or {"used": 0, "cap": int(settings()["cap"] or 0), "warn": False, "blocked": False}
-    return JSONResponse({"gateway": STATE["gateway"], "line": ln,
+    try:
+        import wainbox
+        wa_unread = wainbox.unread_for(ext) if wainbox.ready() else 0
+    except Exception:  # noqa: BLE001
+        wa_unread = 0
+    return JSONResponse({"gateway": STATE["gateway"], "line": ln, "waUnread": wa_unread,
                          "callbacks": [c for c in callbacks() if c["ext"] == ext],
                          "followups": followups(ext), "leads": [x for x in leads(ext) if not x["called"]]},
                         headers=HDR)

@@ -1215,6 +1215,20 @@ PORTAL.CTX.update(dir=DATA_DIR, sip_secret=_sip_secret, check_ext=lambda e, p: c
                   appointments=lambda: APPT._load(), conflicts=lambda: OWN._jload("conflicts.json", []), tz=TZ)
 PORTAL.CTX.update(training=lambda ext: TRAIN.latest_for_ext(ext))
 PORTAL.CTX.update(sim_only=sim_only)
+import wainbox as WAI  # noqa: E402
+app.include_router(WAI.router)
+
+
+def _last_caller(number: str):
+    d = _digits(number)
+    today = dt.datetime.now(TZ).date()
+    hit = [c for c in OPS.calls_c(today - dt.timedelta(days=60), today) if _digits(c.get("number")) == d]
+    return str(max(hit, key=lambda c: c["time"])["ext"]) if hit else None
+
+
+WAI.CTX.update(dir=DATA_DIR, check_ext=lambda e, p: check_ext_password(e, p), scope=lambda: SCOPE.get(),
+               names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},
+               owner_of=lambda n: OWN.owner_of(n), last_caller=_last_caller)
 import ops as OPS  # noqa: E402
 app.include_router(OPS.router)
 OPS.CTX.update(dir=DATA_DIR, tz=TZ, trunk=TRUNK.split("/", 1)[1], query=query, scope=lambda: SCOPE.get(),

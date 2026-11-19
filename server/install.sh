@@ -29,7 +29,7 @@ apt-get install -y -qq python3-venv python3-pip apache2-utils >/dev/null
 
 echo "== app files"
 mkdir -p "$APP" "$CONF" "$DATA/analysis"
-cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/ops.py "$SRC"/targets.py "$SRC"/wa.py "$SRC"/eng.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
+cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/ops.py "$SRC"/targets.py "$SRC"/wa.py "$SRC"/eng.py "$SRC"/wainbox.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
 sed -i "s/__VER__/$VER/" "$APP/static/index.html"
@@ -299,6 +299,7 @@ cat > /usr/local/bin/nq-setkey <<'KEY'
 # sudo nq-setkey backup   -> bucket على S3 للنسخة الاحتياطية
 # sudo nq-setkey google   -> النسخة الاحتياطية على Google Drive
 # sudo nq-setkey partner  -> مفتاح بوابة الشركاء (فحص الرقم في الـ CRM والسنترال)
+# sudo nq-setkey whatsapp -> ربط واتساب الشركة (WhatsApp Cloud API)
 set -e
 F=/etc/nq-calls/env
 setv() { local n=$1 v=$2; grep -v "^$n=" "$F" > "$F.tmp" || true; printf '%s=%s\n' "$n" "$v" >> "$F.tmp"; cat "$F.tmp" > "$F"; rm -f "$F.tmp"; }
@@ -359,6 +360,25 @@ PY
 ) || { echo "✖ اتلغى"; exit 1; }
   setv NQ_TG_TOKEN "$T"; setv NQ_TG_CHAT "$OUT"; systemctl restart nq-calls
   echo "✔ التنبيهات هتوصل هنا من دلوقتي"
+  exit 0
+fi
+if [[ "${1:-}" == whatsapp ]]; then
+  echo "بيانات WhatsApp Cloud API من developers.facebook.com ← تطبيقك ← WhatsApp ← API Setup:"
+  read -rp "Phone number ID: " PID; read -rp "WhatsApp Business Account ID (WABA ID): " WABA
+  read -rsp "Access token (الدائم من System User): " TOK; echo
+  read -rsp "App secret (App settings ← Basic — أو Enter): " SEC; echo
+  TOK=$(printf '%s' "$TOK" | tr -d '[:space:]'); [[ -n "$PID" && -n "$TOK" ]] || { echo "✖ ناقص بيانات"; exit 1; }
+  VER=$(grep -s '^NQ_WA_VERIFY=' "$F" | cut -d= -f2-); [[ -n "$VER" ]] || VER=$(python3 -c "import secrets;print(secrets.token_urlsafe(18))")
+  setv NQ_WA_PHONE_ID "$PID"; setv NQ_WA_WABA_ID "$WABA"; setv NQ_WA_TOKEN "$TOK"; setv NQ_WA_VERIFY "$VER"
+  [[ -n "$SEC" ]] && setv NQ_WA_APP_SECRET "$SEC"
+  systemctl restart nq-calls
+  R=$(curl -s "https://graph.facebook.com/v21.0/$PID?fields=display_phone_number,verified_name" -H "Authorization: Bearer $TOK")
+  echo "$R" | grep -q display_phone_number && echo "✔ متربط بالرقم: $(echo "$R" | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j.get("display_phone_number"),"—",j.get("verified_name"))')" || echo "✖ Meta رفض البيانات: $R"
+  echo; echo "دلوقتي في Meta ← WhatsApp ← Configuration ← Webhook ← Edit:"
+  H=$(grep -s '^NQ_HOST=' "$F" | cut -d= -f2-); [[ -n "$H" ]] || H="$(curl -s -m 3 http://169.254.169.254/latest/meta-data/public-ipv4 || hostname -I | cut -d' ' -f1).sslip.io"
+  echo "   Callback URL:  https://$H/calls-app/wa-hook"
+  echo "   Verify token:  $VER"
+  echo "   وبعدها اعمل Subscribe على: messages"
   exit 0
 fi
 if [[ "${1:-}" == partner ]]; then
