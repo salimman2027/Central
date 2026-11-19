@@ -171,6 +171,8 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   .opt { display:flex; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; margin-bottom:10px; text-align:right; font-size:16px; color:var(--fg); }
   .opt b { font-size:24px; } .opt small { display:block; color:var(--muted); font-size:12px; }
   .viachip { font-size:12px; padding:7px 10px; border-radius:16px; background:#e7f3f2; color:var(--pri); white-space:nowrap; }
+  .missed-box { border:1.5px solid #f3b9b6; background:linear-gradient(180deg, rgba(214,69,65,.07), transparent); }
+  .missed-box > b { display:block; color:#d64541; margin-bottom:4px; }
   .ibar { margin:6px 14px 0; display:flex; flex-direction:column; gap:6px; }
   .ibar:empty { display:none; }
   .ibar > div { border-radius:12px; padding:8px 12px; font-size:13.5px; display:flex; align-items:center; gap:8px; cursor:pointer; line-height:1.5; }
@@ -472,6 +474,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 
 <section id="scrLog" class="screen page">
   <h2>🕘 سجل المكالمات</h2>
+  <div class="card missed-box" id="logMissed" hidden></div>
   <div class="card" id="logList"></div>
 </section>
 
@@ -620,7 +623,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
 
 <nav class="tabbar" id="tabbar">
   <button data-s="scrDial" onclick="show('scrDial')"><b>📞</b>اتصال</button>
-  <button data-s="scrLog" onclick="NQLog.open()"><b>🕘</b>السجل</button>
+  <button data-s="scrLog" onclick="NQLog.open()"><b>🕘</b>السجل<i class="tbadge" id="logBadge"></i></button>
   <button data-s="scrTargets" onclick="NQTargets.open()"><b>🎯</b>التارجت</button>
   <button data-s="scrStats" onclick="NQStats.open()"><b>📊</b>إنجازي</button>
   <button data-s="scrPerf" onclick="NQPerf.open()"><b>🧠</b>أدائي<i class="tbadge" id="pBadge"></i></button>
@@ -1398,7 +1401,7 @@ const NQInbox = {
       const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 8000);
       const r = await fetch(CONFIG.api + "/inbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c), signal: ctl.signal });
       clearTimeout(tm); if (!r.ok) return;
-      this.data = await r.json(); this.render(); this.notify();
+      this.data = await r.json(); this.render(); this.notify(); this.missed();
       if ($("scrInbox").classList.contains("on")) this.renderList();
     } catch (e) {}
   },
@@ -1414,6 +1417,16 @@ const NQInbox = {
     $("inboxBar").innerHTML = parts.join("");
   },
   open() { this.renderList(); show("scrInbox"); this.poll(); },
+  // الفائتة بتاعتي: رقم أحمر على تاب السجل + قايمة فوق السجل لحد ما أكلّمهم ويردوا
+  missed() {
+    const cb = (this.data && this.data.callbacks) || [];
+    $("logBadge").textContent = cb.length || "";
+    const box = $("logMissed"); box.hidden = !cb.length; if (!cb.length) { box.innerHTML = ""; return; }
+    const wait = m => m < 60 ? `${m} دقيقة` : m < 1440 ? `${Math.floor(m / 60)} ساعة` : `${Math.floor(m / 1440)} يوم`;
+    box.innerHTML = `<b>📞 اتصلوا بيك ومحدش رد (${cb.length}) — رجّع الاتصال</b>` + cb.map(c => `<div class="logrow"><div class="info" style="flex:1;min-width:0"><b>${esc(c.customer || c.number)}</b>
+      <small class="${c.waitMin > 60 ? "ib-late" : ""}">${c.customer ? `<span class="n">${esc(c.number)}</span> · ` : ""}اتصل ${c.missed} مرة · مستني من ${wait(c.waitMin)}${c.tries ? ` · حاولت ${c.tries} مرة ومردش` : ""}</small></div>
+      <button class="mini wa" onclick="NQWA.open('${esc(c.number)}','${esc(c.customer || "").replace(/'/g, "")}')">💬</button><button class="mini call" onclick="NQInbox.call('${esc(c.number)}','${esc(c.customer || "").replace(/'/g, "")}')">📞</button></div>`).join("");
+  },
   renderList() {
     const { cb, fu, ld } = this.items();
     const row = (title, sub, num, late) => `<div class="logrow"><div class="info" style="flex:1;min-width:0"><b>${esc(title)}</b><small class="${late ? "ib-late" : ""}">${sub}</small></div>
@@ -1553,7 +1566,7 @@ const NQHistory = {
 /* ---------- call log: مكالمات الجهاز ده + مكالمات التحويلة من السنترال (الموبايل واللاب) ---------- */
 const NQLog = {
   srv: null, loading: false,
-  open() { this.srv = store.get("nq_srv_hist", null); this.render(); show("scrLog"); this.sync(); },
+  open() { this.srv = store.get("nq_srv_hist", null); this.render(); NQInbox.missed(); show("scrLog"); this.sync(); NQInbox.poll(); },
   async sync() {
     const c = NQOwner.creds(); if (!c || this.loading) return; this.loading = true;
     try {
