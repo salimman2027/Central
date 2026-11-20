@@ -712,7 +712,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div id="trBody"></div>
 </div>
 
-<div class="modal" id="taxModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="taxModal" onclick="modalBg(event,this)">
   <div class="mbox" style="max-width:900px;width:96vw;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">⚙️ الأنواع اللي الـ AI بيصنّف بيها المكالمات</h3>
     <div class="muted" style="font-size:13px;margin-bottom:10px">نوع في كل سطر. التعديل بيتطبّق على المكالمات اللي هتتحلّل بعد كده. "أخرى" بتتضاف لوحدها.</div>
@@ -722,7 +722,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
 </div>
 
-<div class="modal" id="crmModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="crmModal" onclick="modalBg(event,this)">
   <div class="mbox" style="max-width:1100px;width:96vw;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">🔗 الربط مع الـ CRM (حجز الاجتماع)</h3>
     <div class="crm-f"><label>رابط الـ endpoint (POST)</label><input id="crmUrl" placeholder="https://national-quality-api-site-nq.premiumasp.net/api/..." dir="ltr"></div>
@@ -740,7 +740,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div id="crmConnMsg" class="muted"></div>
   </div>
 </div>
-<div class="modal" id="orgModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="orgModal" onclick="modalBg(event,this)">
   <div class="mbox org-box">
     <div class="org-head"><h3 style="margin:0">👥 الموظفين والفرق والمديرين</h3>
       <nav class="org-nav"><a href="#" onclick="orgGo('emp');return false">👤 الموظفين</a><a href="#" onclick="orgGo('teams');return false">👥 الفرق</a><a href="#" onclick="orgGo('mgrs');return false">🧑‍💼 المديرين</a></nav></div>
@@ -771,7 +771,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="org-foot"><button class="btn" onclick="orgSave()">💾 حفظ الكل</button><span id="orgMsg"></span></div>
   </div>
 </div>
-<div class="modal" id="cusModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="cusModal" onclick="modalBg(event,this)">
   <div class="mbox" style="max-width:520px;width:94vw;max-height:85vh;overflow:auto">
     <h3 style="margin-top:0">🔎 اختار العميل من الـ CRM</h3>
     <input id="cusQ" class="ap-in" style="width:100%" placeholder="اسم العميل أو رقم تليفونه" oninput="cusSearch()">
@@ -856,7 +856,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div class="card"><h3>🧩 كل موظف في كل بند <span class="muted" style="font-weight:400;font-size:13px">— متوسط الدرجة من 10</span></h3><div class="tw"><table id="eHeat"></table></div></div>
 </div>
 
-<div class="modal" id="rubModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="rubModal" onclick="modalBg(event,this)">
   <div class="mbox" style="max-width:860px;width:96vw;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">⚙️ بنود تقييم المكالمات</h3>
     <div class="muted" style="font-size:13px;margin-bottom:10px">الـ AI بيدّي كل بند درجة من 10 مع دليل من المكالمة ونقطة تحسين، والدرجة الكلية = مجموع (الدرجة × الوزن ÷ 10). التعديل بيتطبّق على المكالمات اللي هتتحلّل بعد كده.</div>
@@ -920,7 +920,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
 </div>
 
-<div class="modal" id="engModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="engModal" onclick="modalBg(event,this)">
   <div class="mbox" style="max-width:820px;width:96vw;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">📅 مواعيد المهندسين للمناديب</h3>
     <div id="engItems"></div>
@@ -937,7 +937,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div id="engPrev" style="margin-top:12px"></div>
   </div>
 </div>
-<div class="modal" id="waModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="waModal" onclick="modalBg(event,this)">
   <div class="mbox" style="max-width:760px;width:96vw;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">💬 قوالب واتساب</h3>
     <p class="muted" style="font-size:13px;margin-top:-6px">في النص تقدر تكتب <code>{العميل}</code> و<code>{الموظف}</code> و<code>{الرابط}</code> (رابط الملف) — بيتغيّروا لوحدهم.</p>
@@ -947,12 +947,12 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <h4 style="margin:18px 0 6px">📊 اتبعت آخر 7 أيام</h4><div id="waStats" class="muted">—</div>
   </div>
 </div>
-<div class="modal" id="hlModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="hlModal" onclick="modalBg(event,this)">
   <div class="mbox" style="max-width:820px;width:96vw;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">🩺 حالة السيستم</h3><div id="hlBody"></div>
   </div>
 </div>
-<div class="modal" id="spyModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="spyModal" onclick="modalBg(event,this)">
   <div class="mbox" style="max-width:460px;width:94vw"><div id="spyBody"></div></div>
 </div>
 <div id="tvView" hidden>
@@ -960,7 +960,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="sp" style="flex:1"></div><b id="tvClock"></b><button class="btn o" onclick="tvClose()">✕ خروج</button></div>
   <div class="tv-body"><div class="tv-board" id="tvBoard"></div><div class="tv-live"><h3>🔴 مباشر</h3><div id="tvLive"></div></div></div>
 </div>
-<div class="modal" id="pwModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" id="pwModal" onclick="modalBg(event,this)">
   <div class="mbox" style="max-width:400px;width:94vw">
     <h3 style="margin-top:0">🔑 غيّر كلمة السر</h3>
     <form id="pwForm" class="pw-form">
@@ -1166,6 +1166,15 @@ function openRec(i){
   const url=`${API_BASE}/recording/${encodeURIComponent(c.id)}`;
   $('player').src=url; $('dl').href=url+'?download=1';
   $('modal').classList.add('show'); $('player').play().catch(()=>{});
+}
+/* الشاشة تتقفل بس لو الضغطة بدأت وخلصت على الخلفية الغامقة نفسها — مش على شريط التمرير ولا سحب من جوه الصندوق */
+let MDOWN=null; document.addEventListener('mousedown',e=>{MDOWN={t:e.target,x:e.clientX,y:e.clientY}},true);
+function modalBg(e,el){
+  if(e.target!==el||!MDOWN||MDOWN.t!==el)return;
+  const r=el.getBoundingClientRect(), x0=r.left+el.clientLeft, y0=r.top+el.clientTop;
+  const inside=p=>p.x>=x0&&p.x<=x0+el.clientWidth&&p.y>=y0&&p.y<=y0+el.clientHeight;
+  if(!inside({x:e.clientX,y:e.clientY})||!inside(MDOWN))return;   // على شريط التمرير
+  el.classList.remove('show');
 }
 function closeRec(){ $('player').pause(); $('modal').classList.remove('show'); }
 function exportCSV(){
