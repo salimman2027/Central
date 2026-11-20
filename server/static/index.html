@@ -748,6 +748,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="muted" style="font-size:12px">اختار اسم الموظف في الـ CRM جنب تحويلته عشان الاجتماعات تتسجّل باسمه (بنحاول نطابق بالاسم لوحدنا 🤖).</div>
     <div class="muted" id="crmSrc" style="font-size:12px;margin-top:4px"></div>
     <div class="muted" style="font-size:12px;margin-top:2px">🔐 <b>اسم الدخول وكلمة السر</b>: الموظف بيدخل التطبيق بيهم بدل رقم التحويلة وباسوردها. لو التحويلة ليها اسم دخول، محدش يقدر يدخل برقمها. سيب كلمة السر فاضية عشان تفضل زي ما هي.</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><input id="orgQ" type="search" placeholder="🔍 دوّر بأي حاجة: تحويلة، رقم خط، IMEI، IMSI، اسم، فريق، اسم دخول…" style="flex:1" oninput="orgFilter()"><span id="orgQn" class="muted" style="font-size:12px;white-space:nowrap"></span></div>
     <div class="crm-tw"><table class="crm-tbl">
       <thead><tr><th>التحويلة</th><th>رقم الخط</th><th>الموظف (من الـ CRM)</th><th>الفريق</th><th>اسم الدخول</th><th>كلمة السر</th><th></th></tr></thead>
       <tbody id="crmSales"></tbody></table></div>
@@ -1736,7 +1737,7 @@ async function openTeams(){ return openOrg('teams'); }
 /* ===== شاشة واحدة: الموظفين + الفرق + المديرين ===== */
 let ORG_LOADED=false;
 document.addEventListener('DOMContentLoaded',()=>document.querySelectorAll('.modal').forEach(m=>document.body.appendChild(m)));
-async function openOrg(sec){
+async function openOrg(sec){ if($("orgQ")){$("orgQ").value="";$("orgQn").textContent="";}
   let c;
   try{c=await (await fetch(API_BASE+'/crm/settings',{cache:'no-store'})).json();
     TM=await (await fetch(API_BASE+'/teams',{cache:'no-store'})).json();}catch(e){alert(e.message);return}
@@ -2323,6 +2324,17 @@ function crmRepName(ext){return (REPS.find(r=>String(r.id)===String(ext))||{}).n
 let CRM_REMOVED=new Set();
 function crmDelRow(b){const tr=b.closest('tr'), e=tr.querySelector('.crm-e').value.trim(); if(e)CRM_REMOVED.add(e); tr.remove();
   $('orgMsg').innerHTML='<span class="muted">دوس 💾 حفظ عشان المسح يتسجّل</span>';}
+function orgFilter(){
+  const q=nrm($('orgQ').value), qd=$('orgQ').value.replace(/\D/g,''); let n=0,all=0;
+  document.querySelectorAll('#crmSales tr').forEach(tr=>{all++;
+    const v=tr.querySelector('.crm-v'), t=tr.querySelector('.crm-t');
+    const txt=[tr.querySelector('.crm-e').value,tr.querySelector('.crm-line').value,tr.dataset.imei,tr.dataset.imsi,tr.querySelector('.crm-u').value,
+      v.tagName==='SELECT'&&v.selectedIndex>=0?v.options[v.selectedIndex].text:v.value,t&&t.selectedIndex>=0?t.options[t.selectedIndex].text:'',crmRepName(tr.querySelector('.crm-e').value)].join(' ');
+    const dg=txt.replace(/\D/g,''), lineAlt=tr.querySelector('.crm-line').value.replace(/^0/,'966');
+    const hit=!q||nrm(txt).includes(q)||(qd.length>=3&&(dg.includes(qd)||lineAlt.includes(qd)||dg.includes(qd.replace(/^966/,'0'))));
+    tr.style.display=hit?'':'none'; if(hit)n++;});
+  $('orgQn').textContent=q?`${n} من ${all}`:'';
+}
 function crmSetSim(tr,imei,imsi){tr.dataset.imei=imei||'';tr.dataset.imsi=imsi||'';
   tr.querySelector('.crm-sim').innerHTML=imei||imsi?`IMEI ${esc(imei||'—')}<br>IMSI ${esc(imsi||'—')}`:'';}
 /* ===== تصدير / استيراد جدول الموظفين Excel ===== */
