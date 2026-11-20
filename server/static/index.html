@@ -753,6 +753,8 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
       <tbody id="crmSales"></tbody></table></div>
     <button class="btn o sm" style="margin-top:6px" onclick="crmAddRow(undefined,'',true)">＋ تحويلة جديدة</button>
     <button class="btn o sm" style="margin-top:6px" onclick="crmAddSim()" title="لموظف بيتصل من شريحته بس — ملوش تحويلة في السنترال">📱 موظف بالشريحة بس</button>
+    <button class="btn o sm" style="margin-top:6px" onclick="orgExport()" title="الجدول كله في ملف Excel">⬇️ تصدير Excel</button>
+    <label class="btn o sm" style="margin-top:6px;cursor:pointer" title="عدّل الملف اللي اتصدّر وارفعه — بيتطابق برقم التحويلة">⬆️ استيراد Excel<input type="file" id="orgImp" hidden accept=".xlsx,.xls,.csv" onchange="orgImport(this.files[0])"></label>
     </section>
     <section id="org-teams" class="org-sec"><h4>👥 الفرق</h4>
       <div class="muted" style="font-size:12px">الفريق بيتختار لكل موظف في جدول الموظفين فوق، أو من <b>＋ ضيف تحويلة</b> هنا. قائد الفريق بيدخل اللوحة بيوزره ويشوف فريقه بس.</div>
@@ -2321,6 +2323,47 @@ function crmRepName(ext){return (REPS.find(r=>String(r.id)===String(ext))||{}).n
 let CRM_REMOVED=new Set();
 function crmDelRow(b){const tr=b.closest('tr'), e=tr.querySelector('.crm-e').value.trim(); if(e)CRM_REMOVED.add(e); tr.remove();
   $('orgMsg').innerHTML='<span class="muted">دوس 💾 حفظ عشان المسح يتسجّل</span>';}
+function crmSetSim(tr,imei,imsi){tr.dataset.imei=imei||'';tr.dataset.imsi=imsi||'';
+  tr.querySelector('.crm-sim').innerHTML=imei||imsi?`IMEI ${esc(imei||'—')}<br>IMSI ${esc(imsi||'—')}`:'';}
+/* ===== تصدير / استيراد جدول الموظفين Excel ===== */
+const ORG_COLS=['التحويلة','رقم الخط','IMEI','IMSI','رقم الموظف في CRM','اسم الموظف','الفريق','اسم الدخول'];
+async function orgExport(){
+  try{await tgLib()}catch(e){return $('orgMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+  const rows=[ORG_COLS];
+  document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(); if(!e)return;
+    const v=tr.querySelector('.crm-v').value, emp=(CRM_EMP||[]).find(x=>String(x.id)===String(v));
+    const t=(TM.teams||[]).find(t=>t.id===tr.querySelector('.crm-t').value);
+    rows.push([e,tr.querySelector('.crm-line').value.trim(),tr.dataset.imei||'',tr.dataset.imsi||'',v||'',emp?emp.name:crmRepName(e),t?t.name:'',tr.querySelector('.crm-u').value.trim()]);});
+  const ws=XLSX.utils.aoa_to_sheet(rows); ws['!cols']=[8,14,18,18,10,22,16,14].map(w=>({wch:w}));
+  rows.forEach((r,i)=>{if(!i)return;[0,1,2,3,4].forEach(c=>{const a=XLSX.utils.encode_cell({r:i,c});if(ws[a])ws[a].t='s',ws[a].z='@'})});
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'الموظفين'); XLSX.writeFile(wb,`NQ-employees-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+async function orgImport(file){
+  const msg=h=>$('orgMsg').innerHTML=h; if(!file)return;
+  try{await tgLib(); const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:''}).filter(r=>r.some(v=>String(v).trim()));
+    if(rows.length<2)throw new Error('الملف فاضي');
+    const h=rows[0].map(x=>String(x).trim().toLowerCase()); const col=n=>h.indexOf(n.toLowerCase());
+    const ci={ext:col('التحويلة'),line:col('رقم الخط'),imei:col('IMEI'),imsi:col('IMSI'),crm:col('رقم الموظف في CRM'),name:col('اسم الموظف'),team:col('الفريق'),user:col('اسم الدخول')};
+    if(ci.ext<0)throw new Error('مش لاقي عمود "التحويلة" — استخدم الملف اللي اتصدّر من هنا');
+    const clean=v=>String(v??'').trim(), digits=v=>clean(v).replace(/\D/g,'');
+    let upd=0,add=0,bad=[];
+    for(const r of rows.slice(1)){const e=digits(r[ci.ext]); if(!e)continue;
+      let tr=[...document.querySelectorAll('#crmSales tr')].find(t=>t.querySelector('.crm-e').value.trim()===e);
+      if(!tr){crmAddRow(e,'',false); tr=$('crmSales').lastElementChild; add++;} else upd++;
+      tr.classList.add('crm-new');
+      if(ci.line>=0&&clean(r[ci.line])){let l=digits(r[ci.line]); if(/^9665\d{8}$/.test(l))l='0'+l.slice(3); tr.querySelector('.crm-line').value=l;}
+      if(ci.imei>=0||ci.imsi>=0)crmSetSim(tr,ci.imei>=0?digits(r[ci.imei]):tr.dataset.imei,ci.imsi>=0?digits(r[ci.imsi]):tr.dataset.imsi);
+      const sel=tr.querySelector('.crm-v'); const id=ci.crm>=0?digits(r[ci.crm]):'', nm=ci.name>=0?clean(r[ci.name]):'';
+      const emp=(CRM_EMP||[]).find(x=>id&&String(x.id)===id)||(CRM_EMP||[]).find(x=>nm&&nrm(x.name)===nrm(nm));
+      if(emp)sel.value=String(emp.id); else if(id&&sel.tagName==='INPUT')sel.value=id; else if(id||nm)bad.push(e+' (الموظف)');
+      if(ci.team>=0&&clean(r[ci.team])){const t=(TM.teams||[]).find(t=>nrm(t.name)===nrm(clean(r[ci.team]))); if(t)tr.querySelector('.crm-t').value=t.id; else bad.push(e+' (الفريق)');}
+      if(ci.user>=0&&clean(r[ci.user]))tr.querySelector('.crm-u').value=clean(r[ci.user]);
+    }
+    msg(`📥 اتقرا الملف: اتحدّث ${upd} واتضاف ${add} — راجع الصفوف المتعلّمة ودوس 💾 حفظ الكل`+(bad.length?`<br><span style="color:var(--red)">مش لاقي: ${esc(bad.join('، '))}</span>`:''));
+  }catch(e){msg(`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`)}
+  $('orgImp').value='';
+}
 function crmAddSim(){   // موظف بيتصل من شريحته بس: بنديله كود من 901 (مش تحويلة في السنترال)
   const used=new Set([...document.querySelectorAll('#crmSales .crm-e')].map(i=>i.value.trim()).concat((REPS||[]).map(r=>String(r.id))));
   let c=901; while(used.has(String(c)))c++; crmAddRow(String(c),'',true,true);
@@ -2331,12 +2374,13 @@ function crmAddRow(ext,val,focusNew,sim){
   sim=sim||!!(REPS.find(r=>String(r.id)===String(ext))||{}).simOnly; if(sim)tr.dataset.sim='1';
   const line=(REPS.find(r=>String(r.id)===String(ext))||{}).line||'';
   tr.innerHTML=`<td><input class="crm-e" inputmode="numeric" value="${esc(ext||'')}" placeholder="مثلًا 108" ${isNew&&!sim?'':'readonly'}>${sim?'<div class="sim-tag">📱 شريحة بس — الكود للسيستم</div>':''}</td>
-    <td><input class="crm-line" inputmode="tel" dir="ltr" value="${esc(line)}" placeholder="05xxxxxxxx">${(()=>{const r=REPS.find(r=>String(r.id)===String(ext))||{};return r.imei||r.imsi?`<div class="muted ltr" dir="ltr" style="font-size:11px;line-height:1.5;margin-top:3px">IMEI ${esc(r.imei||'—')}<br>IMSI ${esc(r.imsi||'—')}</div>`:''})()}</td>
+    <td><input class="crm-line" inputmode="tel" dir="ltr" value="${esc(line)}" placeholder="05xxxxxxxx"><div class="muted ltr crm-sim" dir="ltr" style="font-size:11px;line-height:1.5;margin-top:3px"></div></td>
     <td>${crmEmpField(val)}<div class="crm-n muted">${crmRepName(ext)?'عندنا دلوقتي: '+esc(crmRepName(ext)):''}</div></td>
     <td><select class="crm-t" onchange="orgTeamChanged(this)">${crmTeamOpts((TM.reps.find(r=>r.ext===String(ext))||{}).team||'')}</select></td>
     <td><input class="crm-u" dir="ltr" autocomplete="off" value="${esc((LOGINS[String(ext)]||{}).username||'')}" placeholder="مثلًا hadeer"></td>
     <td><input class="crm-p" dir="ltr" type="password" autocomplete="new-password" placeholder="${(LOGINS[String(ext)]||{}).hasPassword?'متسجّلة ✓ (اكتب لتغييرها)':'6 حروف على الأقل'}"></td>
     <td><button class="x" title="امسح التحويلة دي" onclick="crmDelRow(this)">✕</button></td>`;
+  {const r=REPS.find(r=>String(r.id)===String(ext))||{}; crmSetSim(tr,r.imei||'',r.imsi||'');}
   const ei=tr.querySelector('.crm-e'); ei.oninput=()=>{ei.value=ei.value.replace(/\D/g,'').slice(0,6); tr.querySelector('.crm-n').innerHTML=crmRepName(ei.value)?'عندنا دلوقتي: '+esc(crmRepName(ei.value)):''};
   $('crmSales').appendChild(tr);
   if(isNew&&focusNew){tr.classList.add('crm-new');setTimeout(()=>{tr.scrollIntoView({block:'center',behavior:'smooth'});ei.focus()},120)} else if(isNew) ei.focus();
@@ -2390,7 +2434,8 @@ async function orgSave(){
     LOGINS=await put('/logins',logins);                       // الأول: لو في اسم دخول غلط مايتحفظش حاجة تانية
     TM=await put('/teams',{teams:TM.teams,assign,managers:TM.managers||[]});
     const simOnly=[...document.querySelectorAll('#crmSales tr[data-sim="1"] .crm-e')].map(i=>i.value.trim()).filter(Boolean);
-    await put('/crm/settings',{salesIds,repNames,lines,exts,simOnly,removed:[...CRM_REMOVED].filter(e=>!seen.has(e))});
+    const sims={}; document.querySelectorAll('#crmSales tr').forEach(tr=>{const e=tr.querySelector('.crm-e').value.trim(); if(e&&(tr.dataset.imei||tr.dataset.imsi))sims[e]={imei:tr.dataset.imei||'',imsi:tr.dataset.imsi||''}});
+    await put('/crm/settings',{salesIds,repNames,lines,exts,simOnly,sims,removed:[...CRM_REMOVED].filter(e=>!seen.has(e))});
     TM.teams.forEach(t=>delete t.leaderPassword); (TM.managers||[]).forEach(m=>delete m.password);
     msg('<span style="color:var(--green)">✔ اتحفظ كله</span>');
     await loadConfig(); try{fillSelects()}catch(e){} loadedRange=''; refresh(); loadAppt();
