@@ -39,7 +39,7 @@ except Exception:  # noqa: BLE001
     SUP_NOTES = {}
 MONITOR = Path(os.environ.get("NQ_MONITOR", "/var/spool/asterisk/monitor"))
 TZ = ZoneInfo(os.environ.get("NQ_TZ", "Asia/Riyadh"))
-TRUNK = "PJSIP/" + os.environ.get("NQ_TRUNK", "dinastar1")
+TRUNK = "PJSIP/" + os.environ.get("NQ_TRUNK", "dinastar1").rstrip("0123456789")   # كل الأجهزة: dinastar1..4
 
 app = FastAPI(title="NQ Calls", docs_url=None, redoc_url=None)
 

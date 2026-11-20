@@ -1886,7 +1886,7 @@ async function loadHealth(){
   try{HL=await (await fetch(API_BASE+'/health',{cache:'no-store'})).json();}catch(e){return}
   const p=$('hlPill'), bad=HL.alerts.filter(a=>a.level==='bad'), warn=HL.alerts.filter(a=>a.level!=='bad');
   p.className='hl-pill '+(bad.length?'bad':warn.length?'warn':HL.gateway==='up'?'ok':'warn');
-  p.textContent=bad.length?`🔴 ${bad.length===1?(bad[0].key==='gateway'?'جهاز الشرايح فاصل':'فيه مشكلة'):bad.length+' مشاكل'}`:warn.length?`🟠 ${warn.length} تنبيه`:HL.gateway==='up'?'🟢 السنترال شغال':HL.gateway==='down'?'🔴 جهاز الشرايح فاصل':'⚪ مش عارف حالة الجهاز';
+  p.textContent=bad.length?`🔴 ${bad.length===1?(bad[0].key.startsWith('gateway')?'جهاز شرايح فاصل':'فيه مشكلة'):bad.length+' مشاكل'}`:warn.length?`🟠 ${warn.length} تنبيه`:HL.gateway==='up'?'🟢 السنترال شغال':HL.gateway==='down'?'🔴 أجهزة الشرايح فاصلة':HL.gateway==='partial'?'🔴 جهاز شرايح فاصل':'⚪ مش عارف حالة الأجهزة';
   if($('hlModal').classList.contains('show'))renderHealth();
 }
 function openHealth(){renderHealth();$('hlModal').classList.add('show');loadHealth();}
@@ -1895,7 +1895,9 @@ function renderHealth(){
   const g={up:['ok','🟢 جهاز الشرايح (Dinstar) متصل بالسنترال'],down:['bad','🔴 جهاز الشرايح (Dinstar) فاصل'],unknown:['warn','⚪ مش قادرين نعرف حالة جهاز الشرايح']}[HL.gateway]||['warn','—'];
   const b=HL.backup||{}, d=HL.disk;
   let h=HL.alerts.map(a=>`<div class="hl-row ${a.level}"><div>${a.level==='bad'?'🔴':'🟠'}</div><div><b>${esc(a.text)}</b><div class="muted" style="font-size:12px">${agoTxt(a.since)}</div></div></div>`).join('');
-  if(!HL.alerts.some(a=>a.key==='gateway'))h+=`<div class="hl-row ${g[0]}"><div></div><div><b>${g[1]}</b><div class="muted" style="font-size:12px">${HL.gatewayAt?'الحالة دي '+agoTxt(HL.gatewayAt):''} · آخر فحص ${agoTxt(HL.checked)}</div></div></div>`;
+  const devs=(HL.devices||[]).filter(x=>x.status!=='none');
+  if(devs.length)h+=`<div class="hl-row ${devs.every(x=>x.status==='up')?'ok':'bad'}"><div>📟</div><div><b>أجهزة الشرايح (Dinstar)</b><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${devs.map(x=>`<span class="chip" style="padding:4px 10px;border-radius:999px;background:${x.status==='up'?'#e7f6ec':'#fde8e8'};color:${x.status==='up'?'#17663a':'#a11'}">${x.status==='up'?'🟢':'🔴'} ${esc(x.name)} · ${x.exts[0]}–${x.exts[x.exts.length-1]}</span>`).join('')}</div><div class="muted" style="font-size:12px;margin-top:4px">آخر فحص ${agoTxt(HL.checked)}</div></div></div>`;
+  else h+=`<div class="hl-row ${g[0]}"><div></div><div><b>${g[1]}</b><div class="muted" style="font-size:12px">آخر فحص ${agoTxt(HL.checked)}</div></div></div>`;
   h+=`<div class="hl-row ${b.at&&b.ok?(b.s3?'ok':'warn'):'warn'}"><div>💾</div><div><b>النسخة الاحتياطية: ${b.at?(b.ok?'آخر نسخة '+agoTxt(b.at)+' ('+esc(b.size||'')+')':'فشلت '+agoTxt(b.at)):'لسه متعملتش'}</b>
     <div class="muted" style="font-size:12.5px">${b.s3?'بتترفع على '+esc(b.s3)+' مع التسجيلات':'⚠️ النسخة على نفس السيرفر بس — لو السيرفر وقع هتضيع. علشان تترفع على Google Drive: على السيرفر <code>sudo nq-setkey google</code> (أو S3: <code>sudo nq-setkey backup</code>)'}${b.error?'<br>✖ '+esc(b.error):''}</div></div></div>`;
   if(d)h+=`<div class="hl-row ${d.freeGb<3?'bad':d.pct<15?'warn':'ok'}"><div>🗄️</div><div><b>المساحة الفاضية: ${d.freeGb} جيجا (${d.pct}%)</b></div></div>`;

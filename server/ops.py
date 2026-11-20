@@ -23,7 +23,7 @@ router = APIRouter()
 LOCK = threading.Lock()
 HDR = {"Access-Control-Allow-Origin": "*"}
 # بتتظبط من app.py
-CTX = {"dir": Path("/var/lib/nq-calls"), "tz": dt.timezone(dt.timedelta(hours=3)), "trunk": "dinastar1",
+CTX = {"dir": Path("/var/lib/nq-calls"), "tz": dt.timezone(dt.timedelta(hours=3)), "trunk": "dinastar",
        "query": None, "calls": None, "notes": None, "names": lambda: {}, "teams": lambda: {}, "lines": lambda: {},
        "owner_of": lambda n: None, "scope": lambda: None, "check_ext": lambda e, p: False, "reps": lambda: [],
        "appointments": lambda: [], "analysis": None, "crm_get": None, "crm_on": lambda: False,
@@ -140,15 +140,48 @@ def clear_alert(key: str, text: str = ""):
 
 
 # ------------------------------------------------------------------ فحص السيستم
-def gateway_status() -> str:
-    """up / down / unknown — من تسجيل جهاز الشرايح على السنترال"""
+def devices() -> list:
+    """أجهزة الشرايح: جهاز n = dinastarN وعليه 4 تحويلات (جهاز 1: 100–103، جهاز 2: 104–107 …)"""
+    base, per, n = int(os.environ.get("NQ_GW_BASE", "100")), int(os.environ.get("NQ_GW_PORTS", "4")), int(os.environ.get("NQ_GW_COUNT", "4"))
+    return [{"trunk": f"{CTX['trunk']}{i}", "name": f"جهاز {i}", "no": i,
+             "exts": [str(base + (i - 1) * per + k) for k in range(per)]} for i in range(1, n + 1)]
+
+
+def device_of(ext) -> dict | None:
+    return next((d for d in devices() if str(ext) in d["exts"]), None)
+
+
+def gateways() -> dict:
+    """{dinastarN: up/down} للأجهزة المتعرّفة على السنترال بس (الجهاز اللي لسه ماتضافش مش بيتحسب)"""
     out = asterisk("pjsip show contacts")
+    eps = asterisk("pjsip show endpoints")
     if out is None:
+        return {}
+    known = set(re.findall(r"Endpoint:\s+(\S+?)(?:/\S*)?\s", eps or ""))
+    res = {}
+    for d in devices():
+        t = d["trunk"]
+        if known and t not in known:
+            continue
+        rows = [ln for ln in out.splitlines() if "Contact:" in ln and ln.split("Contact:")[1].strip().split("/")[0] == t]
+        res[t] = "up" if any(re.search(r"\b(Avail|NonQual|Unknown)\b", r) for r in rows) else "down"
+    return res
+
+
+def gateway_status() -> str:
+    """up / down / partial / unknown — مجموع كل الأجهزة"""
+    g = STATE.get("gateways") or {}
+    if not g:
         return "unknown"
-    rows = [ln for ln in out.splitlines() if "Contact:" in ln and CTX["trunk"] in ln.split("Contact:")[1].split("/")[0]]
-    if not rows:
-        return "down"
-    return "up" if any(re.search(r"\b(Avail|NonQual|Unknown)\b", r) for r in rows) else "down"
+    v = set(g.values())
+    return "up" if v == {"up"} else "down" if v == {"down"} else "partial"
+
+
+def gateway_for(ext) -> str:
+    """حالة الجهاز اللي عليه تحويلة الموظف ده"""
+    d = device_of(ext)
+    g = STATE.get("gateways") or {}
+    return g.get(d["trunk"], STATE["gateway"]) if d else STATE["gateway"]
 
 
 def ext_online() -> dict:
@@ -185,15 +218,21 @@ def backup_info() -> dict:
 
 
 def check_health():
-    g = gateway_status()
+    gw = gateways()
+    if gw:
+        STATE["gateways"] = gw
+    g = gateway_status() if gw else "unknown"
     if g != STATE["gateway"]:
         STATE["gatewayAt"] = now().isoformat()
     STATE["gateway"], STATE["checked"] = g, now().isoformat()
-    if g == "down":
-        raise_alert("gateway", "جهاز الشرايح (Dinstar) فاصل عن السنترال — المكالمات من السنترال مش هتطلع. "
-                               "اتأكد إنه شغال وموصّل بالنت في المكتب، والموظفين يكلموا من شرايحهم لحد ما يرجع.")
-    elif g == "up":
-        clear_alert("gateway", "جهاز الشرايح رجع اتصل بالسنترال")
+    for d in devices():
+        st = gw.get(d["trunk"])
+        if st == "down":
+            raise_alert("gateway:" + d["trunk"], f"{d['name']} (تحويلات {d['exts'][0]}–{d['exts'][-1]}) فاصل عن السنترال — "
+                        "المكالمات بتاعته مش هتطلع. اتأكد إنه شغال وكابل النت فيه، وأصحاب التحويلات دي يكلموا من شرايحهم لحد ما يرجع.")
+        elif st == "up":
+            clear_alert("gateway:" + d["trunk"], f"{d['name']} رجع اتصل بالسنترال")
+    clear_alert("gateway")   # التنبيه القديم (جهاز واحد)
     bad, ok = failed_streak()
     if bad >= 4 and ok == 0:
         raise_alert("failing", f"{bad} مكالمات طالعة فشلت آخر 20 دقيقة ومفيش ولا مكالمة نجحت — ممكن شريحة من غير رصيد أو شبكة")
@@ -576,7 +615,9 @@ def _range(period: str):
 @router.get("/api/health")
 def health():
     a = alerts()
+    g = STATE.get("gateways") or {}
     return {"gateway": STATE["gateway"], "gatewayAt": STATE["gatewayAt"], "checked": STATE["checked"],
+            "devices": [{**d, "status": g.get(d["trunk"], "none")} for d in devices()],
             "alerts": list(a["open"].values()), "log": a["log"][:15], "backup": backup_info(),
             "telegram": tg_ready(), "lines": sorted(lines_today().values(), key=lambda x: -x["used"]),
             "disk": _disk()}
@@ -678,7 +719,7 @@ async def app_inbox(request: Request):
         wa_unread = wainbox.unread_for(ext) if wainbox.ready() else 0
     except Exception:  # noqa: BLE001
         wa_unread = 0
-    return JSONResponse({"gateway": STATE["gateway"], "line": ln, "waUnread": wa_unread,
+    return JSONResponse({"gateway": gateway_for(ext), "line": ln, "waUnread": wa_unread,
                          "callbacks": [c for c in callbacks() if c["ext"] == ext],
                          "followups": followups(ext), "leads": [x for x in leads(ext) if not x["called"]]},
                         headers=HDR)
