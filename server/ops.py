@@ -719,7 +719,11 @@ async def app_inbox(request: Request):
         wa_unread = wainbox.unread_for(ext) if wainbox.ready() else 0
     except Exception:  # noqa: BLE001
         wa_unread = 0
-    return JSONResponse({"gateway": gateway_for(ext), "line": ln, "waUnread": wa_unread,
+    d = device_of(ext)
+    me = {"ext": ext, "name": CTX["names"]().get(ext, ""), "sim": CTX["lines"]().get(ext, ""),
+          "device": d["no"] if d else None, "port": d["exts"].index(ext) if d else None,
+          "deviceUp": gateway_for(ext) == "up"}
+    return JSONResponse({"gateway": gateway_for(ext), "me": me, "line": ln, "waUnread": wa_unread,
                          "callbacks": [c for c in callbacks() if c["ext"] == ext],
                          "followups": followups(ext), "leads": [x for x in leads(ext) if not x["called"]]},
                         headers=HDR)

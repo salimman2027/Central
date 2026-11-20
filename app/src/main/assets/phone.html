@@ -375,6 +375,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   <div class="topbar">
     <span id="regDot" class="dot"></span>
     <div class="who"><b id="whoExt">—</b><small id="whoSt">متصل بالسنترال</small></div>
+    <button class="iconbtn mebtn" onclick="NQMe.show()" aria-label="بياناتي" title="رقمي والشريحة والجهاز">؟</button>
     <button class="viachip app-only" id="viaChip" onclick="NQVia.cycle()"></button>
     <span class="ver" id="appVer"></span>
     <button class="iconbtn themebtn" onclick="toggleTheme()" aria-label="فاتح / غامق" title="فاتح / غامق"><span class="i-dark">🌙</span><span class="i-light">☀️</span></button>
@@ -741,6 +742,25 @@ function show(id) {
   document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("sel", b.dataset.s === id));
 }
 function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+/* ===== بياناتي: التحويلة + رقم الشريحة + الجهاز والبورت ===== */
+const NQMe = {
+  show() {
+    const m = (NQInbox.data && NQInbox.data.me) || {};
+    const ext = m.ext || NQPhone.ext || "—";
+    const row = (k, v, copy) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line,#e5e7eb)"><span style="opacity:.7">${k}</span><b class="ltr" style="direction:ltr">${v || "—"}</b>${copy && v ? `<button class="iconbtn" style="width:32px;height:32px;font-size:14px" onclick="navigator.clipboard&&navigator.clipboard.writeText('${v}');toast('اتنسخ ✓')">📋</button>` : ""}</div>`;
+    const dev = m.device ? `جهاز ${m.device} · بورت ${m.port}` : "";
+    let o = document.getElementById("meSheet");
+    if (!o) { o = document.createElement("div"); o.id = "meSheet"; o.onclick = e => { if (e.target === o) o.remove(); };
+      o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;display:flex;align-items:flex-end;justify-content:center"; document.body.appendChild(o); }
+    o.innerHTML = `<div style="background:var(--card,#fff);color:inherit;width:100%;max-width:440px;border-radius:18px 18px 0 0;padding:18px 18px 24px">
+      <div style="font-weight:700;font-size:17px;margin-bottom:6px">📇 بياناتي${m.name ? " — " + m.name : ""}</div>
+      ${row("التحويلة", ext, true)}${row("رقم الشريحة (اللي بيظهر للعميل)", m.sim, true)}${row("الجهاز", dev)}
+      ${m.device ? `<div style="margin-top:10px;font-size:13px;color:${m.deviceUp ? "#17803d" : "#b91c1c"}">${m.deviceUp ? "🟢 الجهاز متصل بالسنترال" : "🔴 الجهاز فاصل — اتصل من شريحتك لحد ما يرجع"}</div>` : ""}
+      ${!m.sim ? `<div style="margin-top:10px;font-size:13px;opacity:.7">رقم الشريحة لسه مش متسجّل — المدير يضيفه من شاشة الموظفين</div>` : ""}
+      <button class="btn" style="width:100%;margin-top:14px" onclick="document.getElementById('meSheet').remove()">تمام</button></div>`;
+    if (!NQInbox.data && typeof NQInbox.poll === "function") NQInbox.poll().then(() => o.isConnected && NQMe.show()).catch(() => {});
+  }
+};
 function toast(t) { const e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = "none", 2500); }
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
