@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>NQ Phone</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;600;700&display=swap" rel="stylesheet">
-<script>(function(){var t;try{t=localStorage.getItem('nq_theme')}catch(e){}if(!t)t='light';document.documentElement.dataset.theme=t;})();
-function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=t;try{localStorage.setItem('nq_theme',t)}catch(e){}}</script>
+<script>(function(){var mq=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)');
+function pref(){try{return localStorage.getItem('nq_theme')||'light'}catch(e){return 'light'}}
+window.applyTheme=function(){var p=pref();document.documentElement.dataset.theme=p==='auto'?(mq&&mq.matches?'dark':'light'):p;document.documentElement.dataset.themePref=p;};
+applyTheme();if(mq&&mq.addEventListener)mq.addEventListener('change',applyTheme);})();
+function setTheme(p){try{localStorage.setItem('nq_theme',p)}catch(e){}applyTheme();document.querySelectorAll('.thm button').forEach(function(b){b.classList.toggle('sel',b.dataset.t===p)});}
+function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');}</script>
 <style>
   :root {
     --bg:#f4f6f8; --card:#fff; --fg:#14202e; --muted:#6b7684; --line:#e3e8ee;
@@ -375,6 +379,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   <div class="topbar">
     <span id="regDot" class="dot"></span>
     <div class="who"><b id="whoExt">—</b><small id="whoSt">متصل بالسنترال</small></div>
+    <button class="iconbtn todobtn" onclick="NQTodo.open()" aria-label="مهام اليوم" title="مهام اليوم" style="position:relative">✅<i class="tbadge" id="todoBadge" style="position:absolute;top:-4px;left:-4px"></i></button>
     <button class="iconbtn mebtn" onclick="NQMe.show()" aria-label="بياناتي" title="رقمي والشريحة والجهاز">؟</button>
     <button class="viachip app-only" id="viaChip" onclick="NQVia.cycle()"></button>
     <span class="ver" id="appVer"></span>
@@ -399,7 +404,7 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <button class="iconbtn" onclick="show('scrDial')" aria-label="رجوع">→</button>
     <h2 style="margin:0;font-size:20px;flex:1">الإعدادات</h2>
-    <button class="themebtn" onclick="toggleTheme()" aria-label="فاتح / غامق"><span class="i-dark">🌙 غامق</span><span class="i-light">☀️ فاتح</span></button>
+    <div class="seg thm" style="display:inline-flex;gap:4px"><button data-t="light" onclick="setTheme('light')">☀️ فاتح</button><button data-t="dark" onclick="setTheme('dark')">🌙 غامق</button><button data-t="auto" onclick="setTheme('auto')">🌓 زي الموبايل</button></div>
   </div>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 14px">
     <div class="switch">
@@ -548,6 +553,23 @@ function toggleTheme(){var t=document.documentElement.dataset.theme==='light'?'d
     <textarea id="chText" rows="1" placeholder="اكتب رسالة…" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
     <button class="ch-send" onclick="NQChat.send()">➤</button>
   </div>
+</section>
+
+<section id="scrTodo" class="screen page">
+  <h2>✅ مهام اليوم <small id="tdDate" style="font-size:13px;opacity:.6;font-weight:400"></small></h2>
+  <div class="card" style="padding:12px">
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span id="tdProg">—</span><span id="tdPct"></span></div>
+    <div style="height:8px;border-radius:9px;background:var(--line);overflow:hidden"><div id="tdBar" style="height:100%;width:0;background:var(--grad,var(--pri));transition:width .3s"></div></div>
+  </div>
+  <h3 style="margin:14px 2px 6px;font-size:15px">📌 من السيستم</h3>
+  <div class="card" id="tdAuto"></div>
+  <h3 style="margin:14px 2px 6px;font-size:15px">📝 مهامي</h3>
+  <div class="card" style="padding:10px">
+    <div style="display:flex;gap:6px"><input id="tdText" placeholder="مهمة جديدة… مثلًا: أكلم عميل X بخصوص العرض" onkeydown="if(event.key==='Enter')NQTodo.add()" style="flex:1"><input id="tdTime" type="time" style="width:96px"><button class="btn sm-btn" onclick="NQTodo.add()">＋</button></div>
+    <div id="tdList" style="margin-top:8px"></div>
+  </div>
+  <div class="muted" style="font-size:12px;margin:8px 4px">المهام اللي ماخلصتش بتترحّل لبكرة لوحدها 🔁 — وبتبان على الموبايل واللاب.</div>
+  <button class="btn ghost" onclick="show('scrDial')">رجوع</button>
 </section>
 
 <section id="scrInbox" class="screen page">
@@ -742,6 +764,63 @@ function show(id) {
   document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("sel", b.dataset.s === id));
 }
 function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+/* ===== مهام اليوم (To-Do) ===== */
+const NQTodo = {
+  _it: null,
+  get items() { if (!this._it) this._it = store.get("nq_todo", { date: "", items: [] }); return this._it; },
+  set items(v) { this._it = v; },
+  async api(body) {
+    const c = NQOwner.creds(); if (!c) throw new Error("ادخل بحسابك الأول");
+    const r = await fetch(CONFIG.api + "/todo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, ...body }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || "السيرفر مش راد"); return j;
+  },
+  set(j) { this.items = { date: j.date, items: j.items || [] }; store.set("nq_todo", this.items); this.render(); },
+  open() { show("scrTodo"); this.render(); this.sync(); if (typeof NQInbox !== "undefined") NQInbox.poll().then(() => this.render()).catch(() => {}); },
+  async sync() { try { this.set(await this.api({ action: "list" })); } catch (e) { this.render(); } },
+  async add() {
+    const t = $("tdText").value.trim(); if (!t) { toast("اكتب المهمة"); return; }
+    try { this.set(await this.api({ action: "add", text: t, time: $("tdTime").value })); $("tdText").value = ""; $("tdTime").value = ""; $("tdText").focus(); }
+    catch (e) { toast("✖ " + e.message); }
+  },
+  async act(id, action) { try { this.set(await this.api({ action, id })); if (action === "toggle") { const x = this.items.items.find(y => y.id === id); if (x && x.done) toast("👏 برافو"); } } catch (e) { toast("✖ " + e.message); } },
+  auto() {
+    const d = (typeof NQInbox !== "undefined" && NQInbox.data) || {}, out = [];
+    const cb = (d.callbacks || []).length, fu = (d.followups || []).length, ld = (d.leads || []).length;
+    out.push({ t: "📞 ترجّع المكالمات الفايتة", n: cb, go: "NQInbox.open()" });
+    out.push({ t: "🔁 متابعات النهارده", n: fu, go: "NQInbox.open()" });
+    if (ld || d.leads) out.push({ t: "🆕 عملاء جداد مستنيين اتصالك", n: ld, go: "NQInbox.open()" });
+    try { const day = isoDay(new Date()), tg = NQTargets.all().filter(x => x.date === day); if (tg.length) out.push({ t: "🎯 تارجت النهارده", n: tg.filter(x => !x.done).length, of: tg.length, go: "NQTargets.open()" }); } catch (e) {}
+    try { const tr = (NQPerf.todoItems ? NQPerf.todoItems() : []); if (tr.length) out.push({ t: "🧠 خطة التدريب", n: tr.filter(x => !x.done).length, of: tr.length, go: "NQPerf.open()" }); } catch (e) {}
+    return out;
+  },
+  render() {
+    const it = this.items.date === isoDay(new Date()) ? this.items.items : [];
+    const au = this.auto(), auDone = au.filter(a => !a.n).length;
+    const done = it.filter(x => x.done).length + auDone, total = it.length + au.length;
+    if ($("tdDate")) $("tdDate").textContent = new Date().toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" });
+    const pct = total ? Math.round(done * 100 / total) : 0;
+    if ($("tdProg")) { $("tdProg").textContent = `خلّصت ${done} من ${total}`; $("tdPct").textContent = pct + "%"; $("tdBar").style.width = pct + "%"; }
+    if ($("tdAuto")) $("tdAuto").innerHTML = au.map(a => `<div class="logrow" style="cursor:pointer;align-items:center" onclick="${a.go}"><span style="font-size:20px">${a.n ? "⬜" : "✅"}</span><div class="info" style="flex:1;${a.n ? "" : "opacity:.55;text-decoration:line-through"}"><b>${a.t}</b><small>${a.n ? `فاضل ${a.n}${a.of ? " من " + a.of : ""}` : "خلصانة 👏"}</small></div><span style="opacity:.5">‹</span></div>`).join("");
+    if ($("tdList")) $("tdList").innerHTML = it.length ? it.map(x => `<div class="logrow" style="align-items:center"><button class="iconbtn" style="width:34px;height:34px;font-size:18px" onclick="NQTodo.act('${x.id}','toggle')">${x.done ? "✅" : "⬜"}</button>
+      <div class="info" style="flex:1;min-width:0;${x.done ? "opacity:.55;text-decoration:line-through" : ""}"><b style="white-space:normal">${esc(x.text)}</b><small>${x.time ? "⏰ " + esc(x.time) : ""}${x.carried ? " · 🔁 من امبارح" : ""}</small></div>
+      <button class="iconbtn" style="width:30px;height:30px;font-size:13px;opacity:.6" onclick="NQTodo.act('${x.id}','del')" title="امسح">✕</button></div>`).join("") : `<div class="muted" style="padding:10px 4px;font-size:13px">لسه مفيش مهام — اكتب أول مهمة فوق ✍️</div>`;
+    const left = it.filter(x => !x.done).length + au.filter(a => a.n).length;
+    const b = $("todoBadge"); if (b) { b.textContent = left || ""; b.style.display = left ? "" : "none"; }
+  },
+  remind() {   // تنبيه بمعاد المهمة
+    const now = new Date(), hm = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+    const seen = new Set(store.get("nq_todo_seen", []));
+    (this.items.date === isoDay(now) ? this.items.items : []).filter(x => !x.done && x.time && x.time <= hm && !seen.has(x.id)).forEach(x => {
+      seen.add(x.id); toast("⏰ " + x.text);
+      try { if (IS_APP && Android.notify) Android.notify(9000 + (parseInt(x.id, 16) % 900), "⏰ مهمة", x.text); } catch (e) {}
+    });
+    store.set("nq_todo_seen", [...seen].slice(-200));
+  }
+};
+setTimeout(() => { NQTodo.render(); NQTodo.sync(); }, 2500);
+document.addEventListener("DOMContentLoaded", () => { const p = document.documentElement.dataset.themePref || "light"; document.querySelectorAll(".thm button").forEach(b => b.classList.toggle("sel", b.dataset.t === p)); });
+setInterval(() => { NQTodo.remind(); NQTodo.render(); }, 30000);
+setInterval(() => { if (document.visibilityState === "visible") NQTodo.sync(); }, 300000);
 /* ===== بياناتي: التحويلة + رقم الشريحة + الجهاز والبورت ===== */
 const NQMe = {
   show() {

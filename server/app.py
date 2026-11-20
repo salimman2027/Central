@@ -1251,6 +1251,10 @@ OPS.CTX.update(dir=DATA_DIR, tz=TZ, trunk=TRUNK.split("/", 1)[1], query=query, s
 OPS.start()
 import targets as TGT  # noqa: E402
 app.include_router(TGT.router)
+import todo as TODO  # noqa: E402
+app.include_router(TODO.router)
+TODO.CTX.update(dir=DATA_DIR, tz=TZ, check_ext=lambda e, p: check_ext_password(e, p), scope=lambda: SCOPE.get(),
+                names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])})
 def _lookup_extra(number: str) -> dict:
     """بطاقة العميل: تارجت مفتوح + آخر ميعاد"""
     d, out = _digits(number), {}
