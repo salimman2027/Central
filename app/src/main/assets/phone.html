@@ -754,7 +754,7 @@ const NQMe = {
       o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;display:flex;align-items:flex-end;justify-content:center"; document.body.appendChild(o); }
     o.innerHTML = `<div style="background:var(--card,#fff);color:inherit;width:100%;max-width:440px;border-radius:18px 18px 0 0;padding:18px 18px 24px">
       <div style="font-weight:700;font-size:17px;margin-bottom:6px">📇 بياناتي${m.name ? " — " + m.name : ""}</div>
-      ${row("التحويلة", ext, true)}${row("رقم الشريحة (اللي بيظهر للعميل)", m.sim, true)}${row("الجهاز", dev)}
+      ${row("التحويلة", ext, true)}${row("رقم الشريحة (اللي بيظهر للعميل)", m.sim, true)}${row("الجهاز", dev)}${m.imei ? row("IMEI", m.imei, true) : ""}${m.imsi ? row("IMSI", m.imsi, true) : ""}
       ${m.device ? `<div style="margin-top:10px;font-size:13px;color:${m.deviceUp ? "#17803d" : "#b91c1c"}">${m.deviceUp ? "🟢 الجهاز متصل بالسنترال" : "🔴 الجهاز فاصل — اتصل من شريحتك لحد ما يرجع"}</div>` : ""}
       ${!m.sim ? `<div style="margin-top:10px;font-size:13px;opacity:.7">رقم الشريحة لسه مش متسجّل — المدير يضيفه من شاشة الموظفين</div>` : ""}
       <button class="btn" style="width:100%;margin-top:14px" onclick="document.getElementById('meSheet').remove()">تمام</button></div>`;

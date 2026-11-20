@@ -383,6 +383,10 @@ def config():
     for ext in sorted((extra | set(lines)) - have, key=lambda x: int(x) if x.isdigit() else 0):
         if ext.isdigit():
             reps.setdefault("reps", []).append({"id": int(ext), "name": over.get(ext) or ext, "team": ""})
+    try:   # IMEI / IMSI لكل تحويلة
+        sims = json.loads((DATA_DIR / "rep_sims.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        sims = {}
     so = sim_only()
     for ext in sorted(so - {str(r.get("id")) for r in reps.get("reps", [])}):
         if ext.isdigit():
@@ -390,6 +394,8 @@ def config():
     for r in reps.get("reps", []):
         if lines.get(str(r.get("id"))):
             r["line"] = lines[str(r.get("id"))]
+        if sims.get(str(r.get("id"))):
+            r["imei"], r["imsi"] = sims[str(r.get("id"))].get("imei", ""), sims[str(r.get("id"))].get("imsi", "")
         if str(r.get("id")) in so:
             r["simOnly"] = True
     try:   # الفرق وربطها بالتحويلات من شاشة الإعدادات
@@ -1237,6 +1243,7 @@ OPS.CTX.update(dir=DATA_DIR, tz=TZ, trunk=TRUNK.split("/", 1)[1], query=query, s
                names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},
                reps=lambda: unscoped(config).get("reps", []),
                lines=lambda: {str(r.get("id")): r.get("line", "") for r in unscoped(config).get("reps", []) if r.get("line")},
+               sims=lambda: {str(r.get("id")): {"imei": r.get("imei", ""), "imsi": r.get("imsi", "")} for r in unscoped(config).get("reps", []) if r.get("imei") or r.get("imsi")},
                owner_of=lambda n: OWN.owner_of(n), check_ext=lambda e, p: check_ext_password(e, p),
                appointments=lambda: APPT._load(), training=lambda: TRAIN.load_all(),
                crm_get=lambda path, params: APPT._items(APPT._get_json(path, params)), crm_on=APPT.crm_configured,

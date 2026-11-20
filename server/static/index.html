@@ -2331,7 +2331,7 @@ function crmAddRow(ext,val,focusNew,sim){
   sim=sim||!!(REPS.find(r=>String(r.id)===String(ext))||{}).simOnly; if(sim)tr.dataset.sim='1';
   const line=(REPS.find(r=>String(r.id)===String(ext))||{}).line||'';
   tr.innerHTML=`<td><input class="crm-e" inputmode="numeric" value="${esc(ext||'')}" placeholder="مثلًا 108" ${isNew&&!sim?'':'readonly'}>${sim?'<div class="sim-tag">📱 شريحة بس — الكود للسيستم</div>':''}</td>
-    <td><input class="crm-line" inputmode="tel" dir="ltr" value="${esc(line)}" placeholder="05xxxxxxxx"></td>
+    <td><input class="crm-line" inputmode="tel" dir="ltr" value="${esc(line)}" placeholder="05xxxxxxxx">${(()=>{const r=REPS.find(r=>String(r.id)===String(ext))||{};return r.imei||r.imsi?`<div class="muted ltr" dir="ltr" style="font-size:11px;line-height:1.5;margin-top:3px">IMEI ${esc(r.imei||'—')}<br>IMSI ${esc(r.imsi||'—')}</div>`:''})()}</td>
     <td>${crmEmpField(val)}<div class="crm-n muted">${crmRepName(ext)?'عندنا دلوقتي: '+esc(crmRepName(ext)):''}</div></td>
     <td><select class="crm-t" onchange="orgTeamChanged(this)">${crmTeamOpts((TM.reps.find(r=>r.ext===String(ext))||{}).team||'')}</select></td>
     <td><input class="crm-u" dir="ltr" autocomplete="off" value="${esc((LOGINS[String(ext)]||{}).username||'')}" placeholder="مثلًا hadeer"></td>

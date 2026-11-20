@@ -325,6 +325,16 @@ def save_crm_settings(c: dict) -> dict:
             hf.write_text(json.dumps(sorted(hid)), encoding="utf-8")
         except Exception:  # noqa: BLE001
             pass
+    if isinstance(c.get("sims"), dict):         # بيانات الشريحة لكل تحويلة: IMEI / IMSI (من صفحة Mobile Information في الجهاز)
+        f = CTX["dir"] / "rep_sims.json"
+        try:
+            old = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            old = {}
+        for k, v in c["sims"].items():
+            if str(k).isdigit() and isinstance(v, dict):
+                old[str(k)] = {x: re.sub(r"\D", "", str(v.get(x) or ""))[:20] for x in ("imei", "imsi")}
+        f.write_text(json.dumps(old, ensure_ascii=False, indent=1), encoding="utf-8")
     if isinstance(c.get("simOnly"), list):      # موظفين بالشريحة بس (كود من غير تحويلة سنترال)
         (CTX["dir"] / "sim_only.json").write_text(json.dumps(sorted({str(x) for x in c["simOnly"] if str(x).isdigit()}, key=int)), encoding="utf-8")
     if isinstance(c.get("removed"), list):      # التحويلات اللي اتمسحت من الجدول متظهرش تاني
@@ -339,7 +349,7 @@ def save_crm_settings(c: dict) -> dict:
         f.write_text(json.dumps(sorted(hid)), encoding="utf-8")
     if cur["url"] and not cur["url"].startswith("https://"):
         raise ValueError("رابط الـ CRM لازم يبدأ بـ https://")
-    cur.pop("repNames", None); cur.pop("removed", None); cur.pop("lines", None); cur.pop("exts", None); cur.pop("simOnly", None)
+    cur.pop("repNames", None); cur.pop("removed", None); cur.pop("lines", None); cur.pop("exts", None); cur.pop("simOnly", None); cur.pop("sims", None)
     (CTX["dir"] / "crm.json").write_text(json.dumps(cur, ensure_ascii=False, indent=1), encoding="utf-8")
     return cur
 
