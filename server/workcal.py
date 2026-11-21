@@ -110,6 +110,29 @@ def auto_holidays(country: str, years: list) -> list:
     return out
 
 
+# ------------------------------------------------------------------ تنبيه الأجازات (للكل — قراية بس)
+@router.get("/api/calendar/upcoming")
+def upcoming(days: int = 45):
+    """الأجازات الجاية (اللي فيها أيام شغل) لكل الدول المختارة + أيام الشغل الباقية في الشهر"""
+    c, t = load(), today()
+    end = t + dt.timedelta(days=max(1, min(days, 120)))
+    out = []
+    for h in c["holidays"]:
+        a, z = dt.date.fromisoformat(h["from"]), dt.date.fromisoformat(h.get("to") or h["from"])
+        if z < t or a > end:
+            continue
+        lost = sum(1 for i in range((z - a).days + 1) if (a + dt.timedelta(days=i)).weekday() not in c["weekend"])
+        out.append({"name": h.get("name") or "أجازة", "from": h["from"], "to": h.get("to") or h["from"],
+                    "country": h.get("country") or "*", "lost": lost, "estimated": bool(h.get("estimated")),
+                    "inDays": max(0, (a - t).days), "now": a <= t <= z})
+    out.sort(key=lambda h: (h["from"], h["country"]))
+    me = (t.replace(day=28) + dt.timedelta(days=4)).replace(day=1) - dt.timedelta(days=1)
+    by = {k: {"left": workdays(t, me, k), "month": workdays(t.replace(day=1), me, k)} for k in (c["countries"] or [None]) if k}
+    return {"today": t.isoformat(), "countries": c["countries"], "countryNames": COUNTRIES,
+            "todayOff": {k: (holiday_on(t, k) or ("أجازة أسبوعية" if t.weekday() in c["weekend"] else "")) for k in c["countries"]},
+            "holidays": out, "workdays": by, "weekend": c["weekend"]}
+
+
 # ------------------------------------------------------------------ API (الأدمن)
 @router.get("/api/workcal")
 def get_cal():

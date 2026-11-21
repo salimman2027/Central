@@ -549,6 +549,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <span class="sp" style="flex:1"></span>
     <button class="btn o" onclick="tvOpen()">📺 شاشة التلفزيون</button>
   </div>
+  <div id="holBanner" style="display:none"></div>
 
   <div class="card lv-card"><div class="lv-h"><h3 style="margin:0">🔴 مباشر الآن</h3><span class="muted" id="lvSum"></span>
     <span class="sp" style="flex:1"></span><span class="muted" style="font-size:12px">🎧 اسمع · 🗣️ وشوش للموظف · 📢 ادخل المكالمة</span></div>
@@ -694,6 +695,9 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="calSave()">💾 حفظ</button>
     <button class="btn o" onclick="crOpen()">📊 تقرير خطة الأجازات وأيام العمل</button><span id="calMsg"></span></div>
 </div></div>
+<style>.hol-card{border-inline-start:4px solid #f59e0b}.hol-row{display:flex;gap:10px;overflow-x:auto;margin-top:10px;padding-bottom:4px}
+.hol-i{min-width:190px;border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:8px 10px;background:var(--card,#fff)}
+.hol-i.soon{border-color:#f59e0b;background:rgba(245,158,11,.08)}.hol-i.now{border-color:#ef4444;background:rgba(239,68,68,.08)}</style>
 <style>#crTbl td,#crTbl th{padding:6px 8px;text-align:center;vertical-align:top}#crTbl td.nm{text-align:right;font-size:12px;line-height:1.7}
 #crTbl tfoot td{font-weight:700;background:rgba(16,185,129,.1)}#crKpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}
 #crKpi div{border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:8px 10px}#crKpi b{display:block;font-size:22px}
@@ -1132,6 +1136,26 @@ function rangeAll(){ // أوسع مدى مطلوب في كل التبويبات
   const w=[...['dTo','lTo','rTo'].map(i=>$(i).value)].sort().pop();
   return [v,w];
 }
+// ---------- تنبيه الأجازات في الصفحة الرئيسية
+async function holBanner(){ const box=$('holBanner'); if(!box)return;
+  let d; try{const r=await fetch(API_BASE+'/calendar/upcoming?days=45',{cache:'no-store'}); if(!r.ok)return; d=await r.json();}catch(e){return}
+  const cn=k=>k==='*'?'🏢 الشركة':(d.countryNames[k]||k), dm=s=>{const[,m,x]=s.split('-');return `${+x}/${+m}`};
+  // نجمّع نفس الأجازة لو جاية في أكتر من دولة
+  const g=[]; d.holidays.forEach(h=>{const x=g.find(y=>y.name===h.name&&y.from===h.from&&y.to===h.to); x?x.c.push(h.country):g.push({...h,c:[h.country]})});
+  const off=Object.entries(d.todayOff||{}).filter(([k,v])=>v&&v!=='أجازة أسبوعية');
+  const chip=h=>{const when=h.now?'<b style="color:var(--red)">النهارده</b>':h.inDays===1?'<b style="color:#d97706">بكرة</b>':`بعد <b>${h.inDays}</b> يوم`;
+    return `<div class="hol-i ${h.now?'now':h.inDays<=7?'soon':''}"><div><b>${esc(h.name)}</b>${h.estimated?' <span title="تاريخ تقريبي بالرؤية">🌙</span>':''}</div>
+      <div class="muted" style="font-size:12px">${h.c.map(cn).join(' · ')} — ${dm(h.from)}${h.to!==h.from?' ← '+dm(h.to):''} · ${h.lost?h.lost+' يوم شغل':'جت في الأجازة الأسبوعية'}</div><div style="font-size:12.5px;margin-top:2px">⏳ ${when}</div></div>`;};
+  const wd=Object.entries(d.workdays||{}).map(([k,v])=>`${cn(k)}: <b>${v.left}</b> يوم شغل باقي من ${v.month}`).join(' &nbsp;·&nbsp; ');
+  if(!g.length&&!off.length&&!wd){box.style.display='none';return}
+  box.style.display=''; box.className='card hol-card';
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h3 style="margin:0">🏖️ الأجازات الجاية</h3>
+    <span class="muted" style="font-size:12.5px">📆 الشهر ده — ${wd}</span>
+    ${ROLE==='admin'?`<span><button class="btn o sm" onclick="calOpen().then(()=>crOpen())">📊 خطة الأجازات</button> <button class="btn o sm" onclick="calOpen()">⚙️ التقويم</button></span>`:''}</div>
+    ${off.length?`<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(239,68,68,.1)">🔴 النهارده أجازة رسمية: ${off.map(([k,v])=>`<b>${esc(v)}</b> (${cn(k)})`).join(' · ')}</div>`:''}
+    <div class="hol-row">${g.slice(0,8).map(chip).join('')||'<div class="muted">مفيش أجازات رسمية في الـ 45 يوم الجايين'+(ROLE==='admin'?' — لو لسه ماحمّلتش الأجازات افتح ⚙️ التقويم':'')+'</div>'}</div>`;
+}
+setTimeout(holBanner,1500); setInterval(holBanner,1800000);
 async function refresh(){
   try{ const [f,t]=rangeAll(); await loadCalls(f,t); renderAll(); renderLog(); renderReport(); }
   catch(e){ $('kpis').innerHTML=`<div class="kpi red"><div class="l">تعذّر تحميل المكالمات من السنترال</div><div class="s">${e.message}</div></div>`; }
