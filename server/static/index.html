@@ -1138,7 +1138,7 @@ function rangeAll(){ // أوسع مدى مطلوب في كل التبويبات
 }
 // ---------- تنبيه الأجازات في الصفحة الرئيسية
 async function holBanner(){ const box=$('holBanner'); if(!box)return;
-  let d; try{const r=await fetch(API_BASE+'/calendar/upcoming?days=45',{cache:'no-store'}); if(!r.ok)return; d=await r.json();}catch(e){return}
+  let d; try{const r=await fetch(API_BASE+'/calendar/upcoming?days=120',{cache:'no-store'}); if(!r.ok)return; d=await r.json();}catch(e){return}
   const cn=k=>k==='*'?'🏢 الشركة':(d.countryNames[k]||k), dm=s=>{const[,m,x]=s.split('-');return `${+x}/${+m}`};
   // نجمّع نفس الأجازة لو جاية في أكتر من دولة
   const g=[]; d.holidays.forEach(h=>{const x=g.find(y=>y.name===h.name&&y.from===h.from&&y.to===h.to); x?x.c.push(h.country):g.push({...h,c:[h.country]})});
@@ -1153,7 +1153,7 @@ async function holBanner(){ const box=$('holBanner'); if(!box)return;
     <span class="muted" style="font-size:12.5px">📆 الشهر ده — ${wd}</span>
     ${ROLE==='admin'?`<span><button class="btn o sm" onclick="calOpen().then(()=>crOpen())">📊 خطة الأجازات</button> <button class="btn o sm" onclick="calOpen()">⚙️ التقويم</button></span>`:''}</div>
     ${off.length?`<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(239,68,68,.1)">🔴 النهارده أجازة رسمية: ${off.map(([k,v])=>`<b>${esc(v)}</b> (${cn(k)})`).join(' · ')}</div>`:''}
-    <div class="hol-row">${g.slice(0,8).map(chip).join('')||'<div class="muted">مفيش أجازات رسمية في الـ 45 يوم الجايين'+(ROLE==='admin'?' — لو لسه ماحمّلتش الأجازات افتح ⚙️ التقويم':'')+'</div>'}</div>`;
+    <div class="hol-row">${g.slice(0,10).map(chip).join('')||'<div class="muted">مفيش أجازات رسمية في الـ 4 شهور الجايين'+(ROLE==='admin'?' — لو لسه ماحمّلتش الأجازات افتح ⚙️ التقويم':'')+'</div>'}</div>`;
 }
 setTimeout(holBanner,1500); setInterval(holBanner,1800000);
 async function refresh(){

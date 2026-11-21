@@ -14,6 +14,8 @@ LOCK = threading.Lock()
 CTX = {"dir": Path("/var/lib/nq-calls"), "tz": dt.timezone(dt.timedelta(hours=3))}
 COUNTRIES = {"SA": "🇸🇦 السعودية", "EG": "🇪🇬 مصر", "AE": "🇦🇪 الإمارات", "KW": "🇰🇼 الكويت", "QA": "🇶🇦 قطر",
              "BH": "🇧🇭 البحرين", "OM": "🇴🇲 عمان", "JO": "🇯🇴 الأردن"}
+# أجازات بتطلع في المكتبة بس مش أجازة رسمية للقطاع الخاص (أو لفئة بس) — مابنحمّلهاش
+SKIP = {"EG": ["رأس السنة الميلادية", "الفصح"]}
 DAYS = ["الاتنين", "التلات", "الأربع", "الخميس", "الجمعة", "السبت", "الحد"]   # Python weekday 0..6
 DEFAULT = {"countries": ["SA", "EG"], "weekend": [4, 5],          # الجمعة والسبت
            "holidays": [], "report": {"days": [6, 0, 1, 2, 3], "time": "21:00", "skipHolidays": True, "country": "SA"}}
@@ -103,6 +105,8 @@ def auto_holidays(country: str, years: list) -> list:
         h = holidays.country_holidays(country, years=years)
     out = []
     for d, name in sorted(h.items()):
+        if any(x in name for x in SKIP.get(country, [])):
+            continue
         est = "تقدير" in name or "estimated" in name.lower()
         name = re.sub(r"\(تقدير[^)]*\)\s*|\(estimated\)\s*", "", name).strip()
         out.append({"date": d.isoformat(), "from": d.isoformat(), "to": d.isoformat(), "name": name, "country": country,

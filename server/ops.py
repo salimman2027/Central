@@ -749,14 +749,16 @@ def tick():
             STATE["calDay"] = day
             c = workcal.load()
             for ctry in c["countries"]:
-                if not any(h.get("source") == "auto" and h.get("country") == ctry and h["from"][:4] == str(t.year + (t.month == 12)) for h in c["holidays"]) and \
-                        (CTX["dir"] / "workcal.json").exists():
+                # السنة الناقصة بس (السنة دي، وفي ديسمبر اللي بعدها) — من غير مانمسح تعديلات الأدمن
+                miss = [y for y in (t.year, t.year + 1) if (y == t.year or t.month == 12) and not any(
+                    h.get("source") == "auto" and h.get("country") == ctry and h["from"][:4] == str(y) for h in c["holidays"])]
+                if miss and (CTX["dir"] / "workcal.json").exists():
                     try:
                         workcal.CTX.update(dir=CTX["dir"], tz=CTX["tz"])
-                        new = workcal.auto_holidays(ctry, [t.year, t.year + 1])
+                        new = workcal.auto_holidays(ctry, miss)
                         with workcal.LOCK:
                             c = workcal.load()
-                            keep = [h for h in c["holidays"] if not (h.get("source") == "auto" and h.get("country") == ctry and int(h["from"][:4]) in (t.year, t.year + 1))]
+                            keep = [h for h in c["holidays"] if not (h.get("source") == "auto" and h.get("country") == ctry and int(h["from"][:4]) in miss)]
                             c["holidays"] = sorted(keep + new, key=lambda x: x["from"])
                             workcal._save(c)
                     except Exception as e:  # noqa: BLE001
