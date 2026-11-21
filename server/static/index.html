@@ -2079,18 +2079,22 @@ function spy(ext,mode){
 function toast(t){let d=$('nqToast');if(!d){d=document.createElement('div');d.id='nqToast';d.style.cssText='position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#0f182b;color:#fff;padding:10px 18px;border-radius:12px;z-index:300;font-size:14px';document.body.appendChild(d)}d.textContent=t;d.style.display='';clearTimeout(d._t);d._t=setTimeout(()=>d.style.display='none',3000)}
 
 /* ===================== الفائتة والمتابعات والعملاء الجدد ===================== */
+function cbDoneBtn(kind,key){return ROLE==='rep'||!key?'<td></td>':`<td><button class="btn o sm" title="خلصت — اقفلها" onclick="cbDone('${kind}','${esc(key)}',this)">✓ خلصت</button></td>`}
+async function cbDone(kind,key,btn){btn.disabled=true;
+  try{const r=await fetch(API_BASE+'/inbox/done',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,key})});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.status);
+    btn.closest('tr').remove(); loadCb();}catch(e){btn.disabled=false;alert('✖ '+e.message)}}
 async function loadCb(){
   try{const j=await (await fetch(`${API_BASE}/callbacks?days=${$('cbDays').value}`,{cache:'no-store'})).json();
     const cb=j.callbacks||[], fu=j.followups||[], ld=j.leads||[];
     $('cbCount').textContent=(cb.length+fu.length)||''; $('cbN1').textContent=cb.length||''; $('cbN2').textContent=fu.length||''; $('cbN3').textContent=ld.length||'';
-    $('cbList').innerHTML=cb.length?`<table class="cb-t"><tr><th>العميل</th><th>اتصل</th><th>أول مرة</th><th>مستني من</th><th>عند مين</th><th>حاولوا يكلموه</th></tr>${cb.map(c=>`<tr class="${c.waitMin>60?'late':''}">
+    $('cbList').innerHTML=cb.length?`<table class="cb-t"><tr><th>العميل</th><th>اتصل</th><th>أول مرة</th><th>مستني من</th><th>عند مين</th><th>حاولوا يكلموه</th><th></th></tr>${cb.map(c=>`<tr class="${c.waitMin>60?'late':''}">
       <td><b>${esc(c.customer||'')}</b> <span class="ltr">${esc(c.number)}</span></td><td>${c.missed} مرة</td><td>${new Date(c.first).toLocaleString('ar-EG',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</td>
       <td class="${c.waitMin>60?'wait-bad':c.waitMin>15?'wait-mid':''}">${waitTxt(c.waitMin)}</td><td>${esc(c.name)} <span class="muted">(${c.ext})${c.owner?' · صاحب العميل':''}</span></td>
-      <td>${c.tries?`${c.tries} مرة — آخر مرة ${agoTxt(c.lastTry)} ومردش`:'<span class="wait-bad">ولا مرة</span>'}</td></tr>`).join('')}</table>`:'<div class="muted">👏 مفيش عميل مستني رد</div>';
-    $('fuList').innerHTML=fu.length?`<table class="cb-t"><tr><th>العميل</th><th>ميعاد المتابعة</th><th>الموظف</th><th>الملخص</th></tr>${fu.map(f=>`<tr class="${f.late>0?'late':''}">
-      <td><b>${esc(f.customer||'')}</b> <span class="ltr">${esc(f.number)}</span></td><td class="${f.late>0?'wait-bad':''}">${f.due}${f.late>0?` (متأخر ${f.late} يوم)`:' (النهارده)'}</td><td>${esc(f.name)} <span class="muted">(${f.ext})</span></td><td style="font-size:13px">${esc(f.summary)}</td></tr>`).join('')}</table>`:'<div class="muted">مفيش متابعات متأخرة</div>';
-    $('ldList').innerHTML=ld.length?`<table class="cb-t"><tr><th>العميل</th><th>دخل</th><th>عند مين</th><th>اتكلّم؟</th></tr>${ld.map(x=>`<tr class="${!x.called&&x.ageMin>30?'late':''}">
-      <td><b>${esc(x.name)}</b> <span class="ltr">${esc(x.phone)}</span></td><td>${agoTxt(x.at)}</td><td>${x.ext?esc(x.repName||x.ext):'<span class="wait-mid">مش متوزّع</span>'}</td><td>${x.called?'✅':'<span class="wait-bad">لسه</span>'}</td></tr>`).join('')}</table>`:'<div class="muted">مفيش عملاء جدد — أو الربط مع الـ CRM مش متظبط</div>';
+      <td>${c.tries?`${c.tries} مرة — آخر مرة ${agoTxt(c.lastTry)} ومردش`:'<span class="wait-bad">ولا مرة</span>'}</td>${cbDoneBtn('cb',c.digits)}</tr>`).join('')}</table>`:'<div class="muted">👏 مفيش عميل مستني رد</div>';
+    $('fuList').innerHTML=fu.length?`<table class="cb-t"><tr><th>العميل</th><th>ميعاد المتابعة</th><th>الموظف</th><th>الملخص</th><th></th></tr>${fu.map(f=>`<tr class="${f.late>0?'late':''}">
+      <td><b>${esc(f.customer||'')}</b> <span class="ltr">${esc(f.number)}</span></td><td class="${f.late>0?'wait-bad':''}">${f.due}${f.late>0?` (متأخر ${f.late} يوم)`:' (النهارده)'}</td><td>${esc(f.name)} <span class="muted">(${f.ext})</span></td><td style="font-size:13px">${esc(f.summary)}</td>${cbDoneBtn('fu',f.key)}</tr>`).join('')}</table>`:'<div class="muted">مفيش متابعات متأخرة</div>';
+    $('ldList').innerHTML=ld.length?`<table class="cb-t"><tr><th>العميل</th><th>دخل</th><th>عند مين</th><th>اتكلّم؟</th><th></th></tr>${ld.map(x=>`<tr class="${!x.called&&x.ageMin>30?'late':''}">
+      <td><b>${esc(x.name)}</b> <span class="ltr">${esc(x.phone)}</span></td><td>${agoTxt(x.at)}</td><td>${x.ext?esc(x.repName||x.ext):'<span class="wait-mid">مش متوزّع</span>'}</td><td>${x.called?'✅':'<span class="wait-bad">لسه</span>'}</td>${cbDoneBtn('ld',String(x.phone||'').replace(/\D/g,''))}</tr>`).join('')}</table>`:'<div class="muted">مفيش عملاء جدد — أو الربط مع الـ CRM مش متظبط</div>';
   }catch(e){$('cbList').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
 }
 setTimeout(loadCb,2500); setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('.modal.show'))loadCb()},60000);

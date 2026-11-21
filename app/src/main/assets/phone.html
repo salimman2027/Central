@@ -319,6 +319,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
     body.web .screen { background:rgba(8,13,26,.92) !important; border:1px solid var(--line); box-shadow:0 30px 80px -20px rgba(0,0,0,.9),0 0 0 1px rgba(25,230,193,.08); } }
 
   /* ---------- وضع فاتح ---------- */
+  .mini.done { background:var(--card); color:#16a34a; border:1.5px solid #16a34a; font-weight:700; margin-inline-end:6px; }
   .themebtn { padding:8px 12px; border-radius:99px; border:1px solid var(--line); background:var(--card); color:var(--fg); font-size:13px; }
   .i-light { display:none; } html[data-theme=light] .i-dark { display:none; } html[data-theme=light] .i-light { display:inline; }
   html[data-theme=light] { --bg:#eef3f8; --card:rgba(255,255,255,.8); --fg:#0c1626; --muted:#5b6b80; --line:rgba(20,50,90,.12); --pri:#0aa58c; --ok:#11a865; --grad:linear-gradient(135deg,#0aa58c,#2b7de0); }
@@ -1664,23 +1665,35 @@ const NQInbox = {
     const wait = m => m < 60 ? `${m} دقيقة` : m < 1440 ? `${Math.floor(m / 60)} ساعة` : `${Math.floor(m / 1440)} يوم`;
     box.innerHTML = `<b>📞 اتصلوا بيك ومحدش رد (${cb.length}) — رجّع الاتصال</b>` + cb.map(c => `<div class="logrow"><div class="info" style="flex:1;min-width:0"><b>${esc(c.customer || c.number)}</b>
       <small class="${c.waitMin > 60 ? "ib-late" : ""}">${c.customer ? `<span class="n">${esc(c.number)}</span> · ` : ""}اتصل ${c.missed} مرة · مستني من ${wait(c.waitMin)}${c.tries ? ` · حاولت ${c.tries} مرة ومردش` : ""}</small></div>
-      <button class="mini wa" onclick="NQWA.open('${esc(c.number)}','${esc(c.customer || "").replace(/'/g, "")}')">💬</button><button class="mini call" onclick="NQInbox.call('${esc(c.number)}','${esc(c.customer || "").replace(/'/g, "")}')">📞</button></div>`).join("");
+      <button class="mini done" title="خلصت — اقفلها" onclick="NQInbox.done('cb','${esc(c.digits)}',this)">✓</button><button class="mini wa" onclick="NQWA.open('${esc(c.number)}','${esc(c.customer || "").replace(/'/g, "")}')">💬</button><button class="mini call" onclick="NQInbox.call('${esc(c.number)}','${esc(c.customer || "").replace(/'/g, "")}')">📞</button></div>`).join("");
   },
   renderList() {
     const { cb, fu, ld } = this.items();
-    const row = (title, sub, num, late) => `<div class="logrow"><div class="info" style="flex:1;min-width:0"><b>${esc(title)}</b><small class="${late ? "ib-late" : ""}">${sub}</small></div>
-      <button class="mini wa" onclick="NQWA.open('${esc(num)}','${esc(title).replace(/'/g, "")}')">💬</button><button class="mini call" onclick="NQInbox.call('${esc(num)}','${esc(title).replace(/'/g, "")}')">📞</button></div>`;
+    const row = (title, sub, num, late, kind, key) => `<div class="logrow"><div class="info" style="flex:1;min-width:0"><b>${esc(title)}</b><small class="${late ? "ib-late" : ""}">${sub}</small></div>
+      <button class="mini done" title="خلصت — اقفلها" onclick="NQInbox.done('${kind}','${esc(key)}',this)">✓</button><button class="mini wa" onclick="NQWA.open('${esc(num)}','${esc(title).replace(/'/g, "")}')">💬</button><button class="mini call" onclick="NQInbox.call('${esc(num)}','${esc(title).replace(/'/g, "")}')">📞</button></div>`;
     const wait = m => m < 60 ? `${m} دقيقة` : m < 1440 ? `${Math.floor(m / 60)} ساعة` : `${Math.floor(m / 1440)} يوم`;
     let h = "";
     h += `<div class="card"><b>📞 عملاء اتصلوا ومحدش رد (${cb.length})</b><div class="ib-h">رد عليهم بسرعة — بيختفوا أول ما حد يكلمهم ويردوا</div>` +
-      (cb.length ? cb.map(c => row(c.customer || c.number, `${c.customer ? `<span class="n">${esc(c.number)}</span> · ` : ""}اتصل ${c.missed} مرة · مستني من ${wait(c.waitMin)}${c.tries ? ` · حاولت ${c.tries} مرة` : ""}`, c.number, c.waitMin > 60)).join("") : `<div class="ib-h">👏 مفيش</div>`) + `</div>`;
+      (cb.length ? cb.map(c => row(c.customer || c.number, `${c.customer ? `<span class="n">${esc(c.number)}</span> · ` : ""}اتصل ${c.missed} مرة · مستني من ${wait(c.waitMin)}${c.tries ? ` · حاولت ${c.tries} مرة` : ""}`, c.number, c.waitMin > 60, "cb", c.digits)).join("") : `<div class="ib-h">👏 مفيش</div>`) + `</div>`;
     h += `<div class="card"><b>🔔 متابعات ميعادها جه (${fu.length})</b>` +
-      (fu.length ? fu.map(f => row(f.customer || f.number, `${f.late > 0 ? `متأخرة ${f.late} يوم` : "النهارده"}${f.summary ? " · " + esc(f.summary.slice(0, 80)) : ""}`, f.number, f.late > 0)).join("") : `<div class="ib-h">مفيش</div>`) + `</div>`;
+      (fu.length ? fu.map(f => row(f.customer || f.number, `${f.late > 0 ? `متأخرة ${f.late} يوم` : "النهارده"}${f.summary ? " · " + esc(f.summary.slice(0, 80)) : ""}`, f.number, f.late > 0, "fu", f.key)).join("") : `<div class="ib-h">مفيش</div>`) + `</div>`;
     h += `<div class="card"><b>🆕 عملاء جدد ليك في الـ CRM (${ld.length})</b><div class="ib-h">اللي بيتكلّم في أول 5 دقايق نسبة إنه يقفل أعلى بكتير</div>` +
-      (ld.length ? ld.map(x => row(x.name || x.phone, `<span class="n">${esc(x.phone)}</span> · دخل من ${wait(x.ageMin)}`, x.phone, x.ageMin > 30)).join("") : `<div class="ib-h">مفيش</div>`) + `</div>`;
+      (ld.length ? ld.map(x => row(x.name || x.phone, `<span class="n">${esc(x.phone)}</span> · دخل من ${wait(x.ageMin)}`, x.phone, x.ageMin > 30, "ld", String(x.phone || "").replace(/\D/g, ""))).join("") : `<div class="ib-h">مفيش</div>`) + `</div>`;
     $("ibBody").innerHTML = h;
   },
   call(num, name) { show("scrDial"); $("dialNum").textContent = num; window._pickedName = name || ""; NQPhone.call(num); },
+  async done(kind, key, btn) {   // قفل مهمة يدوي — بتختفي من الموبايل واللوحة
+    const c = NQOwner.creds(); if (!c || !key) return;
+    const d = this.data || {}, list = { cb: "callbacks", fu: "followups", ld: "leads" }[kind];
+    const keep = x => kind === "cb" ? x.digits !== key : kind === "fu" ? x.key !== key : String(x.phone || "").replace(/\D/g, "") !== key;
+    const before = (d[list] || []).slice();
+    d[list] = before.filter(keep); this.data = d; this.renderList(); this.missed(); try { NQTodo.render(); } catch (e) {}
+    try {
+      const r = await fetch(CONFIG.api + "/inbox/done", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, kind, key }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "السيرفر مش راد");
+      toast("✓ اتقفلت");
+    } catch (e) { d[list] = before; this.renderList(); this.missed(); toast("✖ " + e.message); }
+  },
   notify() {
     const { cb, fu, ld } = this.items(); const seen = new Set(store.get("nq_ib_seen", [])); const fresh = [];
     cb.forEach(c => { const k = "cb" + c.digits + c.first; if (!seen.has(k)) { seen.add(k); fresh.push(["📞 عميل اتصل بيك ومحدش رد", `${c.customer || c.number} — اتصل ${c.missed} مرة`]); } });

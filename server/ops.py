@@ -275,6 +275,31 @@ def lines_today() -> dict:
 
 
 # ------------------------------------------------------------------ المكالمات الفائتة اللي محتاجة رد
+# ------------------------------------------------------------------ قفل مهمة يدوي (من "المطلوب مني")
+DONE_LOCK = threading.Lock()
+
+
+def done_map() -> dict:
+    return _jload("inbox_done.json", {"cb": {}, "fu": {}, "ld": {}})
+
+
+def mark_done(kind: str, key: str, ext: str = "", undo: bool = False):
+    """cb: الرقم → بيختفي لحد ما يتصل تاني | fu: الرقم|الميعاد | ld: الرقم"""
+    if kind not in ("cb", "fu", "ld") or not key:
+        raise HTTPException(400, "مهمة غلط")
+    with DONE_LOCK:
+        d = done_map()
+        d.setdefault(kind, {})
+        if undo:
+            d[kind].pop(key, None)
+        else:
+            d[kind][key] = {"at": dt.datetime.now(dt.timezone.utc).isoformat(), "ext": ext}
+        cut = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=60)).isoformat()
+        for k in d:
+            d[k] = {a: b for a, b in d[k].items() if b.get("at", "") >= cut}
+        (CTX["dir"] / "inbox_done.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
 def callbacks(days: int | None = None) -> list:
     days = days or int(settings()["callbackDays"])
     d2 = now().date()
@@ -286,12 +311,19 @@ def callbacks(days: int | None = None) -> list:
             continue
         by_num.setdefault(d, []).append(c)
     names = CTX["names"]()
+    done = done_map().get("cb", {})
     out = []
     for d, cs in by_num.items():
         last_ok = max((c["time"] for c in cs if c["status"] == "تم الرد"), default="")
         missed = [c for c in cs if c["dir"] == "in" and c["status"] != "تم الرد" and c["time"] > last_ok]
         if not missed:
             continue
+        if d in done:   # اتقفلت يدوي — بترجع بس لو اتصل تاني بعد القفل
+            try:
+                if _ts(missed[-1]["time"]) <= _ts(done[d]["at"]):
+                    continue
+            except (KeyError, ValueError):
+                continue
         first, last = missed[0], missed[-1]
         tries = [c for c in cs if c["dir"] == "out" and c["time"] > first["time"]]
         own = CTX["owner_of"](last.get("number")) or {}
@@ -315,6 +347,7 @@ def followups(ext: str | None = None) -> list:
     for c in calls:
         later.setdefault(digits(c.get("number")), []).append(c["time"])
     names = CTX["names"]()
+    done_fu = done_map().get("fu", {})
     seen, out = set(), []
     for n in sorted(notes, key=lambda x: x.get("started") or "", reverse=True):
         fu = str(n.get("followUp") or "")[:10]
@@ -325,7 +358,7 @@ def followups(ext: str | None = None) -> list:
             continue
         seen.add(d)
         due = dt.date.fromisoformat(fu)
-        if due > today:
+        if due > today or f"{d}|{fu}" in done_fu:
             continue
         try:   # اتكلّم بعد الملاحظة بـ 10 دقايق؟ يبقى المتابعة اتعملت
             st = _ts(n["started"]) + dt.timedelta(minutes=10)
@@ -333,7 +366,7 @@ def followups(ext: str | None = None) -> list:
                 continue
         except (KeyError, ValueError):
             pass
-        out.append({"number": n.get("number"), "customer": n.get("customer") or "", "due": fu,
+        out.append({"number": n.get("number"), "customer": n.get("customer") or "", "due": fu, "key": f"{d}|{fu}",
                     "late": (today - due).days, "summary": (n.get("summary") or "")[:240],
                     "ext": str(n.get("ext")), "name": names.get(str(n.get("ext")), "")})
     out.sort(key=lambda x: x["due"])
@@ -380,9 +413,10 @@ def leads(ext: str | None = None, days=3) -> list:
     cut = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
     today = now().date()
     called = {digits(c.get("number")) for c in calls_c(today - dt.timedelta(days=days), today)}
+    done_ld = done_map().get("ld", {})
     out = []
     for x in st["items"]:
-        if _ts(x["at"]) < cut or (ext and x["ext"] != str(ext)):
+        if _ts(x["at"]) < cut or (ext and x["ext"] != str(ext)) or digits(x["phone"]) in done_ld:
             continue
         out.append({**x, "called": digits(x["phone"]) in called,
                     "ageMin": int((dt.datetime.now(dt.timezone.utc) - _ts(x["at"])).total_seconds() // 60)})
@@ -710,6 +744,25 @@ def ops_test():
 
 
 # ------------------------------------------------------------------ API التطبيق: المطلوب مني
+@router.post("/app/inbox/done")
+async def app_inbox_done(request: Request):
+    """المندوب يقفل مهمة يدوي (أو يرجّعها)"""
+    b = await request.json()
+    ext, pw = str(b.get("ext") or ""), str(b.get("password") or "")
+    if not CTX["check_ext"](ext, pw):
+        return JSONResponse({"detail": "unauthorized"}, 401, headers=HDR)
+    mark_done(str(b.get("kind") or ""), str(b.get("key") or ""), ext, bool(b.get("undo")))
+    return JSONResponse({"ok": True}, headers=HDR)
+
+
+@router.post("/api/inbox/done")
+async def api_inbox_done(request: Request):
+    b = await request.json()
+    sc = CTX["scope"]()
+    mark_done(str(b.get("kind") or ""), str(b.get("key") or ""), (sc or {}).get("user", "admin"), bool(b.get("undo")))
+    return {"ok": True}
+
+
 @router.post("/app/inbox")
 async def app_inbox(request: Request):
     b = await request.json()
