@@ -68,7 +68,7 @@ import contextvars  # noqa: E402
 
 SCOPE = contextvars.ContextVar("nq_scope", default=None)   # None = المدير (يشوف كله)
 HTPASSWD = Path(os.environ.get("NQ_CONF", "/etc/nq-calls")) / "htpasswd"
-LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings|ops/|wa\b|eng\b)")
+LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings|ops/|wa\b|eng\b|goals/settings|goals/manual)")
 
 
 def _teams_file() -> dict:
@@ -1307,6 +1307,12 @@ OPS.CTX.update(dir=DATA_DIR, tz=TZ, trunk=TRUNK.split("/", 1)[1], query=query, s
 OPS.start()
 import targets as TGT  # noqa: E402
 app.include_router(TGT.router)
+import goals as GOALS  # noqa: E402
+app.include_router(GOALS.router)
+GOALS.CTX.update(dir=DATA_DIR, tz=TZ, calls=lambda a, b: unscoped(OPS.calls_c, a, b), scope=lambda: SCOPE.get(),
+                 appointments=lambda: OPS.CTX["appointments"](), teams=_teams_file,
+                 names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},
+                 reps=lambda: unscoped(config).get("reps", []), check_ext=lambda e, p: check_ext_password(e, p))
 import todo as TODO  # noqa: E402
 app.include_router(TODO.router)
 TODO.CTX.update(dir=DATA_DIR, tz=TZ, check_ext=lambda e, p: check_ext_password(e, p), scope=lambda: SCOPE.get(),

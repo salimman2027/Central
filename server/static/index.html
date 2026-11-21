@@ -517,6 +517,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="tab" data-p="report">🖨️ تقرير عدد المكالمات</div>
   </div></div>
   <div class="tgrp"><div class="tgbtn">💼 المبيعات <span class="tcount gcount"></span><small class="tsub"></small> ▾</div><div class="tmenu">
+    <div class="tab" data-p="goals">🏆 الأهداف</div>
     <div class="tab" data-p="tg">🎯 التارجت</div>
     <div class="tab" data-p="appt">📅 طلبات تحديد موعد <span class="tcount" id="apCount"></span></div>
     <div class="tab" data-p="cf">⚔️ التعارضات <span class="tcount" id="cfCount"></span></div>
@@ -658,6 +659,28 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
 </div>
 
+<div class="page" id="p-goals">
+  <div class="filters">
+    <div class="seg2" id="glSeg"><button data-k="day">اليوم</button><button data-k="month" class="on">الشهر</button><button data-k="quarter">الربع سنوي</button></div>
+    <div class="f"><label>التاريخ</label><input type="date" id="glDate"></div>
+    <div class="f"><label>الفئة</label><select id="glCat"></select></div>
+    <span class="sp" style="flex:1"></span>
+    <button class="btn o adm-only" onclick="glManual()">💰 إدخال المبيعات والعملاء</button>
+    <button class="btn o adm-only" onclick="glSettings()">⚙️ تحديد الأهداف</button>
+  </div>
+  <div id="glBody"><div class="card muted">بيحمّل…</div></div>
+</div>
+<div class="modal" id="glSetModal" onclick="modalBg(event,this)"><div class="mbox" style="max-width:900px;width:96vw;max-height:88vh;overflow:auto">
+  <h3 style="margin-top:0">⚙️ تحديد الأهداف</h3>
+  <div class="muted" style="font-size:12px">الأهداف للمندوب الواحد. سيب خانة الفرقة فاضية عشان تاخد الافتراضي. قائد الفرقة = مجموع أهداف فريقه.</div>
+  <div class="crm-tw"><table class="crm-tbl" id="glSetTbl"></table></div>
+  <div style="margin-top:10px;display:flex;gap:8px;align-items:center"><button class="btn" onclick="glSaveSettings()">💾 حفظ</button><span id="glSetMsg"></span></div>
+</div></div>
+<div class="modal" id="glManModal" onclick="modalBg(event,this)"><div class="mbox" style="max-width:700px;width:96vw;max-height:88vh;overflow:auto">
+  <h3 style="margin-top:0">💰 المبيعات والعملاء المحققين</h3>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><label>الشهر</label><input type="month" id="glManMonth" onchange="glManual(this.value)"><span class="muted" style="font-size:12px">بيتحفظ لوحده أول ما تكتب</span></div>
+  <div class="crm-tw"><table class="crm-tbl" id="glManTbl"></table></div>
+</div></div>
 <div class="page" id="p-tg">
   <div class="filters">
     <div class="f"><label>من تاريخ</label><input type="date" id="tgFrom"></div>
@@ -1349,6 +1372,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.p==='train')loadTrain();
   if(t.dataset.p==='cb')loadCb();
   if(t.dataset.p==='tg')loadTg();
+  if(t.dataset.p==='goals')loadGoals();
   if(t.dataset.p==='wai')waiLoad();
   if(t.dataset.p==='set')opLoad();
 });
@@ -1838,6 +1862,73 @@ function tmAddTeam(){tmRead(); TM.teams.push({id:'t'+Date.now().toString(36),nam
 function tmDel(id){tmRead(); const n=TM.reps.filter(r=>r.team===id).length;
   TM.teams=TM.teams.filter(t=>t.id!==id); TM.reps.forEach(r=>{if(r.team===id)r.team=''}); tmRender();
   $('orgMsg').innerHTML=`<span class="muted">${n?n+' تحويلة بقت من غير فريق — ':''}دوس حفظ عشان المسح يتسجّل</span>`;}
+
+/* ===================== الأهداف ===================== */
+let GL=null, GL_K='month';
+const glFmt=(v,k)=>k==='sales'?(v>=1e6?(v/1e6).toFixed(2).replace(/\.?0+$/,'')+' مليون':v>=1000?Math.round(v/1000)+' ألف':Math.round(v)):Math.round(v);
+const glCol=p=>p==null?'var(--muted)':p>=100?'#16a34a':p>=70?'#0ea5e9':p>=40?'#f59e0b':'#ef4444';
+const glBar=(x,k,big)=>{if(!x||!x.target)return '<span class="muted">—</span>';const p=x.pct||0;
+  return `<div style="min-width:${big?150:90}px"><div style="display:flex;justify-content:space-between;font-size:${big?13:11}px;gap:6px"><b>${glFmt(x.done,k)}</b><span class="muted">من ${glFmt(x.target,k)}</span><b style="color:${glCol(p)}">${p}%</b></div>
+  <div style="height:${big?8:6}px;background:var(--line);border-radius:9px;overflow:hidden;margin-top:3px;position:relative"><div style="height:100%;width:${Math.min(p,100)}%;background:${glCol(p)}"></div>
+  ${GL&&GL.period!=='day'?`<div title="المفروض لحد النهارده" style="position:absolute;top:0;bottom:0;right:${100-Math.min(GL.elapsed,100)}%;width:2px;background:var(--fg);opacity:.35"></div>`:''}</div>
+  ${big&&x.forecastPct!=null&&GL.period!=='day'?`<div class="muted" style="font-size:11px;margin-top:2px">📈 لو كمّل كده: ${glFmt(x.forecast,k)} (${x.forecastPct}%)</div>`:''}</div>`;};
+document.querySelectorAll('#glSeg button').forEach(b=>b.onclick=()=>{GL_K=b.dataset.k;document.querySelectorAll('#glSeg button').forEach(x=>x.classList.toggle('on',x===b));loadGoals();});
+async function loadGoals(){
+  if(!$('glDate').value)$('glDate').value=iso(today);
+  if(!$('glCat').options.length){$('glCat').innerHTML='<option value="">📊 المحسوبة في التقارير</option><option value="*">كل الفئات</option>'+CATS.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');$('glCat').onchange=renderGoals;$('glDate').onchange=loadGoals;}
+  document.querySelectorAll('#p-goals .adm-only').forEach(b=>b.style.display=ROLE==='admin'?'':'none');
+  try{GL=await (await fetch(API_BASE+`/goals/progress?period=${GL_K}&date=${$('glDate').value}`,{cache:'no-store'})).json();}catch(e){$('glBody').innerHTML=`<div class="card">تعذّر التحميل: ${esc(e.message)}</div>`;return}
+  renderGoals();
+}
+function glCatOk(category){const v=$('glCat').value; if(v==='*')return true; if(v)return category===v; if(!category)return true; const c=CATS.find(x=>x.id===category); return !c||c.report;}
+function renderGoals(){
+  if(!GL||!GL.metrics)return; const M=GL.metrics.filter(m=>GL.period!=='day'||m.per==='day');
+  const reps=GL.reps.filter(r=>glCatOk(r.category)), teams=GL.teams.filter(t=>glCatOk(t.category));
+  const tot={}; M.forEach(m=>{tot[m.k]={target:0,done:0,forecast:0}; reps.forEach(r=>{const x=r.m[m.k];tot[m.k].target+=x.target;tot[m.k].done+=x.done;tot[m.k].forecast+=x.forecast;});
+    const t=tot[m.k]; t.pct=t.target?Math.round(t.done*100/t.target):null; t.forecastPct=t.target?Math.round(t.forecast*100/t.target):null;});
+  const lbl={day:'اليوم',month:'الشهر',quarter:'الربع'}[GL.period];
+  const behind=reps.filter(r=>GL.period!=='day'&&r.score<GL.elapsed-20), top=reps.slice(0,3).filter(r=>r.score>0);
+  let h=`<div class="card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><b>🏆 أهداف ${lbl} · ${GL.from}${GL.from!==GL.to?' ← '+GL.to:''}</b>
+    ${GL.period!=='day'?`<span class="muted">عدّى ${GL.workdaysDone} من ${GL.workdays} يوم شغل (${GL.elapsed}%) — الخط الرمادي في كل شريط = المفروض توصل له لحد النهارده</span>`:''}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:12px">${M.map(m=>`<div class="card" style="margin:0;padding:12px"><div class="muted" style="font-size:12px">${esc(m.name)}${m.manual?' ✍️':''}</div>${glBar(tot[m.k],m.k,true)}</div>`).join('')}</div></div>`;
+  if(GL.period!=='day'&&(top.length||behind.length))h+=`<div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+    <div><b>🏅 الأحسن في ${lbl}</b>${top.map((r,i)=>`<div style="margin-top:6px">${['🥇','🥈','🥉'][i]} <b>${esc(r.name)}</b> <span class="muted">${esc(r.teamName)}</span> — <b style="color:${glCol(r.score)}">${r.score}%</b></div>`).join('')||'<div class="muted">—</div>'}</div>
+    <div><b>⚠️ محتاجين متابعة</b> <span class="muted" style="font-size:12px">(متأخرين عن المفروض بأكتر من 20%)</span>${behind.slice(0,6).map(r=>`<div style="margin-top:6px">• <b>${esc(r.name)}</b> <span class="muted">${esc(r.teamName)}</span> — ${r.score}% <span class="muted">والمفروض ${GL.elapsed}%</span></div>`).join('')||'<div class="muted" style="margin-top:6px">👏 مفيش حد متأخر</div>'}</div></div>`;
+  if(teams.length)h+=`<h3 style="margin:16px 4px 8px">👥 الفرق (القائد = مجموع فريقه)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">${teams.map(t=>`<div class="card" style="margin:0">
+    <div style="display:flex;justify-content:space-between"><b>${esc(t.name)}</b><span><span class="muted" style="font-size:12px">${t.reps} مندوب</span> · <b style="color:${glCol(t.score)}">${t.score}%</b></span></div>
+    ${M.map(m=>`<div style="margin-top:8px"><div class="muted" style="font-size:12px">${esc(m.name)}</div>${glBar(t.m[m.k],m.k)}</div>`).join('')}</div>`).join('')}</div>`;
+  h+=`<h3 style="margin:16px 4px 8px">🙋 المناديب</h3><div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>#</th><th>المندوب</th><th>الفرقة</th>${M.map(m=>`<th>${esc(m.name)}</th>`).join('')}<th>الإجمالي</th></tr></thead><tbody>
+    ${reps.map((r,i)=>`<tr><td>${i+1}</td><td><b>${esc(r.name)}</b> <span class="muted">${esc(r.ext)}</span></td><td>${esc(r.teamName||'—')}</td>${M.map(m=>`<td>${glBar(r.m[m.k],m.k)}</td>`).join('')}<td><b style="color:${glCol(r.score)}">${r.score}%</b></td></tr>`).join('')||`<tr><td colspan="${M.length+4}" class="muted">مفيش مناديب</td></tr>`}</tbody></table></div>`;
+  $('glBody').innerHTML=h;
+}
+let GLS=null;
+async function glSettings(){
+  try{GLS=await (await fetch(API_BASE+'/goals/settings',{cache:'no-store'})).json();}catch(e){alert(e.message);return}
+  const M=GLS.metrics, per={day:'يوميًا',month:'شهريًا',quarter:'كل ربع سنة'};
+  const inp=(scope,k,v,ph)=>`<input type="number" min="0" step="any" data-s="${esc(scope)}" data-k="${k}" value="${v??''}" placeholder="${ph??''}" style="width:110px">`;
+  $('glSetTbl').innerHTML=`<thead><tr><th></th>${M.map(m=>`<th>${esc(m.name)}<br><small class="muted">${per[m.per]}${m.unit==='ريال'?' — بالريال':''}</small></th>`).join('')}</tr></thead><tbody>
+    <tr style="background:var(--soft,#f6f8fb)"><td><b>⭐ الافتراضي (للكل)</b></td>${M.map(m=>`<td>${inp('*',m.k,GLS.defaults[m.k])}</td>`).join('')}</tr>
+    ${TEAMS.map(t=>`<tr><td>${esc(t.name)}</td>${M.map(m=>`<td>${inp(t.id,m.k,(GLS.teams[t.id]||{})[m.k],GLS.defaults[m.k])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  $('glSetMsg').textContent=''; $('glSetModal').classList.add('show');
+}
+async function glSaveSettings(){
+  const defaults={}, teams={};
+  document.querySelectorAll('#glSetTbl input').forEach(i=>{if(i.value==='')return; if(i.dataset.s==='*')defaults[i.dataset.k]=+i.value; else (teams[i.dataset.s]=teams[i.dataset.s]||{})[i.dataset.k]=+i.value;});
+  try{const r=await fetch(API_BASE+'/goals/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({defaults,teams})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    $('glSetMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; loadGoals();}catch(e){$('glSetMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
+}
+async function glManual(mon){
+  mon=mon||($('glManMonth').value)||($('glDate').value||iso(today)).slice(0,7); $('glManMonth').value=mon;
+  let d; try{d=await (await fetch(API_BASE+'/goals/manual?month='+mon,{cache:'no-store'})).json();}catch(e){alert(e.message);return}
+  $('glManTbl').innerHTML=`<thead><tr><th>المندوب</th><th>الفرقة</th><th>المبيعات (ريال)</th><th>عملاء محققين</th><th></th></tr></thead><tbody>${REPS.map(r=>{const v=d.items[String(r.id)]||{};const t=TEAMS.find(x=>x.id===r.team);
+    return `<tr data-e="${esc(r.id)}"><td><b>${esc(r.name)}</b> <span class="muted">${esc(r.id)}</span></td><td>${esc(t?t.name:'—')}</td>
+    <td><input type="number" min="0" step="any" class="gm-s" value="${v.sales??''}" style="width:130px" onchange="glManSave(this)"></td>
+    <td><input type="number" min="0" step="1" class="gm-c" value="${v.closed??''}" style="width:80px" onchange="glManSave(this)"></td><td class="gm-ok"></td></tr>`}).join('')}</tbody>`;
+  $('glManModal').classList.add('show');
+}
+async function glManSave(inp){const tr=inp.closest('tr');const ok=tr.querySelector('.gm-ok');ok.textContent='…';
+  try{const r=await fetch(API_BASE+'/goals/manual',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({month:$('glManMonth').value,ext:tr.dataset.e,sales:tr.querySelector('.gm-s').value,closed:tr.querySelector('.gm-c').value})});
+    if(!r.ok)throw new Error((await r.json()).detail);ok.textContent='✔';ok.style.color='var(--green)';loadGoals();}catch(e){ok.textContent='✖ '+e.message;ok.style.color='var(--red)'}}
 
 /* ===================== التعارضات ===================== */
 let CF={items:[],counts:{}}, CF_S='pending';

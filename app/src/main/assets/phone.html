@@ -619,6 +619,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   <div class="seg" id="sSeg">
     <button data-p="day" class="sel">اليوم</button><button data-p="month">الشهر</button><button data-p="quarter">الربع</button>
   </div>
+  <div class="card" id="sGoals" hidden></div>
   <div class="card" id="sTarget"></div>
   <div class="kgrid" id="sKpis"></div>
   <div class="card"><b>نتايج المكالمات</b><div id="sOut" style="margin-top:6px"></div></div>
@@ -2134,9 +2135,35 @@ const NQTargets = {
 };
 
 /* ---------- my stats + report ---------- */
+/* ===== أهدافي (من السيرفر): المحقق من هدفي في اليوم / الشهر / الربع ===== */
+const NQGoals = {
+  data: null,
+  async load() {
+    try { const c = NQOwner.creds(); if (!c) return;
+      const r = await fetch(CONFIG.api + "/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c) });
+      if (!r.ok) return; this.data = await r.json(); store.set("nq_goals", this.data); this.render(); } catch (e) {}
+  },
+  render() {
+    const box = $("sGoals"); if (!box) return;
+    const d = this.data || store.get("nq_goals", null); const k = NQStats.period;
+    const p = d && d[k]; const me = p && p.me; if (!me) { box.hidden = true; return; }
+    const col = v => v == null ? "var(--muted)" : v >= 100 ? "#16a34a" : v >= 70 ? "#0ea5e9" : v >= 40 ? "#f59e0b" : "#ef4444";
+    const fmt = (v, key) => key === "sales" ? (v >= 1e6 ? (v / 1e6).toFixed(2).replace(/\.?0+$/, "") + " مليون" : v >= 1000 ? Math.round(v / 1000) + " ألف" : Math.round(v)) : Math.round(v);
+    const rows = d.metrics.filter(m => me.m[m.k] && me.m[m.k].target).map(m => { const x = me.m[m.k], pc = x.pct || 0;
+      return `<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${esc(m.name)}${m.manual ? " ✍️" : ""}</span><span><b>${fmt(x.done, m.k)}</b> <span style="opacity:.6">من ${fmt(x.target, m.k)}</span> · <b style="color:${col(pc)}">${pc}%</b></span></div>
+        <div style="height:8px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:4px;position:relative"><div style="height:100%;width:${Math.min(pc, 100)}%;background:${col(pc)}"></div>
+        ${k !== "day" ? `<div style="position:absolute;top:0;bottom:0;right:${100 - Math.min(p.elapsed, 100)}%;width:2px;background:var(--fg);opacity:.35"></div>` : ""}</div>
+        ${k !== "day" && x.forecastPct != null ? `<div style="font-size:11px;opacity:.6;margin-top:2px">📈 لو كمّلت كده: ${fmt(x.forecast, m.k)} (${x.forecastPct}%)</div>` : ""}</div>`; }).join("");
+    const t = p.team;
+    box.hidden = false;
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b>🏆 أهدافي</b><b style="font-size:20px;color:${col(me.score)}">${me.score}%</b></div>
+      ${k !== "day" ? `<div style="font-size:12px;opacity:.65;margin-top:2px">عدّى ${p.elapsed}% من الفترة — الخط الرمادي = المفروض توصل له لحد النهارده</div>` : ""}${rows}
+      ${t ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px">👥 ${esc(t.name)}: الفريق حقق <b style="color:${col(t.score)}">${t.score}%</b> من هدفه</div>` : ""}`;
+  }
+};
 const NQStats = {
   period: "day",
-  open() { this.render(); show("scrStats"); },
+  open() { this.render(); show("scrStats"); NQGoals.render(); NQGoals.load(); },
   range() {
     const now = new Date(); let from;
     if (this.period === "day") from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -2236,7 +2263,7 @@ const NQStats = {
   }
 };
 window.onFileSaved = ok => toast(ok ? "اتحفظ في التنزيلات ✓" : "تعذّر حفظ الملف");
-document.querySelectorAll("#sSeg button").forEach(b => b.onclick = () => { NQStats.period = b.dataset.p; NQStats.render(); });
+document.querySelectorAll("#sSeg button").forEach(b => b.onclick = () => { NQStats.period = b.dataset.p; NQStats.render(); NQGoals.render(); });
 
 /* ---------- رفع تسجيلات مكالمات الشريحة ---------- */
 const NQSim = {
