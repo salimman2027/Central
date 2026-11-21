@@ -156,7 +156,10 @@ REMEMBER_DAYS = 30            # "تذكرني": الدخول يفضل شهر
 
 def _sign(user: str, remember: bool = False) -> str:
     life = REMEMBER_DAYS * 86400 if remember else SESSION_HOURS * 3600
-    body = base64.urlsafe_b64encode(json.dumps({"u": user, "x": int(time.time()) + life, "r": 1 if remember else 0}).encode()).decode()
+    d = {"u": user, "x": int(time.time()) + life, "r": 1 if remember else 0}
+    if user.startswith("rep:"):   # بصمة كلمة سر المندوب: لو غيّرها الجلسة القديمة تخلص
+        d["k"] = ((PORTAL._users().get(user[4:]) or {}).get("hash") or "")[:12]
+    body = base64.urlsafe_b64encode(json.dumps(d).encode()).decode()
     sig = _hmac.new(_session_key(), body.encode(), hashlib.sha256).hexdigest()
     return body + "." + sig
 
@@ -170,7 +173,16 @@ def _session(tok: str) -> dict:
         if d.get("x", 0) <= time.time():
             return {}
         # اليوزر اتمسح أو باسورده اتغيّر بعد الدخول → الجلسة تخلص
-        if d["u"] not in _ht_users():
+        u = d["u"]
+        if u.startswith("rep:"):   # مندوب: حسابه لسه موجود (وبنفس كلمة السر اللي دخل بيها)
+            rec = PORTAL._users().get(u[4:])
+            if rec:
+                if d.get("k") and d["k"] != (rec.get("hash") or "")[:12]:
+                    return {}
+            elif not (u[4:].isdigit() and u[4:] in {str(r.get("id")) for r in unscoped(config).get("reps", [])}):
+                return {}
+            return d
+        if u not in _ht_users():
             return {}
         return d
     except Exception:  # noqa: BLE001
