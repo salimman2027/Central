@@ -492,8 +492,11 @@ def board(d1: dt.date, d2: dt.date) -> list:
             if isinstance(s, (int, float)):
                 row(x["call"]["ext"])["_sc"].append(s)
     out = []
+    rep_ok = CTX.get("report_exts", lambda: None)()   # الفرق اللي فئتها مش بتتحسب (تدريب، ما بعد البيع…) بره الترتيب
     for r in rows.values():
         if sc is not None and r["ext"] not in sc["exts"]:
+            continue
+        if rep_ok is not None and r["ext"] not in rep_ok:
             continue
         sc_ = r.pop("_sc")
         r["score"] = round(sum(sc_) / len(sc_)) if sc_ else None

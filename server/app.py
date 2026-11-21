@@ -12,6 +12,7 @@ import shutil
 import time
 import os
 import re
+import secrets
 import subprocess
 import sys
 import threading
@@ -84,6 +85,17 @@ def leader_info(user: str) -> dict | None:
         return None
     tm = _teams_file()
     names = {t["id"]: t["name"] for t in tm.get("teams", [])}
+    if u.startswith("rep:"):   # مندوب داخل اللوحة: حاجته هو بس
+        ext = u[4:]
+        tid = (tm.get("assign") or {}).get(ext, "")
+        nm = next((r.get("name") for r in json.loads((CONF_DIR / "reps.json").read_text()).get("reps", []) if str(r.get("id")) == ext), "") \
+            if (CONF_DIR / "reps.json").exists() else ""
+        try:
+            nm = json.loads((DATA_DIR / "rep_names.json").read_text(encoding="utf-8")).get(ext) or nm
+        except Exception:  # noqa: BLE001
+            pass
+        return {"user": user, "role": "rep", "teams": {tid} if tid else set(), "team": tid, "ext": ext,
+                "teamName": names.get(tid, ""), "name": nm or ext, "exts": {ext}}
     m = next((m for m in tm.get("managers", []) if (m.get("user") or "").strip().lower() == u), None)
     if m:   # مدير: مجموعة فرق
         ids = [t for t in m.get("teams", []) if t in names]
@@ -204,6 +216,7 @@ def _check_htpasswd(user: str, pw: str) -> str:
 
 
 OPEN_PATHS = ("/api/auth/", "/app/")
+REP_WRITE = ("/api/auth/",)   # المندوب في اللوحة مايعدّلش حاجة
 
 
 @app.post("/api/auth/login")
@@ -216,6 +229,10 @@ async def auth_login(request: Request):
     if len(LOGIN_FAILS[ip]) >= 8:
         raise HTTPException(429, "محاولات كتير غلط — استنى ربع ساعة وجرّب تاني")
     name = _check_htpasswd(user, pw) if user and pw else ""
+    if not name and user and pw:   # مندوب: برقم تحويلته (أو اسم المستخدم) وباسورد التطبيق
+        ext = PORTAL.verify_login(user, pw)
+        if ext:
+            name = "rep:" + ext
     if not name:
         LOGIN_FAILS[ip].append(now)
         raise HTTPException(401, "اسم المستخدم أو كلمة السر غلط")
@@ -231,6 +248,8 @@ async def auth_password(request: Request):
     user = _session_user(request.cookies.get(COOKIE, ""))
     if not user:
         raise HTTPException(401, "سجّل دخول الأول")
+    if user.startswith("rep:"):
+        raise HTTPException(400, "غيّر كلمة السر من التطبيق (⚙ الإعدادات ← غيّر كلمة السر)")
     b = await request.json()
     old, new = str(b.get("old") or ""), str(b.get("new") or "")
     if not _check_htpasswd(user, old):
@@ -265,7 +284,11 @@ async def leader_scope(request, call_next):
         return JSONResponse({"detail": "سجّل دخول الأول", "login": True}, 401)
     info = leader_info(user)
     if info:
-        if LEADER_DENY.match(path) and (request.method != "GET" or path.startswith("/api/logins")):
+        if info["role"] == "rep":   # المندوب: يقرا حاجته بس — من غير أي إعدادات أو تعديل
+            if (LEADER_DENY.match(path) or path.startswith(("/api/teams", "/api/logins", "/api/crm/settings"))) or \
+                    (request.method != "GET" and path.startswith("/api/") and not path.startswith(REP_WRITE)):
+                return JSONResponse({"detail": "الصفحة دي للمدير بس"}, 403)
+        elif LEADER_DENY.match(path) and (request.method != "GET" or path.startswith("/api/logins")):
             return JSONResponse({"detail": "الإعدادات للمدير بس"}, 403)
     tok = SCOPE.set(info)
     try:
@@ -281,7 +304,8 @@ async def leader_scope(request, call_next):
 def whoami(request: Request):
     sc = SCOPE.get()
     if sc:
-        return {"role": sc["role"], "user": sc["user"], "name": sc["name"], "team": sc["team"], "teams": sorted(sc["teams"]), "teamName": sc["teamName"]}
+        return {"role": sc["role"], "user": sc["user"], "name": sc["name"], "team": sc["team"], "teams": sorted(sc["teams"]),
+                "teamName": sc["teamName"], "ext": sc.get("ext", "")}
     return {"role": "admin", "user": _session_user(request.cookies.get(COOKIE, ""))}
 
 
@@ -356,6 +380,22 @@ def config_api():
     return c
 
 
+DEFAULT_CATS = [{"id": "sales", "name": "مبيعات / تسويق", "report": True},
+                {"id": "training", "name": "تدريب", "report": False},
+                {"id": "aftersales", "name": "خدمة ما بعد البيع", "report": False}]
+
+
+def report_exts() -> set | None:
+    """التحويلات اللي بتتحسب في التقارير (الفرق اللي فئتها "بتتحسب"). None = كله"""
+    tm = _teams_file()
+    cats = {c["id"]: c for c in (tm.get("categories") or DEFAULT_CATS)}
+    off = {t["id"] for t in tm.get("teams", []) if t.get("category") and not cats.get(t["category"], {}).get("report", True)}
+    if not off:
+        return None
+    return {e for e, tid in (tm.get("assign") or {}).items() if tid not in off} | \
+        {str(r.get("id")) for r in unscoped(config).get("reps", []) if str(r.get("id")) not in (tm.get("assign") or {})}
+
+
 def config():
     f = CONF_DIR / "reps.json"
     reps = json.loads(f.read_text()) if f.exists() else {"teams": [], "reps": []}
@@ -404,7 +444,8 @@ def config():
         tm = None
     if tm:
         byid = {str(r.get("id")): r for r in reps.get("reps", [])}
-        reps["teams"] = [{"id": t["id"], "name": t["name"],
+        reps["categories"] = tm.get("categories") or DEFAULT_CATS
+        reps["teams"] = [{"id": t["id"], "name": t["name"], "category": t.get("category", ""),
                           "leader": (byid.get(str(t.get("leaderExt"))) or {}).get("name", "")} for t in tm.get("teams", [])]
         leaders = {str(t.get("leaderExt")) for t in tm.get("teams", []) if t.get("leaderExt")}
         for r in reps.get("reps", []):
@@ -1073,7 +1114,8 @@ def get_teams():
     c = config()
     users = _ht_users()
     raw = {t["id"]: t for t in _teams_file().get("teams", [])}
-    return {"teams": [{"id": t["id"], "name": t["name"],
+    return {"categories": _teams_file().get("categories") or DEFAULT_CATS,
+            "teams": [{"id": t["id"], "name": t["name"], "category": raw.get(t["id"], {}).get("category", ""),
                        "leaderExt": next((str(r["id"]) for r in c["reps"] if r.get("team") == t["id"] and r.get("lead")), ""),
                        "leaderUser": raw.get(t["id"], {}).get("leaderUser", ""),
                        "hasPassword": raw.get(t["id"], {}).get("leaderUser", "") in users}
@@ -1100,6 +1142,7 @@ async def put_teams(request: Request):
         if lu and not re.fullmatch(r"[\w.\-@]{3,40}", lu):
             raise HTTPException(400, f"يوزر قائد \"{name}\": من 3 لـ 40 حرف من غير مسافات")
         teams.append({"id": tid, "name": name, "leaderExt": str(t.get("leaderExt") or ""), "leaderUser": lu,
+                      "category": re.sub(r"[^\w-]", "", str(t.get("category") if "category" in t else old.get("category", "")))[:30],
                       "_pw": str(t.get("leaderPassword") or "")})
     # اليوزرات: مايتكرروش، ومايبقوش يوزر المدير
     old_leaders = {(o.get("leaderUser") or "").lower() for o in _teams_file().get("teams", []) if o.get("leaderUser")}
@@ -1133,7 +1176,19 @@ async def put_teams(request: Request):
             _ht_del(real)
     assign = {str(k): str(v) for k, v in (b.get("assign") or {}).items() if str(k).isdigit() and str(v) in seen}
     f = DATA_DIR / "teams.json"
-    f.write_text(json.dumps({"teams": teams, "assign": assign, "managers": managers}, ensure_ascii=False, indent=1), encoding="utf-8")
+    cats = _teams_file().get("categories") or DEFAULT_CATS
+    if isinstance(b.get("categories"), list):
+        cats, cseen = [], set()
+        for c in b["categories"]:
+            nm = str(c.get("name") or "").strip()[:40]
+            if not nm:
+                continue
+            cid = re.sub(r"[^\w-]", "", str(c.get("id") or "")) or ("c" + secrets.token_hex(3))
+            if cid in cseen:
+                continue
+            cseen.add(cid)
+            cats.append({"id": cid, "name": nm, "report": bool(c.get("report"))})
+    f.write_text(json.dumps({"teams": teams, "assign": assign, "managers": managers, "categories": cats}, ensure_ascii=False, indent=1), encoding="utf-8")
     return get_teams()
 
 
@@ -1243,6 +1298,7 @@ OPS.CTX.update(dir=DATA_DIR, tz=TZ, trunk=TRUNK.split("/", 1)[1], query=query, s
                names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},
                reps=lambda: unscoped(config).get("reps", []),
                lines=lambda: {str(r.get("id")): r.get("line", "") for r in unscoped(config).get("reps", []) if r.get("line")},
+               report_exts=lambda: report_exts(),
                sims=lambda: {str(r.get("id")): {"imei": r.get("imei", ""), "imsi": r.get("imsi", "")} for r in unscoped(config).get("reps", []) if r.get("imei") or r.get("imsi")},
                owner_of=lambda n: OWN.owner_of(n), check_ext=lambda e, p: check_ext_password(e, p),
                appointments=lambda: APPT._load(), training=lambda: TRAIN.load_all(),

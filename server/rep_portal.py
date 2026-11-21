@@ -108,6 +108,23 @@ async def put_logins(request: Request):
     return get_logins()
 
 
+def verify_login(user: str, pw: str) -> str | None:
+    """دخول المندوب (للوحة): برقم التحويلة أو اسم المستخدم + كلمة سر التطبيق. بيرجّع التحويلة أو None"""
+    user, key = str(user or "").strip(), _norm(user)
+    if not user or not pw:
+        return None
+    users = _users()
+    ext = next((e for e, v in users.items() if _norm(v.get("username")) == key), None)
+    if not ext and user.isdigit() and user in users:
+        ext = user                                  # برقم التحويلة نفسه + باسورد حسابه
+    if ext:
+        rec = users[ext]
+        return ext if rec.get("hash") and hmac.compare_digest(_hash(pw, rec["salt"]), rec["hash"]) else None
+    if user.isdigit() and CTX["check_ext"](user, pw):   # تحويلة من غير حساب: باسورد التحويلة
+        return user
+    return None
+
+
 # ------------------------------------------------------------------ الدخول من التطبيق
 @router.post("/app/login")
 async def app_login(request: Request):
