@@ -2454,5 +2454,25 @@ NQSettings.apply(NQSettings.load());
 })();
 window.NQPhone = NQPhone;
 </script>
+<script>/* 👁 إظهار / إخفاء كلمة السر في أي خانة باسورد */
+(function(){
+  function add(inp){
+    if(inp.dataset.eye)return; inp.dataset.eye='1';
+    var w=document.createElement('span'); w.style.cssText='position:relative;display:block;width:100%';
+    inp.parentNode.insertBefore(w,inp); w.appendChild(inp);
+    var cs=getComputedStyle(inp); w.style.margin=cs.margin; inp.style.margin='0'; inp.style.width='100%'; inp.style.boxSizing='border-box';
+    if(cs.flexGrow&&cs.flexGrow!=='0'){w.style.flex=cs.flex;w.style.minWidth='0';}
+    var b=document.createElement('button'); b.type='button'; b.tabIndex=-1; b.textContent='👁'; b.title='إظهار كلمة السر'; b.setAttribute('aria-label','إظهار كلمة السر');
+    b.style.cssText='position:absolute;top:50%;transform:translateY(-50%);left:6px;border:0;background:transparent;cursor:pointer;font-size:16px;line-height:1;padding:6px;opacity:.55;color:inherit';
+    inp.style.paddingLeft='36px';
+    b.onmousedown=function(e){e.preventDefault()};
+    b.onclick=function(){var s=inp.type==='password';inp.type=s?'text':'password';b.textContent=s?'🙈':'👁';b.style.opacity=s?'.9':'.55';b.title=s?'إخفاء كلمة السر':'إظهار كلمة السر';inp.focus();};
+    w.appendChild(b);
+  }
+  function scan(root){(root.querySelectorAll?root:document).querySelectorAll('input[type=password]:not([data-eye])').forEach(add);}
+  function start(){scan(document);new MutationObserver(function(ms){for(var i=0;i<ms.length;i++)for(var j=0;j<ms[i].addedNodes.length;j++){var n=ms[i].addedNodes[j];if(n.nodeType!==1)continue;if(n.matches&&n.matches('input[type=password]:not([data-eye])'))add(n);else if(n.querySelector&&n.querySelector('input[type=password]:not([data-eye])'))scan(n);}}).observe(document.body,{childList:true,subtree:true});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();</script>
+
 </body>
 </html>
