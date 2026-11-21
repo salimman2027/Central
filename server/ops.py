@@ -738,7 +738,35 @@ def tick():
         poll_leads()
     s = settings()
     day = t.strftime("%Y-%m-%d")
-    if t.hour >= int(s["digestHour"]) and STATE["digestDay"] != day and _jload("digest.json", {}).get("day") != day:
+    try:
+        import workcal
+        if STATE.get("calDay") != day:   # مرة في اليوم: نحمّل الأجازات الرسمية للسنة الجاية لو ناقصة
+            STATE["calDay"] = day
+            c = workcal.load()
+            for ctry in c["countries"]:
+                if not any(h.get("source") == "auto" and h.get("country") == ctry and h["from"][:4] == str(t.year + (t.month == 12)) for h in c["holidays"]) and \
+                        (CTX["dir"] / "workcal.json").exists():
+                    try:
+                        workcal.CTX.update(dir=CTX["dir"], tz=CTX["tz"])
+                        new = workcal.auto_holidays(ctry, [t.year, t.year + 1])
+                        with workcal.LOCK:
+                            c = workcal.load()
+                            keep = [h for h in c["holidays"] if not (h.get("source") == "auto" and h.get("country") == ctry and int(h["from"][:4]) in (t.year, t.year + 1))]
+                            c["holidays"] = sorted(keep + new, key=lambda x: x["from"])
+                            workcal._save(c)
+                    except Exception as e:  # noqa: BLE001
+                        print("holidays autoload:", e, flush=True)
+        if (CTX["dir"] / "workcal.json").exists():
+            due, why = workcal.report_due(t)
+        else:
+            due, why = t.hour >= int(s["digestHour"]), ""
+    except Exception as e:  # noqa: BLE001
+        print("workcal:", e, flush=True)
+        due, why = t.hour >= int(s["digestHour"]), ""
+    if not due and why and STATE.get("skipNote") != day:
+        STATE["skipNote"] = day
+        print("digest skipped:", why, flush=True)
+    if due and STATE["digestDay"] != day and _jload("digest.json", {}).get("day") != day:
         txt = digest_text()
         _jsave("digest.json", {"day": day, "text": txt, "at": t.isoformat()})
         STATE["digestDay"] = day

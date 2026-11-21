@@ -127,7 +127,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   }
   .tabbar { position:fixed; left:0; right:0; bottom:0; display:none; background:#fff; border-top:1px solid var(--line); z-index:5; }
   .tabbar.on { display:flex; }
-  .tabbar button { flex:1; background:none; padding:10px 0 12px; font-size:12px; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .tabbar button { flex:1; min-width:0; background:none; padding:10px 0 12px; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:2px; }
   .tabbar button b { font-size:20px; font-weight:400; }
   .tabbar button.sel { color:var(--pri); font-weight:600; }
   .withtabs { padding-bottom:66px !important; }
@@ -184,7 +184,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   .t-add[open] summary:after { content:"▴"; }
   .t-or { text-align:center; color:var(--muted); font-size:12.5px; margin:14px 0 8px; display:flex; align-items:center; gap:8px; }
   .t-or:before, .t-or:after { content:""; flex:1; height:1px; background:var(--line, rgba(127,127,127,.25)); }
-  .tabbar button { font-size:11px; } .tabbar button b { font-size:19px; }
+  .tabbar button { font-size:10.5px; } .tabbar button b { font-size:19px; }
   .ch-row { display:flex; gap:10px; align-items:center; padding:11px 4px; border-top:1px solid var(--line, rgba(127,127,127,.18)); cursor:pointer; }
   .ch-row:first-child { border-top:0; } .ch-row .av { width:42px; height:42px; border-radius:50%; background:#25d366; color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0; }
   .ch-row .mid { flex:1; min-width:0; } .ch-row .mid b { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -383,9 +383,6 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
     <button class="iconbtn todobtn" onclick="NQTodo.open()" aria-label="مهام اليوم" title="مهام اليوم" style="position:relative">✅<i class="tbadge" id="todoBadge" style="position:absolute;top:-4px;left:-4px"></i></button>
     <button class="iconbtn mebtn" onclick="NQMe.show()" aria-label="بياناتي" title="رقمي والشريحة والجهاز">؟</button>
     <button class="viachip app-only" id="viaChip" onclick="NQVia.cycle()"></button>
-    <span class="ver" id="appVer"></span>
-    <button class="iconbtn themebtn" onclick="toggleTheme()" aria-label="فاتح / غامق" title="فاتح / غامق"><span class="i-dark">🌙</span><span class="i-light">☀️</span></button>
-    <button class="iconbtn" onclick="showSettings()" aria-label="الإعدادات">⚙</button>
   </div>
   <div class="ibar" id="inboxBar"></div>
   <div class="display"><div id="dialNum" class="num"></div><div id="dialName" class="who-name"></div><div id="dialErr" class="err"></div>
@@ -401,10 +398,9 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
 </section>
 
 <!-- ================= settings sheet ================= -->
-<section id="scrSettings" class="screen" style="background:var(--bg);padding:20px 20px 40px;overflow:auto">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-    <button class="iconbtn" onclick="show('scrDial')" aria-label="رجوع">→</button>
-    <h2 style="margin:0;font-size:20px;flex:1">الإعدادات</h2>
+<section id="scrSettings" class="screen" style="background:var(--bg);padding:20px 20px 110px;overflow:auto">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+    <h2 style="margin:0;font-size:20px;flex:1">⚙️ الإعدادات <span class="ver" id="appVer" style="font-size:12px;font-weight:400"></span></h2>
     <div class="seg thm" style="display:inline-flex;gap:4px"><button data-t="light" onclick="setTheme('light')">☀️ فاتح</button><button data-t="dark" onclick="setTheme('dark')">🌙 غامق</button><button data-t="auto" onclick="setTheme('auto')">🌓 زي الموبايل</button></div>
   </div>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 14px">
@@ -740,6 +736,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   <button data-s="scrPerf" onclick="NQPerf.open()"><b>🧠</b>أدائي<i class="tbadge" id="pBadge"></i></button>
   <button data-s="scrChats" id="waTab" hidden onclick="NQChat.list()"><b>💬</b>واتساب<i class="tbadge" id="waBadge"></i></button>
   <button data-s="scrFiles" onclick="NQFiles.open()"><b>📁</b>الملفات<i class="tbadge" id="tBadge"></i></button>
+  <button data-s="scrSettings" onclick="showSettings()"><b>⚙️</b>إعدادات</button>
 </nav>
 
 <div id="toast" class="toast"></div>
@@ -756,7 +753,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
    - وضع CRM: بعد المكالمة يسأل عن العميل والملخص ويبعته للسيرفر
    =================================================================== */
 const $ = id => document.getElementById(id);
-const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrPerf", "scrFiles", "scrEng", "scrChats"];
+const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrPerf", "scrFiles", "scrEng", "scrChats", "scrSettings"];
 function show(id) {
   // خانة كتابة في شاشة اتقفلت (زي الباسورد) متفضلش واخدة الكيبورد
   const ae = document.activeElement; if (ae && ae !== document.body && ae.closest && !ae.closest("#" + id)) try { ae.blur(); } catch (e) {}

@@ -68,6 +68,11 @@ def period_range(kind: str, ref: dt.date) -> tuple:
 
 
 def workdays(a: dt.date, b: dt.date) -> int:
+    try:   # تقويم الشغل: الأجازة الأسبوعية + الأجازات الرسمية والسنوية
+        import workcal
+        return workcal.workdays(a, b)
+    except Exception:  # noqa: BLE001
+        pass
     n, d = 0, a
     while d <= b:
         n += d.weekday() in WORKDAYS

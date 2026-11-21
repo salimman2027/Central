@@ -671,6 +671,28 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <div id="glBody"><div class="card muted">بيحمّل…</div></div>
 </div>
 <style>#smtpModal label.lbl{display:block;margin-top:10px;font-size:13px}#smtpModal label.lbl input{display:block;width:100%;box-sizing:border-box;margin-top:4px}</style>
+<style>#calModal .cal-days label{display:inline-flex;gap:4px;align-items:center;margin:3px 8px 3px 0;font-size:13px}#calModal .cal-days input{width:auto}
+#calModal h4{margin:14px 0 6px}#calTbl td,#calTbl th{padding:4px 6px}#calTbl input,#calTbl select{padding:4px 6px;font-size:13px}#calTbl tr.est td{background:rgba(245,158,11,.08)}</style>
+<div class="modal" id="calModal" onclick="modalBg(event,this)"><div class="mbox" style="max-width:860px;width:96vw;max-height:90vh;overflow:auto">
+  <h3 style="margin-top:0">📅 أيام الشغل والأجازات وجدول التقرير</h3>
+  <div id="calToday" class="muted" style="font-size:13px"></div>
+  <h4>🕘 التقرير اليومي (تليجرام + الإيميل)</h4>
+  <div class="cal-days" id="calRepDays"></div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:6px">
+    <label>الساعة <input type="time" id="calTime" class="ap-in" style="width:120px"></label>
+    <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="calSkip" style="width:auto"> مايتبعتش في الأجازات الرسمية والسنوية لـ</label>
+    <select id="calRepCountry" class="ap-in" style="width:auto"></select>
+  </div>
+  <h4>🌍 الدول والأجازة الأسبوعية</h4>
+  <div class="cal-days" id="calCountries"></div>
+  <div class="cal-days" id="calWeekend" style="margin-top:4px"></div>
+  <h4 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">🏖️ الأجازات
+    <span style="display:flex;gap:6px;flex-wrap:wrap"><select id="calFilt" class="ap-in" style="width:auto" onchange="calRender()"></select>
+      <button class="btn o sm" onclick="calAdd()">＋ أجازة (سنوية / خاصة)</button></span></h4>
+  <div class="muted" style="font-size:12px">الأجازات الرسمية بتتحمّل لوحدها كل سنة. الأعياد الهجرية (🌙 تقديري) بتتحدد بالرؤية — عدّل التاريخ لما يتعلن رسمي. "كل الشركة" = أجازة لكل الدول.</div>
+  <div class="crm-tw" style="max-height:340px;overflow:auto"><table class="crm-tbl" id="calTbl"></table></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button class="btn" onclick="calSave()">💾 حفظ</button><span id="calMsg"></span></div>
+</div></div>
 <div class="modal" id="smtpModal" onclick="modalBg(event,this)"><div class="mbox" style="max-width:560px;width:96vw">
   <h3 style="margin-top:0">📧 إعدادات الإيميل اللي هيبعت التقارير</h3>
   <div class="muted" style="font-size:12px;margin-bottom:8px">اختار مزوّد الإيميل والسيستم هيملا السيرفر والبورت. بنجرّب الدخول قبل الحفظ، والباسورد بيتحفظ على السيرفر ومش بيظهر تاني.</div>
@@ -863,6 +885,10 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="card set-c"><h3>📅 مواعيد المهندسين للمناديب</h3>
       <p class="muted">اختار مهندس (أي موظف في الـ CRM) وحدد مين من المناديب يشوف يومه في التطبيق — فاضي إمتى ومحجوز إمتى — عشان يحدد مع العميل ميعاد مناسب.</p>
       <button class="btn" onclick="engOpen()">تعديل</button></div>
+    <div class="card set-c"><h3>📅 أيام الشغل والأجازات وجدول التقرير</h3>
+      <p class="muted">أيام الأجازة الأسبوعية، الأجازات الرسمية لكل دولة (بتتحمّل لوحدها — مصر والسعودية)، الأجازات السنوية للشركة، وأيام وساعة إرسال التقرير اليومي.</p>
+      <div id="setCalSt" class="muted" style="font-size:13px;margin-bottom:8px"></div>
+      <button class="btn" onclick="calOpen()">📅 فتح التقويم</button></div>
     <div class="card set-c"><h3>📧 التقرير اليومي بالإيميل</h3>
       <p class="muted">الإيميل اللي هيبعت التقارير (Gmail / Outlook / إيميل الشركة)، والتقرير بيوصل كل يوم لإيميلات المديرين، وكل مشرف يوصله تقرير فرقه.</p>
       <div id="setMailSt" class="muted" style="font-size:13px;margin-bottom:8px"></div>
@@ -875,7 +901,8 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
       <div class="ops-f">
         <label>حد المكالمات الطالعة لكل شريحة في اليوم <input id="opCap" type="number" min="0" class="ap-in" style="width:90px"> <span class="muted">(0 = من غير حد)</span></label>
         <label>نبّه الموظف لما يوصل <input id="opWarn" type="number" min="10" max="100" class="ap-in" style="width:70px">% من الحد</label>
-        <label>الملخص اليومي الساعة <input id="opHour" type="number" min="0" max="23" class="ap-in" style="width:70px"> <span class="muted">(تليجرام + الإيميل)</span></label>
+        <label hidden>الملخص اليومي الساعة <input id="opHour" type="number" min="0" max="23" class="ap-in" style="width:70px"></label>
+        <div class="muted" style="flex-basis:100%;font-size:13px">🕘 ميعاد التقرير اليومي (تليجرام + الإيميل) وأيامه بقوا في <a href="#" onclick="calOpen();return false">📅 التقويم</a></div>
         <label style="flex-basis:100%">📧 إيميلات المديرين (التقرير الكامل لكل الفرق) <input id="opEmails" class="ap-in ltr" dir="ltr" placeholder="ceo@company.com, manager@company.com" style="width:100%"></label>
         <label style="display:flex;gap:8px;align-items:center;flex-basis:100%"><input type="checkbox" id="opEmailSup" style="width:auto"> وكل مشرف ليه إيميل (في شاشة المستخدمين) يوصله تقرير فرقه هو بس</label>
         <label>تحويلات المدير (تسمع أي مكالمة) <input id="opSpy" class="ap-in ltr" placeholder="مثلاً 100" style="width:150px"></label>
@@ -1398,6 +1425,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.p==='cb')loadCb();
   if(t.dataset.p==='tg')loadTg();
   if(t.dataset.p==='goals')loadGoals();
+  if(t.dataset.p==='set'&&ROLE==='admin')calStatus();
   if(t.dataset.p==='wai')waiLoad();
   if(t.dataset.p==='set')opLoad();
 });
@@ -2168,6 +2196,50 @@ async function opTest(){ try{const r=await fetch(API_BASE+'/ops/test',{method:'P
 async function opDigestSend(){ try{const r=await fetch(API_BASE+'/ops/digest-now',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('opMsg').innerHTML='<span style="color:var(--green)">✔ الملخص اتبعت — شوف تليجرام</span>'}catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`} }
 const SMTP_HELP={'smtp.gmail.com':'Gmail: لازم <b>App Password</b> مش باسورد الإيميل — من myaccount.google.com ← Security ← 2-Step Verification ← App passwords.','smtp.office365.com':'Office 365: اليوزر = الإيميل كامل. لو الدخول اترفض، الأدمن يفعّل "Authenticated SMTP" للإيميل ده من Microsoft 365 admin.','smtp.zoho.com':'Zoho: لو مفعّل التحقق بخطوتين اعمل App Password من Zoho Accounts.'};
 document.querySelectorAll('#smtpPre button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#smtpPre button').forEach(x=>x.classList.toggle('on',x===b));if(b.dataset.h)$('smHost').value=b.dataset.h;$('smPort').value=b.dataset.p;$('smHelp').innerHTML=SMTP_HELP[b.dataset.h]||'اسأل اللي ماسك الإيميل عندكم عن SMTP server والبورت (غالبًا 587).';if(!b.dataset.h)$('smHost').focus();});
+/* ===================== التقويم: الأجازات وجدول التقرير ===================== */
+let CAL=null;
+const CAL_DAYS_ORDER=[6,0,1,2,3,4,5];
+async function calOpen(){
+  try{CAL=await (await fetch(API_BASE+'/workcal',{cache:'no-store'})).json();}catch(e){alert(e.message);return}
+  const dn=CAL.dayNames, cn=CAL.countryNames;
+  $('calToday').innerHTML=`النهارده ${CAL.today}${CAL.todayOff?` — <b style="color:var(--amber,#d97706)">🏖️ ${esc(CAL.todayOff)}</b>`:''}`;
+  $('calRepDays').innerHTML='<b style="font-size:13px">أيام الإرسال:</b> '+CAL_DAYS_ORDER.map(d=>`<label><input type="checkbox" class="cal-rd" value="${d}" ${CAL.report.days.includes(d)?'checked':''}> ${dn[d]}</label>`).join('');
+  $('calTime').value=CAL.report.time; $('calSkip').checked=CAL.report.skipHolidays!==false;
+  $('calRepCountry').innerHTML=Object.entries(cn).map(([k,v])=>`<option value="${k}" ${CAL.report.country===k?'selected':''}>${v}</option>`).join('');
+  calCountries();
+  $('calWeekend').innerHTML='<b style="font-size:13px">الأجازة الأسبوعية:</b> '+CAL_DAYS_ORDER.map(d=>`<label><input type="checkbox" class="cal-we" value="${d}" ${CAL.weekend.includes(d)?'checked':''}> ${dn[d]}</label>`).join('');
+  calRender(); $('calMsg').textContent=''; $('calModal').classList.add('show');
+}
+function calCountries(){const cn=CAL.countryNames;
+  $('calCountries').innerHTML='<b style="font-size:13px">الدول:</b> '+Object.entries(cn).map(([k,v])=>`<label><input type="checkbox" class="cal-c" value="${k}" ${CAL.countries.includes(k)?'checked':''}> ${v}</label>${CAL.countries.includes(k)?`<button class="btn o sm" style="padding:2px 8px;margin-left:8px" onclick="calLoad('${k}')">⬇️ حمّل أجازات ${v.split(' ').pop()}</button>`:''}`).join('');
+  const yrs=[...new Set(CAL.holidays.map(h=>h.from.slice(0,4)))].sort();
+  const cur=$('calFilt').value; $('calFilt').innerHTML=`<option value="">كل الأجازات</option>`+yrs.map(y=>`<option value="y${y}">${y}</option>`).join('')+CAL.countries.map(k=>`<option value="c${k}">${cn[k]}</option>`).join('')+'<option value="c*">كل الشركة</option>'; $('calFilt').value=cur;}
+function calRead(){ // نقرا الجدول (الصفوف المعروضة بس بتتعدّل)
+  document.querySelectorAll('#calTbl tr[data-i]').forEach(tr=>{const h=CAL.holidays[+tr.dataset.i];if(!h)return;
+    h.from=tr.querySelector('.ch-f').value; h.to=tr.querySelector('.ch-t').value||h.from; h.name=tr.querySelector('.ch-n').value; h.country=tr.querySelector('.ch-c').value;});}
+function calRender(){
+  const f=$('calFilt').value, cn={...CAL.countryNames,'*':'🏢 كل الشركة'};
+  const rows=CAL.holidays.map((h,i)=>({h,i})).filter(({h})=>!f||(f[0]==='y'?h.from.startsWith(f.slice(1)):h.country===f.slice(1)));
+  $('calTbl').innerHTML=`<thead><tr><th>من</th><th>لحد</th><th>الأجازة</th><th>الدولة</th><th></th><th></th></tr></thead><tbody>`+(rows.map(({h,i})=>`<tr data-i="${i}" class="${h.estimated?'est':''}">
+    <td><input type="date" class="ch-f" value="${h.from}"></td><td><input type="date" class="ch-t" value="${h.to||h.from}"></td>
+    <td><input class="ch-n" value="${esc(h.name)}" style="min-width:160px"></td>
+    <td><select class="ch-c">${Object.entries(cn).map(([k,v])=>`<option value="${k}" ${h.country===k?'selected':''}>${v}</option>`).join('')}</select></td>
+    <td style="font-size:12px;white-space:nowrap">${h.source==='auto'?(h.estimated?'🌙 تقديري':'🤖 رسمي'):'✍️ يدوي'}</td>
+    <td><button class="x" title="امسح" onclick="calDel(${i})">✕</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">مفيش أجازات — اختار الدولة ودوس ⬇️ حمّل</td></tr>')+'</tbody>';
+}
+function calAdd(){calRead();const d=CAL.today;CAL.holidays.unshift({from:d,to:d,name:'أجازة سنوية',country:'*',source:'manual'});$('calFilt').value='';calRender();document.querySelector('#calTbl .ch-n')?.select();}
+function calDel(i){calRead();CAL.holidays.splice(i,1);calRender();}
+function calBody(){calRead();return {countries:[...document.querySelectorAll('.cal-c:checked')].map(x=>x.value),weekend:[...document.querySelectorAll('.cal-we:checked')].map(x=>+x.value),
+  report:{days:[...document.querySelectorAll('.cal-rd:checked')].map(x=>+x.value),time:$('calTime').value||'21:00',skipHolidays:$('calSkip').checked,country:$('calRepCountry').value},holidays:CAL.holidays};}
+async function calSave(){ $('calMsg').innerHTML='<span class="muted">بيحفظ…</span>';
+  try{const r=await fetch(API_BASE+'/workcal',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(calBody())});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    CAL={...CAL,...j}; calRender(); calStatus(); $('calMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>';}catch(e){$('calMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}}
+async function calLoad(k){ $('calMsg').innerHTML='<span class="muted">بيحمّل الأجازات…</span>';
+  try{await calSave(); const r=await fetch(API_BASE+'/workcal/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({country:k})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    CAL={...CAL,...j}; calCountries(); calRender(); calStatus(); $('calMsg').innerHTML=`<span style="color:var(--green)">✔ اتحمّل ${j.loaded} يوم أجازة لـ ${esc(CAL.countryNames[k])}</span>`;}catch(e){$('calMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}}
+async function calStatus(){ if(!$('setCalSt'))return; try{const c=CAL||await (await fetch(API_BASE+'/workcal',{cache:'no-store'})).json();
+  const up=c.holidays.filter(h=>(h.to||h.from)>=c.today).slice(0,2);
+  $('setCalSt').innerHTML=`🕘 التقرير: ${c.report.days.length===7?'كل يوم':CAL_DAYS_ORDER.filter(d=>c.report.days.includes(d)).map(d=>c.dayNames[d]).join('، ')} الساعة <b>${c.report.time}</b>`+(c.todayOff?`<br>🏖️ النهارده أجازة: ${esc(c.todayOff)}`:'')+(up.length?`<br>📅 الجاي: ${up.map(h=>`${esc(h.name)} (${h.from})`).join(' · ')}`:'');}catch(e){} }
 function smtpPaste(){
   let t=$('smPaste').value.trim(); if(!t)return; let j=null;
   const tries=[t,'{'+t+'}','{'+t.replace(/,\s*$/,'')+'}'];
