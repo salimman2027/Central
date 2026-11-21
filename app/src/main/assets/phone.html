@@ -823,7 +823,7 @@ setInterval(() => { NQTodo.remind(); NQTodo.render(); }, 30000);
 setInterval(() => { if (document.visibilityState === "visible") NQTodo.sync(); }, 300000);
 /* ===== بياناتي: التحويلة + رقم الشريحة + الجهاز والبورت ===== */
 const NQMe = {
-  show() {
+  show(retried) {
     const m = (NQInbox.data && NQInbox.data.me) || {};
     const ext = m.ext || NQPhone.ext || "—";
     const row = (k, v, copy) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line,#e5e7eb)"><span style="opacity:.7">${k}</span><b class="ltr" style="direction:ltr">${v || "—"}</b>${copy && v ? `<button class="iconbtn" style="width:32px;height:32px;font-size:14px" onclick="navigator.clipboard&&navigator.clipboard.writeText('${v}');toast('اتنسخ ✓')">📋</button>` : ""}</div>`;
@@ -837,7 +837,10 @@ const NQMe = {
       ${m.device ? `<div style="margin-top:10px;font-size:13px;color:${m.deviceUp ? "#17803d" : "#b91c1c"}">${m.deviceUp ? "🟢 الجهاز متصل بالسنترال" : "🔴 الجهاز فاصل — اتصل من شريحتك لحد ما يرجع"}</div>` : ""}
       ${!m.sim ? `<div style="margin-top:10px;font-size:13px;opacity:.7">رقم الشريحة لسه مش متسجّل — المدير يضيفه من شاشة الموظفين</div>` : ""}
       <button class="btn" style="width:100%;margin-top:14px" onclick="document.getElementById('meSheet').remove()">تمام</button></div>`;
-    if (!NQInbox.data && typeof NQInbox.poll === "function") NQInbox.poll().then(() => o.isConnected && NQMe.show()).catch(() => {});
+    // مرة واحدة بس نجيب البيانات من السيرفر لو ناقصة (من غير لفّة لا نهائية)
+    if (!retried && !(NQInbox.data && NQInbox.data.me) && typeof NQInbox.poll === "function") {
+      Promise.resolve().then(() => NQInbox.poll()).then(() => { const x = document.getElementById("meSheet"); if (x && NQInbox.data && NQInbox.data.me) NQMe.show(true); }).catch(() => {});
+    }
   }
 };
 function toast(t) { const e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = "none", 2500); }
