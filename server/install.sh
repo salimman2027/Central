@@ -385,6 +385,26 @@ if [[ "${1:-}" == whatsapp ]]; then
   echo "   وبعدها اعمل Subscribe على: messages"
   exit 0
 fi
+if [[ "${1:-}" == email ]]; then
+  echo "إرسال التقرير اليومي بالإيميل (SMTP). مثال Gmail: smtp.gmail.com / 587 / إيميلك / App Password (مش باسورد الإيميل):"
+  echo "  الـ App Password من: myaccount.google.com ← Security ← 2-Step Verification ← App passwords"
+  read -rp "SMTP server [smtp.gmail.com]: " SH; SH=${SH:-smtp.gmail.com}
+  read -rp "Port [587]: " SP; SP=${SP:-587}
+  read -rp "اليوزر (الإيميل اللي هيبعت): " SU
+  read -rsp "الباسورد / App password: " SW; echo
+  read -rp "اسم المرسل يظهر كـ [NQ Call Center]: " SN; SN=${SN:-NQ Call Center}
+  SW=$(printf '%s' "$SW" | tr -d ' '); [[ -n "$SU" && -n "$SW" ]] || { echo "✖ ناقص بيانات"; exit 1; }
+  setv NQ_SMTP_HOST "$SH"; setv NQ_SMTP_PORT "$SP"; setv NQ_SMTP_USER "$SU"; setv NQ_SMTP_PASS "$SW"; setv NQ_SMTP_NAME "$SN"
+  systemctl restart nq-calls
+  python3 - "$SH" "$SP" "$SU" "$SW" <<'PY' && echo "✔ الإيميل اتربط — حط إيميلات المديرين من اللوحة ودوس 📧 تجربة" || echo "✖ السيرفر رفض الدخول — اتأكد من البيانات (Gmail لازم App Password)"
+import smtplib, ssl, sys
+h, p, u, w = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
+s = smtplib.SMTP_SSL(h, p, timeout=15, context=ssl.create_default_context()) if p == 465 else smtplib.SMTP(h, p, timeout=15)
+if p != 465: s.starttls(context=ssl.create_default_context())
+s.login(u, w); s.quit()
+PY
+  exit 0
+fi
 if [[ "${1:-}" == partner ]]; then
   K=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))")
   setv NQ_PARTNER_KEY "$K"; systemctl restart nq-calls

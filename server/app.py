@@ -1133,7 +1133,7 @@ def get_teams():
                        "hasPassword": raw.get(t["id"], {}).get("leaderUser", "") in users}
                       for t in c.get("teams", [])],
             "reps": [{"ext": str(r["id"]), "name": r.get("name", ""), "team": r.get("team", "")} for r in c.get("reps", [])],
-            "managers": [{"name": m.get("name", ""), "user": m.get("user", ""), "teams": m.get("teams", []),
+            "managers": [{"name": m.get("name", ""), "user": m.get("user", ""), "teams": m.get("teams", []), "email": m.get("email", ""),
                           "hasPassword": m.get("user", "") in users} for m in _teams_file().get("managers", [])]}
 
 
@@ -1238,7 +1238,10 @@ def _check_managers(b: dict, team_ids: set, leader_users: set):
         seen.add(k)
         if pw:
             pws.append((user, pw))
-        out.append({"name": name, "user": user, "teams": ids})
+        em = str(m.get("email") or "").strip()[:120]
+        if em and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", em):
+            raise HTTPException(400, f"إيميل المشرف \"{name}\" غلط")
+        out.append({"name": name, "user": user, "teams": ids, "email": em})
     return out, pws, set(old_users) - seen
 
 

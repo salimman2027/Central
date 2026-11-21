@@ -29,7 +29,7 @@ CTX = {"dir": Path("/var/lib/nq-calls"), "tz": dt.timezone(dt.timedelta(hours=3)
        "appointments": lambda: [], "analysis": None, "crm_get": None, "crm_on": lambda: False,
        "sales_ids": lambda: {}, "training": lambda: {}}
 
-DEFAULTS = {"cap": 0, "capWarn": 80, "digestHour": 21, "spyExts": [], "callbackDays": 3, "leads": True}
+DEFAULTS = {"cap": 0, "capWarn": 80, "digestHour": 21, "spyExts": [], "callbackDays": 3, "leads": True, "emails": [], "emailSupervisors": True}
 STATE = {"gateway": "unknown", "gatewayAt": None, "checked": None, "digestDay": "", "leadsAt": 0, "spySig": ""}
 
 
@@ -107,6 +107,115 @@ def tg_send(text: str) -> bool:
     except Exception as e:  # noqa: BLE001
         print("telegram failed:", e, flush=True)
         return False
+
+
+# ------------------------------------------------------------------ الإيميل (التقرير اليومي للمديرين)
+def mail_ready() -> bool:
+    return bool(os.environ.get("NQ_SMTP_HOST") and os.environ.get("NQ_SMTP_USER") and os.environ.get("NQ_SMTP_PASS"))
+
+
+def mail_send(to: list, subject: str, html: str, text: str = "") -> str:
+    """بيرجّع "" لو اتبعت أو سبب الفشل"""
+    import smtplib
+    import ssl
+    from email.message import EmailMessage
+    from email.utils import formataddr
+    to = [x for x in to if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", x or "")]
+    if not to:
+        return "مفيش إيميلات"
+    if not mail_ready():
+        return "الإيميل مش متظبط — على السيرفر: sudo nq-setkey email"
+    m = EmailMessage()
+    m["Subject"], m["From"], m["To"] = subject, formataddr((os.environ.get("NQ_SMTP_NAME", "NQ Call Center"), os.environ["NQ_SMTP_USER"])), ", ".join(to)
+    m.set_content(text or re.sub(r"<[^>]+>", "", html))
+    m.add_alternative(html, subtype="html")
+    try:
+        h, port = os.environ["NQ_SMTP_HOST"], int(os.environ.get("NQ_SMTP_PORT") or 587)
+        ctx = ssl.create_default_context()
+        s = smtplib.SMTP_SSL(h, port, timeout=20, context=ctx) if port == 465 else smtplib.SMTP(h, port, timeout=20)
+        with s:
+            if port != 465:
+                s.starttls(context=ctx)
+            s.login(os.environ["NQ_SMTP_USER"], os.environ["NQ_SMTP_PASS"])
+            s.send_message(m)
+        return ""
+    except Exception as e:  # noqa: BLE001
+        print("mail failed:", e, flush=True)
+        return str(e)[:200]
+
+
+def digest_html(exts: set | None = None, title: str = "") -> str:
+    """التقرير اليومي كإيميل (HTML): الإجمالي، الفرق، الموظفين، الأهداف، الفائتة. exts = فرق المشرف بس"""
+    import html as H
+    d = now().date()
+    rows = [r for r in board(d, d) if exts is None or r["ext"] in exts]
+    cbs = [c for c in callbacks(1) if exts is None or c["ext"] in exts]
+    fu = [f for f in followups() if exts is None or f["ext"] in exts]
+    tot = lambda k, rs: sum(r[k] for r in rs)  # noqa: E731
+    e = H.escape
+    st = "font-family:Tahoma,Arial,sans-serif;direction:rtl;text-align:right"
+    td = "padding:6px 10px;border-bottom:1px solid #e5e7eb"
+    kpi = lambda lbl, v: f'<td style="padding:12px;background:#f0fdfa;border-radius:10px;text-align:center"><div style="font-size:12px;color:#64748b">{lbl}</div><div style="font-size:22px;font-weight:bold;color:#0f766e">{v}</div></td>'  # noqa: E731
+    out = [f'<div style="{st};max-width:760px;margin:auto;color:#0f172a">',
+           f'<h2 style="margin:0 0 4px">📊 التقرير اليومي — {d:%Y-%m-%d}</h2><div style="color:#64748b;margin-bottom:14px">{e(title or "كل الفرق")}</div>',
+           '<table style="width:100%;border-spacing:8px"><tr>' + kpi("مكالمات", tot("calls", rows)) + kpi("اترد عليها", tot("answered", rows))
+           + kpi("دقايق كلام", tot("talkMin", rows)) + kpi("مواعيد", tot("appts", rows)) + '</tr></table>']
+    tm = CTX["teams"]() or {}
+    teams = [t["name"] for t in tm.get("teams", [])] + [""]
+    for tn in teams:
+        rs = [r for r in rows if (r["team"] or "") == tn]
+        if not rs:
+            continue
+        out.append(f'<h3 style="margin:18px 0 6px">👥 {e(tn or "بدون فريق")} — {tot("calls", rs)} مكالمة · {tot("appts", rs)} ميعاد</h3>')
+        out.append(f'<table style="width:100%;border-collapse:collapse;font-size:14px"><tr style="background:#f1f5f9"><th style="{td}">الموظف</th><th style="{td}">مكالمات</th><th style="{td}">اترد</th><th style="{td}">دقايق</th><th style="{td}">مواعيد</th><th style="{td}">التقييم</th><th style="{td}">النقط</th></tr>'
+                   + "".join(f'<tr><td style="{td}"><b>{e(r["name"])}</b> <span style="color:#94a3b8">{r["ext"]}</span></td><td style="{td}">{r["calls"]}</td><td style="{td}">{r["answered"]}</td>'
+                             f'<td style="{td}">{r["talkMin"]}</td><td style="{td}">{r["appts"]}</td><td style="{td}">{r["score"] if r["score"] is not None else "—"}</td><td style="{td}"><b>{r["points"]}</b></td></tr>' for r in rs) + '</table>')
+    try:   # الأهداف (الشهر لحد النهارده)
+        import goals as G
+        p = G.progress("month")
+        prs = [r for r in p["reps"] if exts is None or r["ext"] in exts]
+        if prs:
+            col = lambda v: "#16a34a" if v >= 100 else "#0ea5e9" if v >= 70 else "#f59e0b" if v >= 40 else "#ef4444"  # noqa: E731
+            out.append(f'<h3 style="margin:18px 0 6px">🏆 الأهداف — الشهر (عدّى {p["elapsed"]}% منه)</h3><table style="width:100%;border-collapse:collapse;font-size:14px">'
+                       f'<tr style="background:#f1f5f9"><th style="{td}">الموظف</th>' + "".join(f'<th style="{td}">{e(m["name"])}</th>' for m in p["metrics"]) + f'<th style="{td}">الإجمالي</th></tr>'
+                       + "".join(f'<tr><td style="{td}">{e(r["name"])}</td>' + "".join(
+                           f'<td style="{td}">{"—" if r["m"][m["k"]]["pct"] is None else str(r["m"][m["k"]]["pct"]) + "%"}</td>' for m in p["metrics"])
+                           + f'<td style="{td}"><b style="color:{col(r["score"])}">{r["score"]}%</b></td></tr>' for r in prs) + '</table>')
+    except Exception as ex:  # noqa: BLE001
+        print("digest goals:", ex, flush=True)
+    if cbs:
+        out.append(f'<h3 style="margin:18px 0 6px;color:#b91c1c">📞 {len(cbs)} عميل اتصل ومحدش رد عليه لسه</h3><ul>'
+                   + "".join(f'<li>{e(c["customer"] or c["number"])} — عند {e(c["name"])} — مستني من {c["waitMin"] // 60}س {c["waitMin"] % 60}د</li>' for c in cbs[:15]) + '</ul>')
+    if fu:
+        out.append(f'<h3 style="margin:18px 0 6px">🔔 {len(fu)} متابعة ميعادها جه ومتعملتش</h3><ul>'
+                   + "".join(f'<li>{e(f["customer"] or f["number"])} — {e(f["name"])} — {f["due"]}</li>' for f in fu[:15]) + '</ul>')
+    host = os.environ.get("NQ_HOST", "")
+    if host:
+        out.append(f'<p style="margin-top:20px"><a href="https://{e(host)}/calls/" style="background:#0f766e;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">افتح اللوحة</a></p>')
+    out.append('<p style="color:#94a3b8;font-size:12px;margin-top:20px">NQ Call Monitor — بيتبعت أوتوماتيك كل يوم</p></div>')
+    return "".join(out)
+
+
+def email_digest() -> dict:
+    """يبعت التقرير: الإيميلات العامة = كل الفرق، وكل مشرف ليه إيميل = فرقه بس"""
+    s = settings()
+    sent, errs = [], []
+    subj = f"📊 تقرير مكالمات NQ — {now():%Y-%m-%d}"
+    if s.get("emails"):
+        r = mail_send(s["emails"], subj, digest_html(None, "كل الفرق"))
+        (errs if r else sent).append(r or ", ".join(s["emails"]))
+    if s.get("emailSupervisors", True):
+        tm = CTX["teams"]() or {}
+        tnames = {t["id"]: t["name"] for t in tm.get("teams", [])}
+        assign = {str(k): v for k, v in (tm.get("assign") or {}).items()}
+        for m in tm.get("managers", []):
+            if not m.get("email") or m["email"] in (s.get("emails") or []):
+                continue
+            ids = set(m.get("teams") or [])
+            ex = {e for e, t in assign.items() if t in ids}
+            r = mail_send([m["email"]], subj, digest_html(ex, "، ".join(tnames.get(i, i) for i in ids)))
+            (errs if r else sent).append(r or m["email"])
+    return {"sent": sent, "errors": errs}
 
 
 # ------------------------------------------------------------------ التنبيهات
@@ -619,6 +728,8 @@ def tick():
         _jsave("digest.json", {"day": day, "text": txt, "at": t.isoformat()})
         STATE["digestDay"] = day
         tg_send(txt)
+        if mail_ready():
+            threading.Thread(target=email_digest, daemon=True).start()
         if t.weekday() == 3:   # الخميس: تقدّم خطة التدريب
             pr = [x for x in training_progress() if x["delta"] is not None]
             if pr:
@@ -709,7 +820,7 @@ def api_progress():
 
 @router.get("/api/ops/settings")
 def get_ops():
-    return {**settings(), "telegram": tg_ready()}
+    return {**settings(), "telegram": tg_ready(), "email": mail_ready(), "emailFrom": os.environ.get("NQ_SMTP_USER", "")}
 
 
 @router.put("/api/ops/settings")
@@ -729,9 +840,30 @@ async def put_ops(request: Request):
         s["spyExts"] = [e for e in (str(x).strip() for x in b["spyExts"] or []) if re.fullmatch(r"\d{2,6}", e)]
     if "leads" in b:
         s["leads"] = bool(b["leads"])
+    if "emails" in b:
+        em = [x.strip() for x in (b["emails"] if isinstance(b["emails"], list) else re.split(r"[,\s;]+", str(b["emails"]))) if str(x).strip()]
+        bad = [x for x in em if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", x)]
+        if bad:
+            raise HTTPException(400, f"إيميل غلط: {bad[0]}")
+        s["emails"] = em[:20]
+    if "emailSupervisors" in b:
+        s["emailSupervisors"] = bool(b["emailSupervisors"])
     _jsave("ops.json", {k: s[k] for k in DEFAULTS})
     STATE["spySig"] = ""
     return get_ops()
+
+
+@router.post("/api/ops/email-test")
+def ops_email_test():
+    """يبعت تقرير النهارده دلوقتي لكل الإيميلات (تجربة)"""
+    if not mail_ready():
+        raise HTTPException(400, "الإيميل مش متظبط — على السيرفر: sudo nq-setkey email")
+    r = email_digest()
+    if not r["sent"] and not r["errors"]:
+        raise HTTPException(400, "مفيش إيميلات — اكتب إيميلات المديرين الأول")
+    if r["errors"] and not r["sent"]:
+        raise HTTPException(502, "الإيميل مااتبعتش: " + r["errors"][0])
+    return r
 
 
 @router.post("/api/ops/test")
