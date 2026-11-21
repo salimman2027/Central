@@ -110,33 +110,48 @@ def tg_send(text: str) -> bool:
 
 
 # ------------------------------------------------------------------ الإيميل (التقرير اليومي للمديرين)
+def smtp_conf() -> dict:
+    """إعدادات الإيميل: من شاشة الأدمن (smtp.json) — ولو مش متظبطة هناك من nq-setkey email"""
+    j = _jload("smtp.json", {})
+    env = {"host": os.environ.get("NQ_SMTP_HOST", ""), "port": int(os.environ.get("NQ_SMTP_PORT") or 587),
+           "user": os.environ.get("NQ_SMTP_USER", ""), "password": os.environ.get("NQ_SMTP_PASS", ""),
+           "name": os.environ.get("NQ_SMTP_NAME", "NQ Call Center")}
+    return {**env, **{k: v for k, v in j.items() if v not in ("", None)}} if j.get("host") else env
+
+
 def mail_ready() -> bool:
-    return bool(os.environ.get("NQ_SMTP_HOST") and os.environ.get("NQ_SMTP_USER") and os.environ.get("NQ_SMTP_PASS"))
+    c = smtp_conf()
+    return bool(c["host"] and c["user"] and c["password"])
+
+
+def smtp_login(c: dict):
+    import smtplib
+    import ssl
+    ctx = ssl.create_default_context()
+    port = int(c.get("port") or 587)
+    s = smtplib.SMTP_SSL(c["host"], port, timeout=20, context=ctx) if port == 465 else smtplib.SMTP(c["host"], port, timeout=20)
+    if port != 465:
+        s.starttls(context=ctx)
+    s.login(c["user"], c["password"])
+    return s
 
 
 def mail_send(to: list, subject: str, html: str, text: str = "") -> str:
     """بيرجّع "" لو اتبعت أو سبب الفشل"""
-    import smtplib
-    import ssl
     from email.message import EmailMessage
     from email.utils import formataddr
     to = [x for x in to if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", x or "")]
     if not to:
         return "مفيش إيميلات"
     if not mail_ready():
-        return "الإيميل مش متظبط — على السيرفر: sudo nq-setkey email"
+        return "الإيميل مش متظبط — من الإعدادات ← 📧 إعدادات الإيميل"
+    c = smtp_conf()
     m = EmailMessage()
-    m["Subject"], m["From"], m["To"] = subject, formataddr((os.environ.get("NQ_SMTP_NAME", "NQ Call Center"), os.environ["NQ_SMTP_USER"])), ", ".join(to)
+    m["Subject"], m["From"], m["To"] = subject, formataddr((c.get("name") or "NQ Call Center", c["user"])), ", ".join(to)
     m.set_content(text or re.sub(r"<[^>]+>", "", html))
     m.add_alternative(html, subtype="html")
     try:
-        h, port = os.environ["NQ_SMTP_HOST"], int(os.environ.get("NQ_SMTP_PORT") or 587)
-        ctx = ssl.create_default_context()
-        s = smtplib.SMTP_SSL(h, port, timeout=20, context=ctx) if port == 465 else smtplib.SMTP(h, port, timeout=20)
-        with s:
-            if port != 465:
-                s.starttls(context=ctx)
-            s.login(os.environ["NQ_SMTP_USER"], os.environ["NQ_SMTP_PASS"])
+        with smtp_login(c) as s:
             s.send_message(m)
         return ""
     except Exception as e:  # noqa: BLE001
@@ -820,7 +835,7 @@ def api_progress():
 
 @router.get("/api/ops/settings")
 def get_ops():
-    return {**settings(), "telegram": tg_ready(), "email": mail_ready(), "emailFrom": os.environ.get("NQ_SMTP_USER", "")}
+    return {**settings(), "telegram": tg_ready(), "email": mail_ready(), "emailFrom": smtp_conf().get("user", "")}
 
 
 @router.put("/api/ops/settings")
@@ -853,11 +868,47 @@ async def put_ops(request: Request):
     return get_ops()
 
 
+@router.get("/api/ops/smtp")
+def get_smtp():
+    c = smtp_conf()
+    return {"host": c["host"], "port": c["port"], "user": c["user"], "name": c.get("name", ""),
+            "hasPassword": bool(c["password"]), "ready": mail_ready()}
+
+
+@router.put("/api/ops/smtp")
+async def put_smtp(request: Request):
+    """الأدمن يظبط الإيميل اللي هيبعت منه — بنجرّب الدخول قبل ما نحفظ. الباسورد عمره ما بيرجع للشاشة"""
+    b = await request.json()
+    old = smtp_conf()
+    c = {"host": str(b.get("host") or "").strip()[:120], "user": str(b.get("user") or "").strip()[:160],
+         "name": str(b.get("name") or "NQ Call Center").strip()[:80],
+         "password": str(b.get("password") or "").replace(" ", "") or (old["password"] if str(b.get("user") or "").strip() == old["user"] else "")}
+    try:
+        c["port"] = int(b.get("port") or 587)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "البورت لازم يبقى رقم")
+    if not re.fullmatch(r"[\w.\-]+", c["host"]) or not c["user"]:
+        raise HTTPException(400, "اكتب السيرفر والإيميل")
+    if not c["password"]:
+        raise HTTPException(400, "اكتب الباسورد")
+    try:
+        smtp_login(c).quit()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"السيرفر رفض الدخول — اتأكد من البيانات (Gmail لازم App Password): {str(e)[:160]}")
+    f = CTX["dir"] / "smtp.json"
+    f.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
+    try:
+        os.chmod(f, 0o600)
+    except OSError:
+        pass
+    return get_smtp()
+
+
 @router.post("/api/ops/email-test")
 def ops_email_test():
     """يبعت تقرير النهارده دلوقتي لكل الإيميلات (تجربة)"""
     if not mail_ready():
-        raise HTTPException(400, "الإيميل مش متظبط — على السيرفر: sudo nq-setkey email")
+        raise HTTPException(400, "الإيميل مش متظبط — من الإعدادات ← 📧 إعدادات الإيميل")
     r = email_digest()
     if not r["sent"] and not r["errors"]:
         raise HTTPException(400, "مفيش إيميلات — اكتب إيميلات المديرين الأول")

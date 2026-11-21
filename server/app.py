@@ -300,7 +300,7 @@ async def leader_scope(request, call_next):
             if (LEADER_DENY.match(path) or path.startswith(("/api/teams", "/api/logins", "/api/crm/settings"))) or \
                     (request.method != "GET" and path.startswith("/api/") and not path.startswith(REP_WRITE)):
                 return JSONResponse({"detail": "الصفحة دي للمدير بس"}, 403)
-        elif LEADER_DENY.match(path) and (request.method != "GET" or path.startswith("/api/logins")):
+        elif LEADER_DENY.match(path) and (request.method != "GET" or path.startswith(("/api/logins", "/api/ops/smtp"))):
             return JSONResponse({"detail": "الإعدادات للمدير بس"}, 403)
     tok = SCOPE.set(info)
     try:

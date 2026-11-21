@@ -670,6 +670,20 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   </div>
   <div id="glBody"><div class="card muted">بيحمّل…</div></div>
 </div>
+<div class="modal" id="smtpModal" onclick="modalBg(event,this)"><div class="mbox" style="max-width:560px;width:96vw">
+  <h3 style="margin-top:0">📧 إعدادات الإيميل اللي هيبعت التقارير</h3>
+  <div class="muted" style="font-size:12px;margin-bottom:8px">اختار مزوّد الإيميل والسيستم هيملا السيرفر والبورت. بنجرّب الدخول قبل الحفظ، والباسورد بيتحفظ على السيرفر ومش بيظهر تاني.</div>
+  <div class="seg2" id="smtpPre" style="margin-bottom:10px"><button data-h="smtp.gmail.com" data-p="587">Gmail</button><button data-h="smtp.office365.com" data-p="587">Outlook / Office 365</button><button data-h="smtp.zoho.com" data-p="465">Zoho</button><button data-h="" data-p="587">تاني</button></div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px">
+    <label class="lbl">السيرفر (SMTP)<input id="smHost" class="ap-in ltr" dir="ltr" placeholder="smtp.company.com"></label>
+    <label class="lbl">البورت<input id="smPort" class="ap-in ltr" dir="ltr" type="number" value="587"></label>
+  </div>
+  <label class="lbl">الإيميل اللي هيبعت<input id="smUser" class="ap-in ltr" dir="ltr" type="email" autocomplete="off" placeholder="reports@company.com"></label>
+  <label class="lbl">الباسورد <span class="muted" id="smPwHint" style="font-size:12px"></span><input id="smPass" class="ap-in ltr" dir="ltr" type="password" autocomplete="new-password"></label>
+  <label class="lbl">اسم المرسل اللي يظهر<input id="smName" class="ap-in" value="NQ Call Center"></label>
+  <div id="smHelp" class="muted" style="font-size:12px;margin:6px 0"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button class="btn" onclick="smtpSave()">💾 جرّب واحفظ</button><span id="smMsg"></span></div>
+</div></div>
 <div class="modal" id="glSetModal" onclick="modalBg(event,this)"><div class="mbox" style="max-width:900px;width:96vw;max-height:88vh;overflow:auto">
   <h3 style="margin-top:0">⚙️ تحديد الأهداف</h3>
   <div class="muted" style="font-size:12px">الأهداف للمندوب الواحد. سيب خانة الفرقة فاضية عشان تاخد الافتراضي. قائد الفرقة = مجموع أهداف فريقه.</div>
@@ -860,7 +874,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
       </div>
       <div id="opTg" class="muted" style="margin:6px 0"></div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="opSave()">💾 حفظ</button>
-        <button class="btn sm o" onclick="opTest()">📨 جرّب تليجرام</button><button class="btn sm o" onclick="opEmailTest()">📧 ابعت التقرير بالإيميل دلوقتي</button><button class="btn sm o" onclick="opDigest()">📊 شوف ملخص النهارده</button><button class="btn sm o" onclick="opDigestSend()">📨 ابعت الملخص على تليجرام</button><span id="opMsg"></span></div>
+        <button class="btn sm o" onclick="opTest()">📨 جرّب تليجرام</button><button class="btn sm o" onclick="smtpOpen()">⚙️ إعدادات الإيميل</button><button class="btn sm o" onclick="opEmailTest()">📧 ابعت التقرير بالإيميل دلوقتي</button><button class="btn sm o" onclick="opDigest()">📊 شوف ملخص النهارده</button><button class="btn sm o" onclick="opDigestSend()">📨 ابعت الملخص على تليجرام</button><span id="opMsg"></span></div>
       <pre id="opDig" class="op-dig" hidden></pre></div>
     <div class="card set-c"><h3>🛡️ حماية العميل من تكرار الاتصال</h3>
       <p class="muted">العميل بيفضل تبع أول مندوب كلّمه طول ما آخر تواصل منه أقل من المدة دي. أي مندوب تاني بيتنبّه، ولو أصرّ بيتبعت طلب في ⚔️ التعارضات. بعد المدة العميل بيبقى متاح لأي حد.</p>
@@ -2128,7 +2142,7 @@ async function opLoad(){
   try{const j=await (await fetch(API_BASE+'/ops/settings',{cache:'no-store'})).json();
     $('opCap').value=j.cap; $('opWarn').value=j.capWarn; $('opHour').value=j.digestHour; $('opSpy').value=(j.spyExts||[]).join(', '); $('opLeads').checked=!!j.leads;
     $('opEmails').value=(j.emails||[]).join(', '); $('opEmailSup').checked=j.emailSupervisors!==false;
-    $('opTg').dataset.mail=j.email?`<br>📧 الإيميل شغال — بيتبعت من <b dir="ltr">${esc(j.emailFrom)}</b>`:'<br>📧 الإيميل مش متظبط — على السيرفر: <code>sudo nq-setkey email</code>';
+    $('opTg').dataset.mail=j.email?`<br>📧 الإيميل شغال — بيتبعت من <b dir="ltr">${esc(j.emailFrom)}</b>`:'<br>📧 الإيميل مش متظبط — دوس <b>⚙️ إعدادات الإيميل</b>';
     $('opTg').innerHTML=j.telegram?'📨 تليجرام شغال — التنبيهات والملخص بيوصلوا على الجروب':'📨 تليجرام مش متظبط — على السيرفر: <code>sudo nq-setkey telegram</code>';
     $('opTg').innerHTML+=$('opTg').dataset.mail;
   }catch(e){}
@@ -2142,6 +2156,22 @@ async function opSave(){
 }
 async function opTest(){ try{const r=await fetch(API_BASE+'/ops/test',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('opMsg').innerHTML='<span style="color:var(--green)">✔ الرسالة اتبعتت — شوف تليجرام</span>'}catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`} }
 async function opDigestSend(){ try{const r=await fetch(API_BASE+'/ops/digest-now',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('opMsg').innerHTML='<span style="color:var(--green)">✔ الملخص اتبعت — شوف تليجرام</span>'}catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`} }
+const SMTP_HELP={'smtp.gmail.com':'Gmail: لازم <b>App Password</b> مش باسورد الإيميل — من myaccount.google.com ← Security ← 2-Step Verification ← App passwords.','smtp.office365.com':'Office 365: اليوزر = الإيميل كامل. لو الدخول اترفض، الأدمن يفعّل "Authenticated SMTP" للإيميل ده من Microsoft 365 admin.','smtp.zoho.com':'Zoho: لو مفعّل التحقق بخطوتين اعمل App Password من Zoho Accounts.'};
+document.querySelectorAll('#smtpPre button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#smtpPre button').forEach(x=>x.classList.toggle('on',x===b));if(b.dataset.h)$('smHost').value=b.dataset.h;$('smPort').value=b.dataset.p;$('smHelp').innerHTML=SMTP_HELP[b.dataset.h]||'اسأل اللي ماسك الإيميل عندكم عن SMTP server والبورت (غالبًا 587).';if(!b.dataset.h)$('smHost').focus();});
+async function smtpOpen(){
+  try{const j=await (await fetch(API_BASE+'/ops/smtp',{cache:'no-store'})).json();
+    $('smHost').value=j.host||'';$('smPort').value=j.port||587;$('smUser').value=j.user||'';$('smName').value=j.name||'NQ Call Center';$('smPass').value='';
+    $('smPwHint').textContent=j.hasPassword?'(متسجّل ✓ — سيبه فاضي عشان يفضل زي ما هو)':'';
+    document.querySelectorAll('#smtpPre button').forEach(x=>x.classList.toggle('on',!!j.host&&x.dataset.h===j.host));
+    $('smHelp').innerHTML=SMTP_HELP[j.host]||''; $('smMsg').innerHTML=j.ready?'<span style="color:var(--green)">✔ متظبط وشغال</span>':'';
+  }catch(e){} $('smtpModal').classList.add('show');
+}
+async function smtpSave(){ $('smMsg').innerHTML='<span class="muted">بيجرّب الدخول…</span>';
+  try{const r=await fetch(API_BASE+'/ops/smtp',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({host:$('smHost').value.trim(),port:+$('smPort').value||587,user:$('smUser').value.trim(),password:$('smPass').value,name:$('smName').value.trim()})});
+    const j=await r.json(); if(!r.ok)throw new Error(j.detail||r.status);
+    $('smPass').value=''; $('smPwHint').textContent='(متسجّل ✓ — سيبه فاضي عشان يفضل زي ما هو)';
+    $('smMsg').innerHTML='<span style="color:var(--green)">✔ الدخول نجح واتحفظ</span>'; opLoad();
+  }catch(e){$('smMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}}
 async function opEmailTest(){ $('opMsg').innerHTML='<span class="muted">بيبعت…</span>'; try{await opSave(); const r=await fetch(API_BASE+'/ops/email-test',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail);
   $('opMsg').innerHTML=`<span style="color:var(--green)">✔ اتبعت لـ: ${esc(j.sent.join(' · '))}</span>`+(j.errors.length?`<br><span style="color:var(--red)">✖ ${esc(j.errors.join(' · '))}</span>`:'')}catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`} }
 async function opDigest(){ try{const j=await (await fetch(API_BASE+'/digest',{cache:'no-store'})).json(); $('opDig').hidden=false; $('opDig').textContent=j.text;}catch(e){} }
