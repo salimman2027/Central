@@ -732,6 +732,10 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <h3 style="margin-top:0">⚙️ تحديد الأهداف</h3>
   <div class="muted" style="font-size:12px">الأهداف للمندوب الواحد. سيب خانة الفرقة فاضية عشان تاخد الافتراضي. قائد الفرقة = مجموع أهداف فريقه.</div>
   <div class="crm-tw"><table class="crm-tbl" id="glSetTbl"></table></div>
+  <div class="card" style="margin:10px 0 0;padding:10px 12px">
+    <label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="glPlanFixed" style="width:auto;margin-top:4px">
+      <span><b>📅 ثبّت تارجت الشهر ووزّع الأجازات على باقي الأيام</b><br><span class="muted" style="font-size:12px">تارجت الشهر = اليومي × <input type="number" id="glPlanDays" min="1" max="31" style="width:60px;padding:2px 6px"> يوم ثابت مهما كان فيه أجازات. الأيام اللي ضاعت في الأجازات (أو التأخير) بتتوزّع على أيام الشغل الباقية، فالتارجت اليومي بيزيد ويوصل للمندوب تنبيه الصبح على الأبلكيشن. لو مش متعلّمة: تارجت الشهر = اليومي × أيام الشغل الفعلية بس.</span></span></label>
+  </div>
   <div style="margin-top:10px;display:flex;gap:8px;align-items:center"><button class="btn" onclick="glSaveSettings()">💾 حفظ</button><span id="glSetMsg"></span></div>
 </div></div>
 <div class="modal" id="glManModal" onclick="modalBg(event,this)"><div class="mbox" style="max-width:700px;width:96vw;max-height:88vh;overflow:auto">
@@ -1942,7 +1946,9 @@ const glBar=(x,k,big)=>{if(!x||!x.target)return '<span class="muted">—</span>'
   return `<div style="min-width:${big?150:90}px"><div style="display:flex;justify-content:space-between;font-size:${big?13:11}px;gap:6px"><b>${glFmt(x.done,k)}</b><span class="muted">من ${glFmt(x.target,k)}</span><b style="color:${glCol(p)}">${p}%</b></div>
   <div style="height:${big?8:6}px;background:var(--line);border-radius:9px;overflow:hidden;margin-top:3px;position:relative"><div style="height:100%;width:${Math.min(p,100)}%;background:${glCol(p)}"></div>
   ${GL&&GL.period!=='day'?`<div title="المفروض لحد النهارده" style="position:absolute;top:0;bottom:0;right:${100-Math.min(GL.elapsed,100)}%;width:2px;background:var(--fg);opacity:.35"></div>`:''}</div>
-  ${big&&x.forecastPct!=null&&GL.period!=='day'?`<div class="muted" style="font-size:11px;margin-top:2px">📈 لو كمّل كده: ${glFmt(x.forecast,k)} (${x.forecastPct}%)</div>`:''}</div>`;};
+  ${big&&x.forecastPct!=null&&GL.period!=='day'?`<div class="muted" style="font-size:11px;margin-top:2px">📈 لو كمّل كده: ${glFmt(x.forecast,k)} (${x.forecastPct}%)</div>`:''}
+  ${GL&&GL.period!=='day'&&x.pace!=null?(x.need>0?`<div style="font-size:11px;margin-top:2px;color:${x.pace>x.base?'var(--red)':'var(--green)'}" title="المطلوب في اليوم لآخر الفترة">🎯 ${glFmt(x.pace,k)}/يوم${x.pace>x.base?` (+${glFmt(x.pace-x.base,k)})`:''}</div>`:`<div style="font-size:11px;margin-top:2px;color:var(--green)">🎉 اتحقق</div>`):''}
+  ${GL&&GL.period==='day'&&x.extra>0?`<div style="font-size:11px;margin-top:2px;color:var(--red)">⬆️ ${glFmt(x.base,k)} + ${glFmt(x.extra,k)} تعويض</div>`:''}</div>`;};
 document.querySelectorAll('#glSeg button').forEach(b=>b.onclick=()=>{GL_K=b.dataset.k;document.querySelectorAll('#glSeg button').forEach(x=>x.classList.toggle('on',x===b));loadGoals();});
 async function loadGoals(){
   if(!$('glDate').value)$('glDate').value=iso(today);
@@ -1960,11 +1966,13 @@ function renderGoals(){
   const lbl={day:'اليوم',month:'الشهر',quarter:'الربع'}[GL.period];
   const behind=reps.filter(r=>GL.period!=='day'&&r.score<GL.elapsed-20), top=reps.slice(0,3).filter(r=>r.score>0);
   let h=`<div class="card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><b>🏆 أهداف ${lbl} · ${GL.from}${GL.from!==GL.to?' ← '+GL.to:''}</b>
-    ${GL.period!=='day'?`<span class="muted">عدّى ${GL.workdaysDone} من ${GL.workdays} يوم شغل (${GL.elapsed}%) — الخط الرمادي في كل شريط = المفروض توصل له لحد النهارده</span>`:''}</div>
+    ${GL.period!=='day'?`<span class="muted">عدّى ${GL.workdaysDone} من ${GL.workdays} يوم شغل (${GL.elapsed}%) · فاضل ${GL.remDays} يوم — الخط الرمادي = المفروض توصل له لحد النهارده · 🎯 = المطلوب في اليوم لآخر الفترة</span>`:''}</div>
+    ${GL.plan&&GL.plan.fixed?`<div class="muted" style="font-size:12px;margin-top:4px">📅 التارجت الشهري ثابت (اليومي × ${GL.plan.stdDays} يوم) — الأجازات والتأخير بيتوزّعوا على الأيام الباقية</div>`:''}
+    ${(GL.holidays||[]).length?`<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(245,158,11,.12);font-size:13px">🏖️ أجازات جاية: ${GL.holidays.map(h=>`<b>${esc(h.name)}</b> ${h.from.slice(5)}${h.to!==h.from?'←'+h.to.slice(5):''} (${h.lost} يوم شغل${h.estimated?'، تقريبي':''})`).join(' · ')}</div>`:''}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:12px">${M.map(m=>`<div class="card" style="margin:0;padding:12px"><div class="muted" style="font-size:12px">${esc(m.name)}${m.manual?' ✍️':''}</div>${glBar(tot[m.k],m.k,true)}</div>`).join('')}</div></div>`;
   if(GL.period!=='day'&&(top.length||behind.length))h+=`<div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
     <div><b>🏅 الأحسن في ${lbl}</b>${top.map((r,i)=>`<div style="margin-top:6px">${['🥇','🥈','🥉'][i]} <b>${esc(r.name)}</b> <span class="muted">${esc(r.teamName)}</span> — <b style="color:${glCol(r.score)}">${r.score}%</b></div>`).join('')||'<div class="muted">—</div>'}</div>
-    <div><b>⚠️ محتاجين متابعة</b> <span class="muted" style="font-size:12px">(متأخرين عن المفروض بأكتر من 20%)</span>${behind.slice(0,6).map(r=>`<div style="margin-top:6px">• <b>${esc(r.name)}</b> <span class="muted">${esc(r.teamName)}</span> — ${r.score}% <span class="muted">والمفروض ${GL.elapsed}%</span></div>`).join('')||'<div class="muted" style="margin-top:6px">👏 مفيش حد متأخر</div>'}</div></div>`;
+    <div><b>⚠️ محتاجين متابعة</b> <span class="muted" style="font-size:12px">(متأخرين عن المفروض بأكتر من 20%)</span>${behind.slice(0,6).map(r=>`<div style="margin-top:6px">• <b>${esc(r.name)}</b> <span class="muted">${esc(r.teamName)}</span> — ${r.score}% <span class="muted">والمفروض ${GL.elapsed}%</span>${r.m.calls&&r.m.calls.pace?` · <span style="color:var(--red)">محتاج ${r.m.calls.pace} مكالمة/يوم</span>`:''}</div>`).join('')||'<div class="muted" style="margin-top:6px">👏 مفيش حد متأخر</div>'}</div></div>`;
   if(teams.length)h+=`<h3 style="margin:16px 4px 8px">👥 الفرق (القائد = مجموع فريقه)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">${teams.map(t=>`<div class="card" style="margin:0">
     <div style="display:flex;justify-content:space-between"><b>${esc(t.name)}</b><span><span class="muted" style="font-size:12px">${t.reps} مندوب</span> · <b style="color:${glCol(t.score)}">${t.score}%</b></span></div>
     ${M.map(m=>`<div style="margin-top:8px"><div class="muted" style="font-size:12px">${esc(m.name)}</div>${glBar(t.m[m.k],m.k)}</div>`).join('')}</div>`).join('')}</div>`;
@@ -1980,12 +1988,13 @@ async function glSettings(){
   $('glSetTbl').innerHTML=`<thead><tr><th></th>${M.map(m=>`<th>${esc(m.name)}<br><small class="muted">${per[m.per]}${m.unit==='ريال'?' — بالريال':''}</small></th>`).join('')}</tr></thead><tbody>
     <tr style="background:var(--soft,#f6f8fb)"><td><b>⭐ الافتراضي (للكل)</b></td>${M.map(m=>`<td>${inp('*',m.k,GLS.defaults[m.k])}</td>`).join('')}</tr>
     ${TEAMS.map(t=>`<tr><td>${esc(t.name)}</td>${M.map(m=>`<td>${inp(t.id,m.k,(GLS.teams[t.id]||{})[m.k],GLS.defaults[m.k])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  $('glPlanFixed').checked=!!(GLS.plan&&GLS.plan.fixed); $('glPlanDays').value=(GLS.plan&&GLS.plan.stdDays)||22;
   $('glSetMsg').textContent=''; $('glSetModal').classList.add('show');
 }
 async function glSaveSettings(){
   const defaults={}, teams={};
   document.querySelectorAll('#glSetTbl input').forEach(i=>{if(i.value==='')return; if(i.dataset.s==='*')defaults[i.dataset.k]=+i.value; else (teams[i.dataset.s]=teams[i.dataset.s]||{})[i.dataset.k]=+i.value;});
-  try{const r=await fetch(API_BASE+'/goals/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({defaults,teams})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+  try{const r=await fetch(API_BASE+'/goals/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({defaults,teams,plan:{fixed:$('glPlanFixed').checked,stdDays:+$('glPlanDays').value||22}})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
     $('glSetMsg').innerHTML='<span style="color:var(--green)">✔ اتحفظ</span>'; loadGoals();}catch(e){$('glSetMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`}
 }
 async function glManual(mon){

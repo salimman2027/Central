@@ -194,8 +194,13 @@ def digest_html(exts: set | None = None, title: str = "") -> str:
             out.append(f'<h3 style="margin:18px 0 6px">🏆 الأهداف — الشهر (عدّى {p["elapsed"]}% منه)</h3><table style="width:100%;border-collapse:collapse;font-size:14px">'
                        f'<tr style="background:#f1f5f9"><th style="{td}">الموظف</th>' + "".join(f'<th style="{td}">{e(m["name"])}</th>' for m in p["metrics"]) + f'<th style="{td}">الإجمالي</th></tr>'
                        + "".join(f'<tr><td style="{td}">{e(r["name"])}</td>' + "".join(
-                           f'<td style="{td}">{"—" if r["m"][m["k"]]["pct"] is None else str(r["m"][m["k"]]["pct"]) + "%"}</td>' for m in p["metrics"])
-                           + f'<td style="{td}"><b style="color:{col(r["score"])}">{r["score"]}%</b></td></tr>' for r in prs) + '</table>')
+                           f'<td style="{td}">{"—" if r["m"][m["k"]]["pct"] is None else str(r["m"][m["k"]]["pct"]) + "%"}'
+                           + (f'<br><small style="color:{"#dc2626" if (r["m"][m["k"]].get("pace") or 0) > r["m"][m["k"]].get("base", 0) else "#64748b"}">🎯 {r["m"][m["k"]]["pace"]}/يوم</small>'
+                              if r["m"][m["k"]].get("pace") and r["m"][m["k"]].get("need", 0) > 0 else "")
+                           + '</td>' for m in p["metrics"])
+                           + f'<td style="{td}"><b style="color:{col(r["score"])}">{r["score"]}%</b></td></tr>' for r in prs) + '</table>'
+                       + f'<div style="color:#64748b;font-size:12px;margin-top:4px">🎯 = المطلوب في اليوم في الـ {p["remDays"]} يوم شغل الباقيين عشان يحقق تارجت الشهر</div>'
+                       + ("".join(f'<div style="margin-top:6px;padding:6px 10px;background:#fef3c7;border-radius:8px">🏖️ {e(h["name"])} {h["from"]}{" ← " + h["to"] if h["to"] != h["from"] else ""} — {h["lost"]} يوم شغل</div>' for h in p["holidays"][:3])))
     except Exception as ex:  # noqa: BLE001
         print("digest goals:", ex, flush=True)
     if cbs:

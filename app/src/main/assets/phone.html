@@ -789,6 +789,7 @@ const NQTodo = {
     out.push({ t: "🔁 متابعات النهارده", n: fu, go: "NQInbox.open()" });
     if (ld || d.leads) out.push({ t: "🆕 عملاء جداد مستنيين اتصالك", n: ld, go: "NQInbox.open()" });
     try { const day = isoDay(new Date()), tg = NQTargets.all().filter(x => x.date === day); if (tg.length) out.push({ t: "🎯 تارجت النهارده", n: tg.filter(x => !x.done).length, of: tg.length, go: "NQTargets.open()" }); } catch (e) {}
+    try { const g = NQGoals.today(); if (g) out.push({ t: `📞 تارجت مكالمات النهارده${g.extra > 0 ? ` (${g.base} + ${g.extra} تعويض)` : ""}`, n: Math.max(0, g.target - g.done), of: g.target, go: "NQStats.open()" }); } catch (e) {}
     try { const tr = (NQPerf.todoItems ? NQPerf.todoItems() : []); if (tr.length) out.push({ t: "🧠 خطة التدريب", n: tr.filter(x => !x.done).length, of: tr.length, go: "NQPerf.open()" }); } catch (e) {}
     return out;
   },
@@ -817,6 +818,8 @@ const NQTodo = {
   }
 };
 setTimeout(() => { NQTodo.render(); NQTodo.sync(); }, 2500);
+setTimeout(() => { try { NQGoals.load(); } catch (e) {} }, 4000);
+setInterval(() => { if (document.visibilityState === "visible") try { NQGoals.load(); } catch (e) {} }, 600000);
 document.addEventListener("DOMContentLoaded", () => { const p = document.documentElement.dataset.themePref || "light"; document.querySelectorAll(".thm button").forEach(b => b.classList.toggle("sel", b.dataset.t === p)); });
 setInterval(() => { NQTodo.remind(); NQTodo.render(); }, 30000);
 setInterval(() => { if (document.visibilityState === "visible") NQTodo.sync(); }, 300000);
@@ -2151,7 +2154,22 @@ const NQGoals = {
   async load() {
     try { const c = NQOwner.creds(); if (!c) return;
       const r = await fetch(CONFIG.api + "/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c) });
-      if (!r.ok) return; this.data = await r.json(); store.set("nq_goals", this.data); this.render(); } catch (e) {}
+      if (!r.ok) return; this.data = await r.json(); store.set("nq_goals", this.data); this.render(); this.nudge();
+      try { NQTodo.render(); } catch (e) {} } catch (e) {}
+  },
+  /* تارجت مكالمات النهارده (بعد توزيع الأجازات والتأخير على باقي الشهر) */
+  today() { const d = this.data || store.get("nq_goals", null); const me = d && d.day && d.day.me; const x = me && me.m && me.m.calls;
+    return x && x.target ? x : null; },
+  holidayLine(p) { const h = (p && p.holidays || [])[0]; if (!h) return "";
+    const dm = s => { const [, m, d] = s.split("-"); return `${+d}/${+m}`; };
+    return `🏖️ قدامك ${esc(h.name)}${h.estimated ? " (تقريبًا)" : ""} ${dm(h.from)}${h.to !== h.from ? "–" + dm(h.to) : ""} — ${h.lost} يوم شغل اتوزّعوا على باقي الأيام`; },
+  nudge() {   // تنبيه مرة في اليوم بتارجت النهارده لو زاد عن الأساسي
+    const x = this.today(); if (!x) return; const day = isoDay(new Date()), key = "nq_goal_nudge";
+    if (store.get(key, "") === day || new Date().getHours() < 8) return; store.set(key, day);
+    const d = this.data, hl = this.holidayLine(d.month).replace(/<[^>]+>/g, "");
+    const msg = x.extra > 0 ? `تارجتك النهارده ${x.target} مكالمة (${x.base} + ${x.extra} تعويض أجازات/تأخير) عشان تحقق تارجت الشهر` : `تارجتك النهارده ${x.target} مكالمة — يلا بينا 💪`;
+    toast("🎯 " + msg);
+    try { if (IS_APP && Android.notify) Android.notify(8800, "🎯 تارجت النهارده", msg + (hl ? "\n" + hl : "")); } catch (e) {}
   },
   render() {
     const box = $("sGoals"); if (!box) return;
@@ -2163,11 +2181,16 @@ const NQGoals = {
       return `<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${esc(m.name)}${m.manual ? " ✍️" : ""}</span><span><b>${fmt(x.done, m.k)}</b> <span style="opacity:.6">من ${fmt(x.target, m.k)}</span> · <b style="color:${col(pc)}">${pc}%</b></span></div>
         <div style="height:8px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:4px;position:relative"><div style="height:100%;width:${Math.min(pc, 100)}%;background:${col(pc)}"></div>
         ${k !== "day" ? `<div style="position:absolute;top:0;bottom:0;right:${100 - Math.min(p.elapsed, 100)}%;width:2px;background:var(--fg);opacity:.35"></div>` : ""}</div>
-        ${k !== "day" && x.forecastPct != null ? `<div style="font-size:11px;opacity:.6;margin-top:2px">📈 لو كمّلت كده: ${fmt(x.forecast, m.k)} (${x.forecastPct}%)</div>` : ""}</div>`; }).join("");
+        ${k !== "day" && x.forecastPct != null ? `<div style="font-size:11px;opacity:.6;margin-top:2px">📈 لو كمّلت كده: ${fmt(x.forecast, m.k)} (${x.forecastPct}%)</div>` : ""}
+        ${k !== "day" && x.pace != null && x.need > 0 ? `<div style="font-size:12px;margin-top:3px;color:${x.pace > x.base ? "#dc2626" : "#16a34a"}">🎯 المطلوب: <b>${x.pace}</b> في اليوم في الـ ${x.remDays} يوم شغل الباقيين${x.pace > x.base ? ` (الأساسي ${x.base} — زوّد ${x.pace - x.base})` : " ✓"}</div>` : ""}
+        ${k !== "day" && x.pace != null && x.need <= 0 ? `<div style="font-size:12px;margin-top:3px;color:#16a34a">🎉 حققت تارجت ${k === "month" ? "الشهر" : "الربع"}!</div>` : ""}
+        ${k === "day" && x.extra > 0 ? `<div style="font-size:12px;margin-top:3px;color:#dc2626">⬆️ تارجت النهارده ${x.target} = ${x.base} + ${x.extra} تعويض الأجازات والتأخير عشان تلحق الشهر</div>` : ""}</div>`; }).join("");
+    const hl = this.holidayLine(k === "day" ? d.day : p);
     const t = p.team;
     box.hidden = false;
     box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b>🏆 أهدافي</b><b style="font-size:20px;color:${col(me.score)}">${me.score}%</b></div>
-      ${k !== "day" ? `<div style="font-size:12px;opacity:.65;margin-top:2px">عدّى ${p.elapsed}% من الفترة — الخط الرمادي = المفروض توصل له لحد النهارده</div>` : ""}${rows}
+      ${k !== "day" ? `<div style="font-size:12px;opacity:.65;margin-top:2px">عدّى ${p.elapsed}% من الفترة — الخط الرمادي = المفروض توصل له لحد النهارده</div>` : ""}
+      ${hl ? `<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(245,158,11,.12);font-size:12.5px">${hl}</div>` : ""}${rows}
       ${t ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px">👥 ${esc(t.name)}: الفريق حقق <b style="color:${col(t.score)}">${t.score}%</b> من هدفه</div>` : ""}`;
   }
 };

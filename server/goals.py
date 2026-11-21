@@ -26,6 +26,9 @@ METRICS = [  # المفتاح، الاسم، وحدة الهدف، المصدر
     {"k": "sales", "name": "مبيعات", "per": "quarter", "unit": "ريال", "manual": True},
 ]
 DEFAULTS = {"calls": 100, "answered": 50, "meetings": 20, "closed": 5, "sales": 600000}
+# خطة التارجت: fixed = التارجت الشهري ثابت (اليومي × stdDays) مهما كان فيه أجازات،
+# فالأيام اللي ضاعت في الأجازات بتتوزّع على باقي أيام الشغل (المطلوب يوميًا بيزيد)
+PLAN = {"fixed": True, "stdDays": 22}
 WORKDAYS = {6, 0, 1, 2, 3}   # Python weekday: الأحد=6 … الخميس=3
 
 
@@ -41,6 +44,7 @@ def load() -> dict:
     d.setdefault("defaults", dict(DEFAULTS))
     d.setdefault("teams", {})
     d.setdefault("manual", {})
+    d["plan"] = {**PLAN, **(d.get("plan") or {})}
     return d
 
 
@@ -94,13 +98,44 @@ def targets_for(team: str, g: dict) -> dict:
     return t
 
 
-def scale(metric: dict, val: float, a: dt.date, b: dt.date) -> float:
-    """هدف الفترة: اليومي × أيام الشغل، الشهري × عدد الشهور، الربع سنوي ÷ 3 لكل شهر"""
+def scale(metric: dict, val: float, a: dt.date, b: dt.date, plan: dict | None = None) -> float:
+    """هدف الفترة: اليومي × أيام الشغل (أو × أيام ثابتة لو الخطة ثابتة)، الشهري × عدد الشهور، الربع سنوي ÷ 3 لكل شهر"""
     if metric["per"] == "day":
+        if plan and plan.get("fixed"):
+            return val * float(plan.get("stdDays") or 22) * len(months_in(a, b))
         return val * workdays(a, b)
     if metric["per"] == "month":
         return val * len(months_in(a, b))
     return val * len(months_in(a, b)) / 3
+
+
+def holidays_ahead(a: dt.date, b: dt.date) -> list:
+    """الأجازات (اللي في أيام شغل) من a لحد b — عشان ننبّه المناديب"""
+    try:
+        import workcal
+        c = workcal.load()
+        country = (c["countries"] or [None])[0]
+        out = []
+        for h in c["holidays"]:
+            if h.get("country") not in ("*", country, "", None):
+                continue
+            x, y = dt.date.fromisoformat(h["from"]), dt.date.fromisoformat(h.get("to") or h["from"])
+            if y < a or x > b:
+                continue
+            x0, y0 = max(x, a), min(y, b)
+            lost = sum(1 for i in range((y0 - x0).days + 1) if (x0 + dt.timedelta(days=i)).weekday() not in c["weekend"])
+            if lost:
+                out.append({"name": h.get("name") or "أجازة", "from": h["from"], "to": h.get("to") or h["from"], "lost": lost,
+                            "estimated": bool(h.get("estimated"))})
+        return sorted(out, key=lambda h: h["from"])
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def rem_start() -> dt.date:
+    """أيام الشغل الباقية بتتحسب من النهارده — وبعد الساعة 5 العصر من بكرة"""
+    now = dt.datetime.now(CTX["tz"])
+    return now.date() + dt.timedelta(days=1 if now.hour >= 17 else 0)
 
 
 def progress(kind: str = "month", ref: dt.date | None = None) -> dict:
@@ -108,6 +143,13 @@ def progress(kind: str = "month", ref: dt.date | None = None) -> dict:
     a, b = period_range(kind, ref)
     upto = min(b, today())
     g = load()
+    plan = g["plan"]
+    mplan = None
+    if kind == "day" and plan.get("fixed") and ref == today():
+        # تارجت النهارده = (تارجت الشهر − اللي اتعمل قبل النهارده) ÷ أيام الشغل الباقية بالنهارده
+        mp = progress("month", ref)
+        left = workdays(ref, mp["_b"])
+        mplan = {r["ext"]: r for r in mp["reps"]} if left and workdays(ref, ref) else None
     tm = CTX["teams"]() or {}
     assign = {str(k): v for k, v in (tm.get("assign") or {}).items()}
     tnames = {t["id"]: t["name"] for t in tm.get("teams", [])}
@@ -150,15 +192,30 @@ def progress(kind: str = "month", ref: dt.date | None = None) -> dict:
                "m": {}}
         pcts = []
         for m in METRICS:
+            base, extra = tg[m["k"]], 0
             if kind == "day":   # اليوم: الأهداف اليومية بس (حتى لو النهارده أجازة)
-                target = tg[m["k"]] if m["per"] == "day" else 0
+                target = base if m["per"] == "day" else 0
+                if target and mplan and e in mplan:   # تعويض الأجازات والتأخير على باقي الشهر
+                    mm = mplan[e]["m"][m["k"]]
+                    need = mm["target"] - (mm["done"] - act[e][m["k"]])
+                    target = int(max(base, -(-need // max(1, left))))
+                    extra = target - base
             else:
-                target = round(scale(m, tg[m["k"]], a, b), 1)
+                target = round(scale(m, tg[m["k"]], a, b, plan), 1)
             done = act[e][m["k"]]
             pct = round(done * 100 / target) if target else None
             fc = round(done / frac) if frac > 0 and upto < b else done
             row["m"][m["k"]] = {"target": target, "done": done, "pct": pct, "forecast": fc,
                                 "forecastPct": round(fc * 100 / target) if target else None}
+            if m["per"] == "day":
+                row["m"][m["k"]]["base"] = base
+                if kind == "day":
+                    row["m"][m["k"]]["extra"] = extra
+                else:   # المطلوب يوميًا من دلوقتي لآخر الفترة
+                    rs = max(rem_start(), a)
+                    rd = workdays(rs, b) if rs <= b else 0
+                    need = max(0, target - done)
+                    row["m"][m["k"]].update(remDays=rd, need=need, pace=(int(-(-need // rd)) if rd else None))
             if pct is not None:
                 pcts.append(min(pct, 150))
         row["score"] = round(sum(pcts) / len(pcts)) if pcts else 0
@@ -170,6 +227,10 @@ def progress(kind: str = "month", ref: dt.date | None = None) -> dict:
             for m in METRICS:
                 for k in ("target", "done", "forecast"):
                     t["m"][m["k"]][k] += row["m"][m["k"]][k]
+                for k in ("base", "need", "pace", "extra"):
+                    v = row["m"][m["k"]].get(k)
+                    if v is not None:
+                        t["m"][m["k"]][k] = t["m"][m["k"]].get(k, 0) + v
     for t in teams.values():
         ps = []
         for m in METRICS:
@@ -181,9 +242,12 @@ def progress(kind: str = "month", ref: dt.date | None = None) -> dict:
                 ps.append(min(x["pct"], 150))
         t["score"] = round(sum(ps) / len(ps)) if ps else 0
     reps.sort(key=lambda r: -r["score"])
+    rs = max(rem_start(), a)
+    hz = b if kind != "day" else ref + dt.timedelta(days=14)
     return {"period": kind, "from": str(a), "to": str(b), "upto": str(upto), "elapsed": round(frac * 100),
-            "workdays": workdays(a, b), "workdaysDone": workdays(a, upto), "metrics": METRICS,
-            "reps": reps, "teams": sorted(teams.values(), key=lambda t: -t["score"]), "months": months_in(a, b)}
+            "workdays": workdays(a, b), "workdaysDone": workdays(a, upto), "metrics": METRICS, "plan": plan,
+            "remDays": workdays(rs, b) if rs <= b else 0, "holidays": holidays_ahead(max(today(), a), hz),
+            "reps": reps, "teams": sorted(teams.values(), key=lambda t: -t["score"]), "months": months_in(a, b), "_b": b}
 
 
 # ------------------------------------------------------------------ اللوحة
@@ -198,7 +262,7 @@ def api_progress(period: str = "month", date: str = ""):
 @router.get("/api/goals/settings")
 def get_settings():
     g = load()
-    return {"defaults": g["defaults"], "teams": g["teams"], "metrics": METRICS}
+    return {"defaults": g["defaults"], "teams": g["teams"], "metrics": METRICS, "plan": g["plan"]}
 
 
 @router.put("/api/goals/settings")
@@ -221,6 +285,13 @@ async def put_settings(request: Request):
             g["defaults"] = {**DEFAULTS, **clean(b["defaults"])}
         if "teams" in b:
             g["teams"] = {str(t): clean(v) for t, v in (b["teams"] or {}).items() if clean(v)}
+        if "plan" in b:
+            p = b["plan"] or {}
+            try:
+                sd = min(31, max(1, int(float(p.get("stdDays") or 22))))
+            except (TypeError, ValueError):
+                raise HTTPException(400, "عدد أيام الشغل غلط")
+            g["plan"] = {"fixed": bool(p.get("fixed")), "stdDays": sd}
         _save(g)
     return get_settings()
 
@@ -265,5 +336,7 @@ async def app_goals(request: Request):
         team = None
         if me and me["team"]:
             team = next((t for t in p["teams"] if t["id"] == me["team"]), None)
-        out[kind] = {"from": p["from"], "to": p["to"], "elapsed": p["elapsed"], "me": me, "team": team}
+        out[kind] = {"from": p["from"], "to": p["to"], "elapsed": p["elapsed"], "me": me, "team": team,
+                     "remDays": p["remDays"], "holidays": p["holidays"]}
+    out["plan"] = load()["plan"]
     return JSONResponse({"metrics": METRICS, **out}, headers=HDR)
