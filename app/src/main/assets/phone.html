@@ -379,7 +379,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
 <section id="scrDial" class="screen withtabs">
   <div class="topbar">
     <span id="regDot" class="dot"></span>
-    <div class="who"><b id="whoExt">—</b><small id="whoSt">متصل بالسنترال</small></div>
+    <div class="who"><b><span id="whoExt">—</span> <span id="topVer" style="font-size:10.5px;font-weight:500;opacity:.5;border:1px solid currentColor;border-radius:6px;padding:0 5px;vertical-align:middle;direction:ltr;display:inline-block"></span></b><small id="whoSt">متصل بالسنترال</small></div>
     <button class="iconbtn todobtn" onclick="NQTodo.open()" aria-label="مهام اليوم" title="مهام اليوم" style="position:relative">✅<i class="tbadge" id="todoBadge" style="position:absolute;top:-4px;left:-4px"></i></button>
     <button class="iconbtn mebtn" onclick="NQMe.show()" aria-label="بياناتي" title="رقمي والشريحة والجهاز">؟</button>
     <button class="viachip app-only" id="viaChip" onclick="NQVia.cycle()"></button>
@@ -856,7 +856,7 @@ const store = {
 const DEFAULT_SERVER = { host: "3.89.245.93.sslip.io", port: "443", path: "/ws" };
 const IS_APP = !!window.Android;
 const APP_VER = (() => { try { return IS_APP && Android.appVersion ? "v" + Android.appVersion() : "web __VER__"; } catch (e) { return ""; } })();
-document.addEventListener("DOMContentLoaded", () => { const v = document.getElementById("appVer"); if (v) v.textContent = APP_VER; });
+document.addEventListener("DOMContentLoaded", () => { ["appVer", "topVer"].forEach(id => { const v = document.getElementById(id); if (v) v.textContent = APP_VER; }); });
 if (!IS_APP) document.body.classList.add("web");
 const CONFIG = { wss: [], domain: "", api: "", iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 const NQSettings = {
