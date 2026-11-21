@@ -147,7 +147,7 @@ def mail_send(to: list, subject: str, html: str, text: str = "") -> str:
         return "الإيميل مش متظبط — من الإعدادات ← 📧 إعدادات الإيميل"
     c = smtp_conf()
     m = EmailMessage()
-    m["Subject"], m["From"], m["To"] = subject, formataddr((c.get("name") or "NQ Call Center", c["user"])), ", ".join(to)
+    m["Subject"], m["From"], m["To"] = subject, formataddr((c.get("name") or "NQ Call Center", c.get("from") or c["user"])), ", ".join(to)
     m.set_content(text or re.sub(r"<[^>]+>", "", html))
     m.add_alternative(html, subtype="html")
     try:
@@ -871,7 +871,7 @@ async def put_ops(request: Request):
 @router.get("/api/ops/smtp")
 def get_smtp():
     c = smtp_conf()
-    return {"host": c["host"], "port": c["port"], "user": c["user"], "name": c.get("name", ""),
+    return {"host": c["host"], "port": c["port"], "user": c["user"], "name": c.get("name", ""), "from": c.get("from", ""),
             "hasPassword": bool(c["password"]), "ready": mail_ready()}
 
 
@@ -881,7 +881,7 @@ async def put_smtp(request: Request):
     b = await request.json()
     old = smtp_conf()
     c = {"host": str(b.get("host") or "").strip()[:120], "user": str(b.get("user") or "").strip()[:160],
-         "name": str(b.get("name") or "NQ Call Center").strip()[:80],
+         "name": str(b.get("name") or "NQ Call Center").strip()[:80], "from": str(b.get("from") or "").strip()[:160],
          "password": str(b.get("password") or "").replace(" ", "") or (old["password"] if str(b.get("user") or "").strip() == old["user"] else "")}
     try:
         c["port"] = int(b.get("port") or 587)

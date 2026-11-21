@@ -674,6 +674,9 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
 <div class="modal" id="smtpModal" onclick="modalBg(event,this)"><div class="mbox" style="max-width:560px;width:96vw">
   <h3 style="margin-top:0">📧 إعدادات الإيميل اللي هيبعت التقارير</h3>
   <div class="muted" style="font-size:12px;margin-bottom:8px">اختار مزوّد الإيميل والسيستم هيملا السيرفر والبورت. بنجرّب الدخول قبل الحفظ، والباسورد بيتحفظ على السيرفر ومش بيظهر تاني.</div>
+  <details style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:600">📋 الصق إعدادات SMTP جاهزة (من الـ CRM أو appsettings.json)</summary>
+    <textarea id="smPaste" dir="ltr" rows="6" class="ap-in" style="width:100%;box-sizing:border-box;margin-top:6px;font-family:monospace;font-size:12px" placeholder='"Smtp": { "Host": "mail.company.com", "Port": 587, "Username": "...", "Password": "...", "From": "...", "DisplayName": "..." }'></textarea>
+    <button class="btn o sm" style="margin-top:6px" onclick="smtpPaste()">⬇️ املا الخانات من اللي لزقته</button> <span id="smPasteMsg" class="muted" style="font-size:12px"></span></details>
   <div class="seg2" id="smtpPre" style="margin-bottom:10px"><button data-h="smtp.gmail.com" data-p="587">Gmail</button><button data-h="smtp.office365.com" data-p="587">Outlook / Office 365</button><button data-h="smtp.zoho.com" data-p="465">Zoho</button><button data-h="" data-p="587">تاني</button></div>
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px">
     <label class="lbl">السيرفر (SMTP)<input id="smHost" class="ap-in ltr" dir="ltr" placeholder="smtp.company.com"></label>
@@ -682,6 +685,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <label class="lbl">الإيميل اللي هيبعت<input id="smUser" class="ap-in ltr" dir="ltr" type="email" autocomplete="off" placeholder="reports@company.com"></label>
   <label class="lbl">الباسورد <span class="muted" id="smPwHint" style="font-size:12px"></span><input id="smPass" class="ap-in ltr" dir="ltr" type="password" autocomplete="new-password"></label>
   <label class="lbl">اسم المرسل اللي يظهر<input id="smName" class="ap-in" value="NQ Call Center"></label>
+  <label class="lbl">إيميل المرسل (From) <span class="muted" style="font-size:12px">— سيبه فاضي لو هو نفس الإيميل اللي فوق</span><input id="smFrom" class="ap-in ltr" dir="ltr" type="email" autocomplete="off"></label>
   <div id="smHelp" class="muted" style="font-size:12px;margin:6px 0"></div>
   <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button class="btn" onclick="smtpSave()">💾 جرّب واحفظ</button><span id="smMsg"></span></div>
 </div></div>
@@ -2164,16 +2168,33 @@ async function opTest(){ try{const r=await fetch(API_BASE+'/ops/test',{method:'P
 async function opDigestSend(){ try{const r=await fetch(API_BASE+'/ops/digest-now',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('opMsg').innerHTML='<span style="color:var(--green)">✔ الملخص اتبعت — شوف تليجرام</span>'}catch(e){$('opMsg').innerHTML=`<span style="color:var(--red)">✖ ${esc(e.message)}</span>`} }
 const SMTP_HELP={'smtp.gmail.com':'Gmail: لازم <b>App Password</b> مش باسورد الإيميل — من myaccount.google.com ← Security ← 2-Step Verification ← App passwords.','smtp.office365.com':'Office 365: اليوزر = الإيميل كامل. لو الدخول اترفض، الأدمن يفعّل "Authenticated SMTP" للإيميل ده من Microsoft 365 admin.','smtp.zoho.com':'Zoho: لو مفعّل التحقق بخطوتين اعمل App Password من Zoho Accounts.'};
 document.querySelectorAll('#smtpPre button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#smtpPre button').forEach(x=>x.classList.toggle('on',x===b));if(b.dataset.h)$('smHost').value=b.dataset.h;$('smPort').value=b.dataset.p;$('smHelp').innerHTML=SMTP_HELP[b.dataset.h]||'اسأل اللي ماسك الإيميل عندكم عن SMTP server والبورت (غالبًا 587).';if(!b.dataset.h)$('smHost').focus();});
+function smtpPaste(){
+  let t=$('smPaste').value.trim(); if(!t)return; let j=null;
+  const tries=[t,'{'+t+'}','{'+t.replace(/,\s*$/,'')+'}'];
+  for(const x of tries){try{j=JSON.parse(x);break}catch(e){}}
+  if(!j){ // سطور key: value أو key=value
+    j={}; t.replace(/["']?([A-Za-z]+)["']?\s*[:=]\s*["']?([^"',\n}]*)["']?/g,(m,k,v)=>{j[k]=v.trim()}); }
+  const flat={}; const walk=o=>{for(const [k,v] of Object.entries(o||{})){if(v&&typeof v==='object')walk(v);else flat[k.toLowerCase().replace(/[_\s-]/g,'')]=v}}; walk(j);
+  const g=(...ks)=>{for(const k of ks)if(flat[k]!=null&&flat[k]!=='')return String(flat[k]);return ''};
+  const host=g('host','server','smtphost','smtpserver'), port=g('port','smtpport'), user=g('username','user','login','smtpuser','email'),
+        pass=g('password','pass','pwd','smtppassword'), from=g('from','fromaddress','fromemail','sender'), name=g('displayname','fromname','name','sendername');
+  if(!host&&!user){$('smPasteMsg').innerHTML='<span style="color:var(--red)">✖ مش لاقي Host أو Username في اللي لزقته</span>';return}
+  if(host)$('smHost').value=host; if(port)$('smPort').value=port; if(user||from)$('smUser').value=user||from; if(pass)$('smPass').value=pass; if(name)$('smName').value=name;
+  $('smFrom').value=from&&from!==user?from:'';
+  document.querySelectorAll('#smtpPre button').forEach(x=>x.classList.remove('on'));
+  $('smPaste').value=''; // مايفضلش الباسورد ظاهر في الصندوق
+  $('smPasteMsg').innerHTML=`<span style="color:var(--green)">✔ اتملت: ${esc(host)} · ${esc(port||'587')} · ${esc(user||from)}${pass?' · الباسورد ✓':''} — دوس "جرّب واحفظ"</span>`;
+}
 async function smtpOpen(){
   try{const j=await (await fetch(API_BASE+'/ops/smtp',{cache:'no-store'})).json();
-    $('smHost').value=j.host||'';$('smPort').value=j.port||587;$('smUser').value=j.user||'';$('smName').value=j.name||'NQ Call Center';$('smPass').value='';
+    $('smHost').value=j.host||'';$('smPort').value=j.port||587;$('smUser').value=j.user||'';$('smName').value=j.name||'NQ Call Center';$('smPass').value='';$('smFrom').value=j.from||'';
     $('smPwHint').textContent=j.hasPassword?'(متسجّل ✓ — سيبه فاضي عشان يفضل زي ما هو)':'';
     document.querySelectorAll('#smtpPre button').forEach(x=>x.classList.toggle('on',!!j.host&&x.dataset.h===j.host));
     $('smHelp').innerHTML=SMTP_HELP[j.host]||''; $('smMsg').innerHTML=j.ready?'<span style="color:var(--green)">✔ متظبط وشغال</span>':'';
   }catch(e){} $('smtpModal').classList.add('show');
 }
 async function smtpSave(){ $('smMsg').innerHTML='<span class="muted">بيجرّب الدخول…</span>';
-  try{const r=await fetch(API_BASE+'/ops/smtp',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({host:$('smHost').value.trim(),port:+$('smPort').value||587,user:$('smUser').value.trim(),password:$('smPass').value,name:$('smName').value.trim()})});
+  try{const r=await fetch(API_BASE+'/ops/smtp',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({host:$('smHost').value.trim(),port:+$('smPort').value||587,user:$('smUser').value.trim(),password:$('smPass').value,name:$('smName').value.trim(),from:$('smFrom').value.trim()})});
     const j=await r.json(); if(!r.ok)throw new Error(j.detail||r.status);
     $('smPass').value=''; $('smPwHint').textContent='(متسجّل ✓ — سيبه فاضي عشان يفضل زي ما هو)';
     $('smMsg').innerHTML='<span style="color:var(--green)">✔ الدخول نجح واتحفظ</span>'; opLoad();
