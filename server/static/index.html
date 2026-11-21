@@ -859,6 +859,10 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="card set-c"><h3>📅 مواعيد المهندسين للمناديب</h3>
       <p class="muted">اختار مهندس (أي موظف في الـ CRM) وحدد مين من المناديب يشوف يومه في التطبيق — فاضي إمتى ومحجوز إمتى — عشان يحدد مع العميل ميعاد مناسب.</p>
       <button class="btn" onclick="engOpen()">تعديل</button></div>
+    <div class="card set-c"><h3>📧 التقرير اليومي بالإيميل</h3>
+      <p class="muted">الإيميل اللي هيبعت التقارير (Gmail / Outlook / إيميل الشركة)، والتقرير بيوصل كل يوم لإيميلات المديرين، وكل مشرف يوصله تقرير فرقه.</p>
+      <div id="setMailSt" class="muted" style="font-size:13px;margin-bottom:8px"></div>
+      <button class="btn" onclick="smtpOpen()">⚙️ إعدادات الإيميل</button></div>
     <div class="card set-c"><h3>💬 رسايل واتساب</h3>
       <p class="muted">قوالب الرسايل اللي الموظف بيبعتها للعميل بعد المكالمة بزرار واحد — وممكن تحط معاها ملف (كتالوج، عرض سعر، بروفايل الشركة) والعميل بيفتحه من رابط.</p>
       <button class="btn" onclick="waOpen()">تعديل القوالب</button></div>
@@ -2146,6 +2150,7 @@ async function opLoad(){
     $('opTg').dataset.mail=j.email?`<br>📧 الإيميل شغال — بيتبعت من <b dir="ltr">${esc(j.emailFrom)}</b>`:'<br>📧 الإيميل مش متظبط — دوس <b>⚙️ إعدادات الإيميل</b>';
     $('opTg').innerHTML=j.telegram?'📨 تليجرام شغال — التنبيهات والملخص بيوصلوا على الجروب':'📨 تليجرام مش متظبط — على السيرفر: <code>sudo nq-setkey telegram</code>';
     $('opTg').innerHTML+=$('opTg').dataset.mail;
+    if($('setMailSt'))$('setMailSt').innerHTML=j.email?`✅ شغال — بيبعت من <b dir="ltr">${esc(j.emailFrom)}</b>${(j.emails||[]).length?` لـ ${(j.emails||[]).length} إيميل`:' — اكتب إيميلات المديرين في كارت التشغيل'}`:'⚠️ لسه مش متظبط';
   }catch(e){}
 }
 async function opSave(){
