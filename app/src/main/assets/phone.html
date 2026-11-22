@@ -490,6 +490,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   <div id="cState" class="sub">جاري الاتصال…</div>
   <div class="ccard" id="cCard"></div>
   <div class="spacer"></div>
+  <div id="cDtmf" style="text-align:center;font-size:22px;letter-spacing:4px;min-height:28px;direction:ltr;opacity:.85"></div>
   <div class="incall-pad" id="callPad"></div>
   <div class="ctrls">
     <button class="ctrl" id="cMute" onclick="NQPhone.toggleMute()"><b>🎙</b>كتم</button>
@@ -1175,7 +1176,9 @@ const NQPhone = {
       $("dialErr").textContent = "خط السنترال بتاعك وصل حد المكالمات النهارده — اتصل من شريحتك";
       return IS_APP ? NQVia.open(number) : undefined;
     }
-    if (this.session) return;
+    if (this.session && !this._clearStale()) { $("dialErr").textContent = "فيه مكالمة لسه مفتوحة — اقفلها الأول (لو مش ظاهرة دوس اتصال تاني)"; this._stuckTap = (this._stuckTap || 0) + 1;
+      if (this._stuckTap >= 2) { this._forceReset(); $("dialErr").textContent = "اتمسحت المكالمة المعلّقة — اتصل تاني"; } return; }
+    this._stuckTap = 0;
     if (window.Android) Android.onCallStateChanged(true);
     const out = pbxNumber(number);
     if (out !== number) toast(`📞 بيتصل على ${out} (رقم مصري من الشريحة السعودي)`);
@@ -1201,12 +1204,32 @@ const NQPhone = {
     if (window.Android) Android.setSpeaker(this.speaker);
   },
 
-  dtmf(d) { if (this.session && this.callStart) try { this.session.sendDTMF(d); } catch (e) {} },
+  /* الأرقام أثناء المكالمة (الرد الآلي / التحويلات): RFC2833 جوه الصوت — والسنترال والجيتواي بيفهموها؛ ولو فشلت نبعتها SIP INFO */
+  dtmf(d) {
+    const s = this.session; if (!s || s.isEnded()) return;
+    try { s.sendDTMF(d, { transportType: "RFC2833", duration: 160, interToneGap: 80 }); }
+    catch (e) { try { s.sendDTMF(d, { transportType: "INFO", duration: 160 }); } catch (x) {} }
+    try { $("cDtmf").textContent = (($("cDtmf").textContent || "") + d).slice(-20); } catch (e) {}
+  },
+  /* مكالمة قديمة علّقت (اتقفلت من الناحية التانية ومجالهاش إشعار) — بتمنع المكالمة الجاية والواردة (بتطلع مشغول) */
+  _clearStale() {
+    const s = this.session; if (!s) return true;
+    let dead = false;
+    try { dead = s.isEnded() || (!this.callStart && Date.now() - this.started > 75000) || (this.callStart && s.status === 0); } catch (e) { dead = true; }
+    if (dead) this._forceReset();
+    return dead;
+  },
+  _forceReset() {
+    const s = this.session; this.session = null; clearInterval(this.timer); this.callStart = null; this.muted = false; this.speaker = false;
+    try { if (s && !s.isEnded()) s.terminate(); } catch (e) {}
+    try { if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); } else NQWeb.stopRing(); } catch (e) {}
+    show("scrDial");
+  },
 
   /* ---- internal ---- */
   _onSession(e) {
     const s = e.session;
-    if (this.session) { s.terminate({ status_code: 486 }); return; }
+    if (this.session && !this._clearStale()) { s.terminate({ status_code: 486 }); return; }
     this.session = s;
     this.direction = e.originator === "remote" ? "in" : "out";
     // الجيتواي ساعات بيبعت اسم حسابه (dinastar1) مكان الرقم والرقم الحقيقي في اسم العرض
@@ -1215,7 +1238,7 @@ const NQPhone = {
     this.callStart = null; this.started = new Date();
     this.muted = false; this.speaker = false;
     $("cMute").classList.remove("on"); $("cSpk").classList.remove("on");
-    $("callPad").classList.remove("on"); $("cPad").classList.remove("on");
+    $("callPad").classList.remove("on"); $("cPad").classList.remove("on"); try { $("cDtmf").textContent = ""; } catch (e) {}
 
     if (this.direction === "in") {
       $("inNum").textContent = this.peer; $("cName").innerHTML = ""; $("inCard").innerHTML = ""; $("cCard").innerHTML = "";
@@ -1233,8 +1256,10 @@ const NQPhone = {
 
     // اللابتوب فيه كروت شبكة كتير (VPN، Hyper-V…) وتجميع ICE ممكن يعلّق دقيقة —
     // نبعت المكالمة بعد أول ثانية من آخر candidate بدل ما نستنى للآخر
-    let iceT = null;
-    s.on("icecandidate", ev => { clearTimeout(iceT); iceT = setTimeout(() => { try { ev.ready(); } catch (x) {} }, 1000); });
+    // وحد أقصى ثانية ونص من أول candidate — عشان المكالمة ماتقعدش ساكتة من غير جرس
+    let iceT = null, iceCap = null;
+    s.on("icecandidate", ev => { clearTimeout(iceT); iceT = setTimeout(() => { try { ev.ready(); } catch (x) {} }, 700);
+      if (!iceCap) iceCap = setTimeout(() => { try { ev.ready(); } catch (x) {} }, 1500); });
     s.on("peerconnection", ev => this._audio(ev.peerconnection));
     if (s.connection) this._audio(s.connection);
     s.on("progress", () => { if (this.direction === "out") $("cState").textContent = "بيرن…"; });
