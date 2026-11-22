@@ -396,7 +396,8 @@ def _scope_exts():
 @router.get("/api/wai/diag")
 def api_diag():
     """فحص الربط: التوكن، الرقم، اشتراك الـ webhook، آخر حاجة وصلت من Meta، وآخر غلطات الإرسال"""
-    c, out = cfg(), {"ready": ready(), "phoneId": bool(c["phone_id"]), "waba": bool(c["waba"]), "verify": bool(c["verify"]),
+    c = cfg()
+    out = {"ready": ready(), "phoneId": bool(c["phone_id"]), "waba": bool(c["waba"]), "verify": bool(c["verify"]),
                      "secret": bool(c["secret"]), "checks": []}
     def chk(name, fn):
         try:
