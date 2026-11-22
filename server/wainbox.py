@@ -212,22 +212,40 @@ def hook_verify(request: Request):
     raise HTTPException(403, "bad verify token")
 
 
+HOOK = {"hits": 0, "last": "", "lastOk": "", "lastErr": "", "msgs": 0, "statuses": 0}
+
+
+def _hook_note(**k):
+    HOOK.update(k)
+    try:
+        (CTX["dir"] / "wa_hook.json").write_text(json.dumps(HOOK, ensure_ascii=False))
+    except OSError:
+        pass
+
+
 @router.post("/app/wa-hook")
 async def hook(request: Request):
     raw = await request.body()
+    HOOK["hits"] += 1
     sec = cfg()["secret"]
     if sec:
         sig = request.headers.get("x-hub-signature-256", "")
         good = "sha256=" + hmac.new(sec.encode(), raw, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, good):
+            _hook_note(last=now(), lastErr="توقيع غلط (App Secret مش مطابق) — الرسايل الجاية اترفضت")
             raise HTTPException(403, "bad signature")
     try:
         data = json.loads(raw or b"{}")
     except ValueError:
         return {"ok": True}
+    _hook_note(last=now(), lastOk=now(), lastErr="")
     for ent in data.get("entry") or []:
         for ch in ent.get("changes") or []:
             v = ch.get("value") or {}
+            HOOK["msgs"] += len(v.get("messages") or [])
+            HOOK["statuses"] += len(v.get("statuses") or [])
+            for er in v.get("errors") or []:
+                _hook_note(lastErr="واتساب: " + str(er.get("message") or er.get("title") or er)[:200])
             names = {c.get("wa_id"): (c.get("profile") or {}).get("name", "") for c in v.get("contacts") or []}
             for m in v.get("messages") or []:
                 try:
@@ -302,6 +320,8 @@ def thread(phone: str, before: int = 0) -> list:
 
 
 def do_send(phone: str, ext: str, b: dict) -> dict:
+    if not re.fullmatch(r"\d{8,15}", phone or ""):
+        raise HTTPException(400, "رقم العميل غلط")
     c = ensure_conv(phone, str(b.get("name") or ""), ext if ext != "admin" else "")
     if c["ext"] and ext not in ("admin", c["ext"]):
         raise HTTPException(403, "العميل ده تبع مندوب تاني")
@@ -371,6 +391,62 @@ def unread_for(ext: str) -> int:
 def _scope_exts():
     sc = CTX["scope"]()
     return None if sc is None else {str(e) for e in sc["exts"]}
+
+
+@router.get("/api/wai/diag")
+def api_diag():
+    """فحص الربط: التوكن، الرقم، اشتراك الـ webhook، آخر حاجة وصلت من Meta، وآخر غلطات الإرسال"""
+    c, out = cfg(), {"ready": ready(), "phoneId": bool(c["phone_id"]), "waba": bool(c["waba"]), "verify": bool(c["verify"]),
+                     "secret": bool(c["secret"]), "checks": []}
+    def chk(name, fn):
+        try:
+            out["checks"].append({"name": name, "ok": True, **fn()})
+        except HTTPException as e:
+            out["checks"].append({"name": name, "ok": False, "err": str(e.detail)})
+        except Exception as e:  # noqa: BLE001
+            out["checks"].append({"name": name, "ok": False, "err": str(e)[:200]})
+    if ready():
+        def phone():
+            j = graph("GET", f"{c['phone_id']}?fields=display_phone_number,verified_name,quality_rating,code_verification_status,name_status,status,platform_type,throughput")
+            ok = (j.get("status") in (None, "CONNECTED")) and j.get("platform_type", "CLOUD_API") == "CLOUD_API"
+            return {"ok": ok, "info": {k: j.get(k) for k in ("display_phone_number", "verified_name", "status", "quality_rating", "name_status", "code_verification_status", "platform_type")}}
+        chk("الرقم", phone)
+        def tok():
+            j = graph("GET", f"debug_token?input_token={urllib.parse.quote(c['token'])}")
+            d = j.get("data") or {}
+            exp = d.get("expires_at") or 0
+            return {"ok": bool(d.get("is_valid")), "info": {"valid": d.get("is_valid"), "type": d.get("type"),
+                    "expires": ("مابيخلصش" if not exp else dt.datetime.fromtimestamp(exp, dt.timezone.utc).strftime("%Y-%m-%d %H:%M")),
+                    "scopes": d.get("scopes")}}
+        chk("التوكن", tok)
+        if c["waba"]:
+            def sub():
+                j = graph("GET", f"{c['waba']}/subscribed_apps")
+                apps = [((a.get("whatsapp_business_api_data") or {}).get("name") or a.get("name") or "app") for a in j.get("data") or []]
+                return {"ok": bool(apps), "info": {"apps": apps}, **({} if apps else {"err": "الـ WABA مش مشترك في أي App — رسايل العملاء مش هتوصلنا"})}
+            chk("اشتراك الرسايل الواردة", sub)
+    try:
+        h = json.loads((CTX["dir"] / "wa_hook.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        h = dict(HOOK)
+    out["hook"] = h
+    rows = db().execute("SELECT phone, dir, type, status, error, at FROM msgs ORDER BY id DESC LIMIT 8").fetchall()
+    out["recent"] = [dict(r) for r in rows]
+    out["counts"] = dict(db().execute("SELECT SUM(dir='in') AS inn, SUM(dir='out') AS outt, SUM(status='failed') AS failed FROM msgs").fetchone())
+    return out
+
+
+@router.post("/api/wai/repair")
+async def api_repair():
+    """يشترك الـ App في رسايل الـ WABA (لو مش مشترك) + يمسح المحادثة الفاضية"""
+    c = cfg()
+    res = {}
+    if c["waba"]:
+        res["subscribe"] = graph("POST", f"{c['waba']}/subscribed_apps", {})
+    with LOCK:
+        db().execute("DELETE FROM convs WHERE phone=''")
+        db().commit()
+    return {"ok": True, **res}
 
 
 @router.get("/api/wai/status")
