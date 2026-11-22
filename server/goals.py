@@ -110,24 +110,25 @@ def scale(metric: dict, val: float, a: dt.date, b: dt.date, plan: dict | None = 
 
 
 def holidays_ahead(a: dt.date, b: dt.date) -> list:
-    """الأجازات (اللي في أيام شغل) من a لحد b — عشان ننبّه المناديب"""
+    """الأجازات (ومعاها أيام التعويض) اللي بتاكل أيام شغل من a لحد b — عشان ننبّه المناديب"""
     try:
         import workcal
         c = workcal.load()
         country = (c["countries"] or [None])[0]
-        out = []
-        for h in c["holidays"]:
-            if h.get("country") not in ("*", country, "", None):
-                continue
-            x, y = dt.date.fromisoformat(h["from"]), dt.date.fromisoformat(h.get("to") or h["from"])
-            if y < a or x > b:
-                continue
-            x0, y0 = max(x, a), min(y, b)
-            lost = sum(1 for i in range((y0 - x0).days + 1) if (x0 + dt.timedelta(days=i)).weekday() not in c["weekend"])
-            if lost:
-                out.append({"name": h.get("name") or "أجازة", "from": h["from"], "to": h.get("to") or h["from"], "lost": lost,
-                            "estimated": bool(h.get("estimated"))})
-        return sorted(out, key=lambda h: h["from"])
+        off = workcal.days_off(country, c)
+        groups = {}
+        for d, n in sorted(off.items()):
+            if a <= d <= b and d.weekday() not in c["weekend"]:
+                base = n[len("تعويض "):] if n.startswith("تعويض ") else n
+                g = groups.setdefault(base, {"name": base, "from": d.isoformat(), "to": d.isoformat(), "lost": 0, "comp": [], "estimated": False})
+                g["lost"] += 1
+                g["to"] = d.isoformat()
+                if n.startswith("تعويض "):
+                    g["comp"].append(d.isoformat())
+        est = {h.get("name") for h in c["holidays"] if h.get("estimated")}
+        for g in groups.values():
+            g["estimated"] = g["name"] in est
+        return sorted(groups.values(), key=lambda h: h["from"])
     except Exception:  # noqa: BLE001
         return []
 

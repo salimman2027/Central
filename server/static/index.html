@@ -687,6 +687,8 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <h4>🌍 الدول والأجازة الأسبوعية</h4>
   <div class="cal-days" id="calCountries"></div>
   <div class="cal-days" id="calWeekend" style="margin-top:4px"></div>
+  <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:13px"><input type="checkbox" id="calComp" style="width:auto;margin-top:3px">
+    <span><b>🔁 الأجازة الرسمية اللي تيجي في يوم أجازة أسبوعية تتعوّض</b> بأول يوم شغل بعدها <span class="muted">(تقدر تلغي التعويض لأجازة معيّنة من عمود "تعويض" في الجدول)</span></span></label>
   <h4 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">🏖️ الأجازات
     <span style="display:flex;gap:6px;flex-wrap:wrap"><select id="calFilt" class="ap-in" style="width:auto" onchange="calRender()"></select>
       <button class="btn o sm" onclick="calAdd()">＋ أجازة (سنوية / خاصة)</button></span></h4>
@@ -708,6 +710,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <label>الدولة <select id="crCountry" class="ap-in" style="width:auto" onchange="crRender()"></select></label>
     <label>السنة <select id="crYear" class="ap-in" style="width:auto" onchange="crRender()"></select></label>
     <span class="cal-days" id="crWe" style="font-size:13px"></span>
+    <label style="font-size:13px;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" id="crComp" style="width:auto" onchange="crRender()"> 🔁 تعويض الأجازة اللي تيجي في الويك إند</label>
   </div>
   <div class="muted" id="crNote" style="font-size:12px;margin-top:6px"></div>
   <div id="crKpi"></div>
@@ -1145,7 +1148,7 @@ async function holBanner(){ const box=$('holBanner'); if(!box)return;
   const off=Object.entries(d.todayOff||{}).filter(([k,v])=>v&&v!=='أجازة أسبوعية');
   const chip=h=>{const when=h.now?'<b style="color:var(--red)">النهارده</b>':h.inDays===1?'<b style="color:#d97706">بكرة</b>':`بعد <b>${h.inDays}</b> يوم`;
     return `<div class="hol-i ${h.now?'now':h.inDays<=7?'soon':''}"><div><b>${esc(h.name)}</b>${h.estimated?' <span title="تاريخ تقريبي بالرؤية">🌙</span>':''}</div>
-      <div class="muted" style="font-size:12px">${h.c.map(cn).join(' · ')} — ${dm(h.from)}${h.to!==h.from?' ← '+dm(h.to):''} · ${h.lost?h.lost+' يوم شغل':'جت في الأجازة الأسبوعية'}</div><div style="font-size:12.5px;margin-top:2px">⏳ ${when}</div></div>`;};
+      <div class="muted" style="font-size:12px">${h.c.map(cn).join(' · ')} — ${dm(h.from)}${h.to!==h.from?' ← '+dm(h.to):''} · ${h.lost?h.lost+' يوم شغل':'جت في الأجازة الأسبوعية'}${(h.comp||[]).length?` · 🔁 تعويض ${h.comp.map(dm).join('، ')}`:''}</div><div style="font-size:12.5px;margin-top:2px">⏳ ${when}</div></div>`;};
   const wd=Object.entries(d.workdays||{}).map(([k,v])=>`${cn(k)}: <b>${v.left}</b> يوم شغل باقي من ${v.month}`).join(' &nbsp;·&nbsp; ');
   if(!g.length&&!off.length&&!wd){box.style.display='none';return}
   box.style.display=''; box.className='card hol-card';
@@ -2257,6 +2260,7 @@ async function calOpen(){
   $('calTime').value=CAL.report.time; $('calSkip').checked=CAL.report.skipHolidays!==false;
   $('calRepCountry').innerHTML=Object.entries(cn).map(([k,v])=>`<option value="${k}" ${CAL.report.country===k?'selected':''}>${v}</option>`).join('');
   calCountries();
+  $('calComp').checked=CAL.compensate!==false;
   $('calWeekend').innerHTML='<b style="font-size:13px">الأجازة الأسبوعية:</b> '+CAL_DAYS_ORDER.map(d=>`<label><input type="checkbox" class="cal-we" value="${d}" ${CAL.weekend.includes(d)?'checked':''}> ${dn[d]}</label>`).join('');
   calRender(); $('calMsg').textContent=''; $('calModal').classList.add('show');
 }
@@ -2266,20 +2270,24 @@ function calCountries(){const cn=CAL.countryNames;
   const cur=$('calFilt').value; $('calFilt').innerHTML=`<option value="">كل الأجازات</option>`+yrs.map(y=>`<option value="y${y}">${y}</option>`).join('')+CAL.countries.map(k=>`<option value="c${k}">${cn[k]}</option>`).join('')+'<option value="c*">كل الشركة</option>'; $('calFilt').value=cur;}
 function calRead(){ // نقرا الجدول (الصفوف المعروضة بس بتتعدّل)
   document.querySelectorAll('#calTbl tr[data-i]').forEach(tr=>{const h=CAL.holidays[+tr.dataset.i];if(!h)return;
-    h.from=tr.querySelector('.ch-f').value; h.to=tr.querySelector('.ch-t').value||h.from; h.name=tr.querySelector('.ch-n').value; h.country=tr.querySelector('.ch-c').value;});}
+    h.from=tr.querySelector('.ch-f').value; h.to=tr.querySelector('.ch-t').value||h.from; h.name=tr.querySelector('.ch-n').value; h.country=tr.querySelector('.ch-c').value;
+    if(tr.querySelector('.ch-comp').checked)delete h.noComp; else h.noComp=true;});}
 function calRender(){
   const f=$('calFilt').value, cn={...CAL.countryNames,'*':'🏢 كل الشركة'};
   const rows=CAL.holidays.map((h,i)=>({h,i})).filter(({h})=>!f||(f[0]==='y'?h.from.startsWith(f.slice(1)):h.country===f.slice(1)));
-  $('calTbl').innerHTML=`<thead><tr><th>من</th><th>لحد</th><th>الأجازة</th><th>الدولة</th><th></th><th></th></tr></thead><tbody>`+(rows.map(({h,i})=>`<tr data-i="${i}" class="${h.estimated?'est':''}">
+  const we=new Set([...document.querySelectorAll('.cal-we:checked')].map(x=>+x.value));
+  const onWe=h=>{for(let d=new Date(h.from+'T00:00:00Z'),z=new Date((h.to||h.from)+'T00:00:00Z');d<=z;d.setUTCDate(d.getUTCDate()+1))if(we.has((d.getUTCDay()+6)%7))return true;return false};
+  $('calTbl').innerHTML=`<thead><tr><th>من</th><th>لحد</th><th>الأجازة</th><th>الدولة</th><th title="لو جت في الأجازة الأسبوعية تتعوّض">تعويض</th><th></th><th></th></tr></thead><tbody>`+(rows.map(({h,i})=>`<tr data-i="${i}" class="${h.estimated?'est':''}">
     <td><input type="date" class="ch-f" value="${h.from}"></td><td><input type="date" class="ch-t" value="${h.to||h.from}"></td>
     <td><input class="ch-n" value="${esc(h.name)}" style="min-width:160px"></td>
     <td><select class="ch-c">${Object.entries(cn).map(([k,v])=>`<option value="${k}" ${h.country===k?'selected':''}>${v}</option>`).join('')}</select></td>
+    <td style="text-align:center;white-space:nowrap"><input type="checkbox" class="ch-comp" style="width:auto" ${h.noComp?'':'checked'} title="تتعوّض لو جت في الأجازة الأسبوعية">${onWe(h)?' <span title="جت في الأجازة الأسبوعية" style="font-size:11px">📌</span>':''}</td>
     <td style="font-size:12px;white-space:nowrap">${h.source==='auto'?(h.estimated?'🌙 تقديري':'🤖 رسمي'):'✍️ يدوي'}</td>
-    <td><button class="x" title="امسح" onclick="calDel(${i})">✕</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">مفيش أجازات — اختار الدولة ودوس ⬇️ حمّل</td></tr>')+'</tbody>';
+    <td><button class="x" title="امسح" onclick="calDel(${i})">✕</button></td></tr>`).join('')||'<tr><td colspan="7" class="muted">مفيش أجازات — اختار الدولة ودوس ⬇️ حمّل</td></tr>')+'</tbody>';
 }
 function calAdd(){calRead();const d=CAL.today;CAL.holidays.unshift({from:d,to:d,name:'أجازة سنوية',country:'*',source:'manual'});$('calFilt').value='';calRender();document.querySelector('#calTbl .ch-n')?.select();}
 function calDel(i){calRead();CAL.holidays.splice(i,1);calRender();}
-function calBody(){calRead();return {countries:[...document.querySelectorAll('.cal-c:checked')].map(x=>x.value),weekend:[...document.querySelectorAll('.cal-we:checked')].map(x=>+x.value),
+function calBody(){calRead();return {compensate:$('calComp').checked,countries:[...document.querySelectorAll('.cal-c:checked')].map(x=>x.value),weekend:[...document.querySelectorAll('.cal-we:checked')].map(x=>+x.value),
   report:{days:[...document.querySelectorAll('.cal-rd:checked')].map(x=>+x.value),time:$('calTime').value||'21:00',skipHolidays:$('calSkip').checked,country:$('calRepCountry').value},holidays:CAL.holidays};}
 async function calSave(){ $('calMsg').innerHTML='<span class="muted">بيحفظ…</span>';
   try{const r=await fetch(API_BASE+'/workcal',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(calBody())});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
@@ -2296,14 +2304,20 @@ function crOpen(){ calRead(); const cn=CAL.countryNames, y=+CAL.today.slice(0,4)
   $('crCountry').value=CAL.countries.includes('EG')?'EG':(CAL.countries[0]||'SA');
   $('crYear').innerHTML=yrs.map(v=>`<option ${v===y?'selected':''}>${v}</option>`).join('');
   const we=[...document.querySelectorAll('.cal-we:checked')].map(x=>+x.value);
+  $('crComp').checked=$('calComp').checked;
   $('crWe').innerHTML='<b>الأجازة الأسبوعية:</b> '+CAL_DAYS_ORDER.map(d=>`<label><input type="checkbox" class="cr-we" value="${d}" ${(we.length?we:CAL.weekend).includes(d)?'checked':''} onchange="crRender()"> ${CAL.dayNames[d]}</label>`).join('');
   crRender(); $('crModal').classList.add('show');
 }
-function crCalc(country, year, weekend){
-  const ds=d=>d.toISOString().slice(0,10), hol={};   // يوم → [أسماء]
-  CAL.holidays.filter(h=>h.country===country||h.country==='*'||!h.country).forEach(h=>{
+function crCalc(country, year, weekend, comp){
+  const ds=d=>d.toISOString().slice(0,10), hol={}, all={}, we=new Set(weekend);   // يوم → [أسماء]
+  const hs=CAL.holidays.filter(h=>h.country===country||h.country==='*'||!h.country).sort((a,b)=>a.from<b.from?-1:1);
+  hs.forEach(h=>{
     let d=new Date((h.from)+'T00:00:00Z'), z=new Date((h.to||h.from)+'T00:00:00Z');
-    for(;d<=z;d.setUTCDate(d.getUTCDate()+1)){ if(d.getUTCFullYear()!==year)continue; const k=ds(d);(hol[k]=hol[k]||[]); if(!hol[k].some(x=>x.name===h.name))hol[k].push(h);} });
+    for(;d<=z;d.setUTCDate(d.getUTCDate()+1)){ const k=ds(d); all[k]=1; if(d.getUTCFullYear()!==year)continue; (hol[k]=hol[k]||[]); if(!hol[k].some(x=>x.name===h.name))hol[k].push(h);} });
+  if(comp) hs.forEach(h=>{ if(h.noComp)return; let n=0;   // التعويض: أول يوم شغل بعد آخر يوم في الأجازة
+    for(let d=new Date(h.from+'T00:00:00Z'),z=new Date((h.to||h.from)+'T00:00:00Z');d<=z;d.setUTCDate(d.getUTCDate()+1)) if(we.has((d.getUTCDay()+6)%7))n++;
+    for(let d=new Date((h.to||h.from)+'T00:00:00Z');n>0;){ d.setUTCDate(d.getUTCDate()+1); const k=ds(d); if(we.has((d.getUTCDay()+6)%7)||all[k])continue;
+      all[k]=1; n--; if(d.getUTCFullYear()===year) hol[k]=[{name:'تعويض '+h.name,estimated:h.estimated,comp:true}]; } });
   const months=CR_MONTHS.map((m,i)=>({m,i,days:0,we:0,hol:0,holWe:0,work:0,items:[]}));
   for(let d=new Date(Date.UTC(year,0,1));d.getUTCFullYear()===year;d.setUTCDate(d.getUTCDate()+1)){
     const r=months[d.getUTCMonth()], wd=(d.getUTCDay()+6)%7, isWe=weekend.includes(wd), h=hol[ds(d)];
@@ -2318,17 +2332,17 @@ function crCalc(country, year, weekend){
   return {months,tot};
 }
 function crRender(){
-  const c=$('crCountry').value, y=+$('crYear').value, we=[...document.querySelectorAll('.cr-we:checked')].map(x=>+x.value);
-  const {months,tot}=crCalc(c,y,we); CR={c,y,we,months,tot};
+  const c=$('crCountry').value, y=+$('crYear').value, we=[...document.querySelectorAll('.cr-we:checked')].map(x=>+x.value), comp=$('crComp').checked;
+  const {months,tot}=crCalc(c,y,we,comp); CR={c,y,we,months,tot};
   const dm=s=>{const [,m,d]=s.split('-');return `${+d}/${+m}`};
   const anyHol=months.some(r=>r.items.length);
-  $('crNote').innerHTML=`الأجازة الأسبوعية: <b>${CAL_DAYS_ORDER.filter(d=>we.includes(d)).map(d=>CAL.dayNames[d]).join(' و ')||'—'}</b> · أيام العمل = أيام الشهر − الأجازة الأسبوعية − الأجازات الرسمية/السنوية اللي جت في يوم شغل.`+
+  $('crNote').innerHTML=`الأجازة الأسبوعية: <b>${CAL_DAYS_ORDER.filter(d=>we.includes(d)).map(d=>CAL.dayNames[d]).join(' و ')||'—'}</b> · أيام العمل = أيام الشهر − الأجازة الأسبوعية − الأجازات الرسمية/السنوية اللي جت في يوم شغل${comp?' − أيام التعويض (🔁)':''}.`+
     (anyHol?' 🌙 = تاريخ تقديري (بيتحدد بالرؤية).':` <b style="color:var(--red)">مفيش أجازات متسجلة لـ ${esc(CAL.countryNames[c])} سنة ${y} — دوس ⬇️ حمّل أجازات ${esc(CAL.countryNames[c].split(' ').pop())} الأول.</b>`);
   $('crKpi').innerHTML=[['أيام السنة',tot.days],['أجازة أسبوعية',tot.we],['أجازات رسمية/سنوية (في أيام شغل)',tot.hol],['أجازات وقعت في الويك إند',tot.holWe],['✅ أيام العمل الفعلية',tot.work],['متوسط أيام العمل/شهر',(tot.work/12).toFixed(1)]]
     .map(([k,v])=>`<div><span class="muted" style="font-size:12px">${k}</span><b>${v}</b></div>`).join('');
   $('crTbl').innerHTML=`<thead><tr><th>الشهر</th><th>أيام الشهر</th><th>أجازة أسبوعية</th><th>أجازات رسمية<br><small>(في أيام شغل)</small></th><th>أيام العمل الفعلية</th><th style="text-align:right">الأجازات</th></tr></thead><tbody>`+
     months.map(r=>`<tr><td><b>${r.m}</b></td><td>${r.days}</td><td>${r.we}</td><td>${r.hol||'—'}${r.holWe?`<br><small class="muted">+${r.holWe} في الويك إند</small>`:''}</td><td><b style="font-size:16px">${r.work}</b></td>
-      <td class="nm">${r.items.map(x=>`${x.est?'🌙 ':''}${esc(x.name)} <span class="muted">(${x.n>1?dm(x.from)+' – '+dm(x.to)+' · '+x.n+' أيام':dm(x.from)})</span>`).join('<br>')||'<span class="muted">—</span>'}</td></tr>`).join('')+
+      <td class="nm">${r.items.map(x=>`${x.est?'🌙 ':''}${x.name.startsWith('تعويض ')?'🔁 ':''}${esc(x.name)} <span class="muted">(${x.n>1?dm(x.from)+' – '+dm(x.to)+' · '+x.n+' أيام':dm(x.from)})</span>`).join('<br>')||'<span class="muted">—</span>'}</td></tr>`).join('')+
     `</tbody><tfoot><tr><td>إجمالي ${y}</td><td>${tot.days}</td><td>${tot.we}</td><td>${tot.hol}${tot.holWe?`<br><small>+${tot.holWe} في الويك إند</small>`:''}</td><td style="font-size:17px">${tot.work}</td><td class="nm">${months.reduce((a,r)=>a+r.items.length,0)} أجازة</td></tr></tfoot>`;
 }
 function crExport(){ if(!CR)return; const {c,y,months,tot}=CR, q=s=>`"${String(s).replace(/"/g,'""')}"`;

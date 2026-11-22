@@ -18,6 +18,7 @@ COUNTRIES = {"SA": "🇸🇦 السعودية", "EG": "🇪🇬 مصر", "AE": "
 SKIP = {"EG": ["رأس السنة الميلادية", "الفصح"]}
 DAYS = ["الاتنين", "التلات", "الأربع", "الخميس", "الجمعة", "السبت", "الحد"]   # Python weekday 0..6
 DEFAULT = {"countries": ["SA", "EG"], "weekend": [4, 5],          # الجمعة والسبت
+           "compensate": True,   # الأجازة الرسمية اللي تيجي في الأجازة الأسبوعية بتتعوّض بأول يوم شغل بعدها
            "holidays": [], "report": {"days": [6, 0, 1, 2, 3], "time": "21:00", "skipHolidays": True, "country": "SA"}}
 
 
@@ -45,13 +46,45 @@ def today() -> dt.date:
     return dt.datetime.now(CTX["tz"]).date()
 
 
+def days_off(country: str | None, c: dict | None = None) -> dict:
+    """كل أيام الأجازة الرسمية/السنوية لدولة {يوم: اسم} — ومعاها أيام التعويض:
+    كل يوم أجازة وقع في الأجازة الأسبوعية بيتعوّض بأول يوم شغل بعد آخر يوم في الأجازة
+    (إلا لو التعويض مقفول للكل أو للأجازة دي)."""
+    c = c or load()
+    we = set(c["weekend"])
+    hs = sorted((h for h in c["holidays"] if country is None or h.get("country") in ("*", country, "", None)),
+                key=lambda h: h.get("from", h.get("date")))
+    out = {}
+    for h in hs:
+        x, y = dt.date.fromisoformat(h.get("from", h.get("date"))), dt.date.fromisoformat(h.get("to") or h.get("from", h.get("date")))
+        while x <= y:
+            out.setdefault(x, h.get("name") or "أجازة")
+            x += dt.timedelta(days=1)
+    if c.get("compensate", True):
+        taken = set(out)
+        for h in hs:
+            if h.get("noComp"):
+                continue
+            x, y = dt.date.fromisoformat(h.get("from", h.get("date"))), dt.date.fromisoformat(h.get("to") or h.get("from", h.get("date")))
+            n = sum(1 for i in range((y - x).days + 1) if (x + dt.timedelta(days=i)).weekday() in we)
+            d = y
+            while n > 0:
+                d += dt.timedelta(days=1)
+                if d.weekday() in we or d in taken:
+                    continue
+                out[d] = "تعويض " + (h.get("name") or "أجازة")
+                taken.add(d)
+                n -= 1
+    return out
+
+
 def holiday_on(day: dt.date, country: str | None = None) -> str:
-    """اسم الأجازة في اليوم ده (لو فيه) — country=None يعني أي دولة، أو "*" = أجازة الشركة كلها"""
-    s = day.isoformat()
-    for h in load()["holidays"]:
-        if h.get("from", h.get("date")) <= s <= h.get("to", h.get("date")) and \
-                (country is None or h.get("country") in ("*", country, "", None)):
-            return h.get("name") or "أجازة"
+    """اسم الأجازة في اليوم ده (لو فيه، ومعاها أيام التعويض) — country=None يعني أي دولة"""
+    c = load()
+    for k in ([country] if country else (c["countries"] or [None])):
+        n = days_off(k, c).get(day)
+        if n:
+            return n
     return ""
 
 
@@ -65,14 +98,7 @@ def is_workday(day: dt.date, country: str | None = None) -> bool:
 def workdays(a: dt.date, b: dt.date, country: str | None = None) -> int:
     c = load()
     country = country or (c["countries"] or [None])[0]
-    hol = set()
-    for h in c["holidays"]:
-        if h.get("country") not in ("*", country, "", None):
-            continue
-        x, y = dt.date.fromisoformat(h.get("from", h.get("date"))), dt.date.fromisoformat(h.get("to", h.get("date")))
-        while x <= y:
-            hol.add(x)
-            x += dt.timedelta(days=1)
+    hol = days_off(country, c)
     n, d = 0, a
     while d <= b:
         n += d.weekday() not in c["weekend"] and d not in hol
@@ -121,18 +147,23 @@ def upcoming(days: int = 45):
     c, t = load(), today()
     end = t + dt.timedelta(days=max(1, min(days, 120)))
     out = []
+    comp = {k: {d: n for d, n in days_off(k, c).items() if n.startswith("تعويض ")} for k in (c["countries"] or [])}
     for h in c["holidays"]:
         a, z = dt.date.fromisoformat(h["from"]), dt.date.fromisoformat(h.get("to") or h["from"])
-        if z < t or a > end:
+        k = h.get("country") or "*"
+        cd = sorted({d for kk, m in comp.items() if k in ("*", kk) for d, n in m.items()
+                     if n == "تعويض " + (h.get("name") or "أجازة") and a < d <= z + dt.timedelta(days=14)})
+        if max([z] + cd) < t or a > end:
             continue
-        lost = sum(1 for i in range((z - a).days + 1) if (a + dt.timedelta(days=i)).weekday() not in c["weekend"])
+        lost = sum(1 for i in range((z - a).days + 1) if (a + dt.timedelta(days=i)).weekday() not in c["weekend"]) + len(cd)
         out.append({"name": h.get("name") or "أجازة", "from": h["from"], "to": h.get("to") or h["from"],
-                    "country": h.get("country") or "*", "lost": lost, "estimated": bool(h.get("estimated")),
+                    "country": k, "lost": lost, "estimated": bool(h.get("estimated")), "comp": [d.isoformat() for d in cd],
+                    "noComp": bool(h.get("noComp")),
                     "inDays": max(0, (a - t).days), "now": a <= t <= z})
     out.sort(key=lambda h: (h["from"], h["country"]))
     me = (t.replace(day=28) + dt.timedelta(days=4)).replace(day=1) - dt.timedelta(days=1)
     by = {k: {"left": workdays(t, me, k), "month": workdays(t.replace(day=1), me, k)} for k in (c["countries"] or [None]) if k}
-    return {"today": t.isoformat(), "countries": c["countries"], "countryNames": COUNTRIES,
+    return {"today": t.isoformat(), "countries": c["countries"], "countryNames": COUNTRIES, "compensate": c.get("compensate", True),
             "todayOff": {k: (holiday_on(t, k) or ("أجازة أسبوعية" if t.weekday() in c["weekend"] else "")) for k in c["countries"]},
             "holidays": out, "workdays": by, "weekend": c["weekend"]}
 
@@ -152,6 +183,8 @@ async def put_cal(request: Request):
         c = load()
         if "countries" in b:
             c["countries"] = [x for x in b["countries"] if x in COUNTRIES][:6]
+        if "compensate" in b:
+            c["compensate"] = bool(b["compensate"])
         if "weekend" in b:
             c["weekend"] = sorted({int(x) for x in b["weekend"] if str(x).isdigit() and 0 <= int(x) <= 6})
         if "report" in b:
@@ -173,7 +206,8 @@ async def put_cal(request: Request):
                     a, z = z, a
                 hs.append({"date": a, "from": a, "to": z, "name": str(h.get("name") or "أجازة").strip()[:80],
                            "country": h.get("country") if h.get("country") in COUNTRIES else "*",
-                           "source": "auto" if h.get("source") == "auto" else "manual", "estimated": bool(h.get("estimated"))})
+                           "source": "auto" if h.get("source") == "auto" else "manual", "estimated": bool(h.get("estimated")),
+                           **({"noComp": True} if h.get("noComp") else {})})
             c["holidays"] = sorted(hs, key=lambda x: x["from"])
         _save(c)
     return get_cal()
