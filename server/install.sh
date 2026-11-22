@@ -366,6 +366,19 @@ PY
   echo "✔ التنبيهات هتوصل هنا من دلوقتي"
   exit 0
 fi
+if [[ "${1:-}" == whatsapp-token ]]; then   # تجديد التوكن بس (الأرقام زي ما هي)
+  PID=$(grep -s '^NQ_WA_PHONE_ID=' "$F" | cut -d= -f2-); [[ -n "$PID" ]] || { echo "✖ واتساب مش متربط — استخدم: sudo nq-setkey whatsapp"; exit 1; }
+  read -rsp "التوكن الدائم (System User — Never expire): " TOK; echo
+  TOK=$(printf '%s' "$TOK" | tr -d '[:space:]'); [[ -n "$TOK" ]] || { echo "✖ اتلغى"; exit 1; }
+  R=$(curl -s "https://graph.facebook.com/v21.0/$PID?fields=display_phone_number,verified_name" -H "Authorization: Bearer $TOK")
+  echo "$R" | grep -q display_phone_number || { echo "✖ Meta رفض التوكن: $R"; exit 1; }
+  setv NQ_WA_TOKEN "$TOK"; systemctl restart nq-calls
+  WABA=$(grep -s '^NQ_WA_WABA_ID=' "$F" | cut -d= -f2-)
+  [[ -n "$WABA" ]] && curl -s -X POST "https://graph.facebook.com/v21.0/$WABA/subscribed_apps" -H "Authorization: Bearer $TOK" >/dev/null
+  echo "✔ التوكن اتجدد — متربط بالرقم: $(echo "$R" | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j.get("display_phone_number"),"—",j.get("verified_name"))')"
+  echo "✔ اشتركنا في الرسايل الواردة. Verify token للـ webhook: $(grep -s '^NQ_WA_VERIFY=' "$F" | cut -d= -f2-)"
+  exit 0
+fi
 if [[ "${1:-}" == whatsapp ]]; then
   echo "بيانات WhatsApp Cloud API من developers.facebook.com ← تطبيقك ← WhatsApp ← API Setup:"
   read -rp "Phone number ID: " PID; read -rp "WhatsApp Business Account ID (WABA ID): " WABA
