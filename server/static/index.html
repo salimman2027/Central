@@ -578,6 +578,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="f"><label>من تاريخ</label><input type="date" id="lFrom"></div>
     <div class="f"><label>إلى تاريخ</label><input type="date" id="lTo"></div>
     <div class="f"><label>المندوب</label><select id="lRep"></select></div>
+    <div class="f"><label>النوع</label><select id="lDir" onchange="logPage=1;renderLog()"><option value="">الكل</option><option value="in">↙ واردة</option><option value="out">↗ صادرة</option><option value="sim">📱 من شريحة الموظف</option></select></div>
     <div class="f"><label>الحالة</label><select id="lSt"><option value="">الكل</option><option>تم الرد</option><option>لم يرد</option><option>فائتة</option><option>مرفوضة</option></select></div>
     <div class="f"><label>رقم العميل</label><input id="lNum" placeholder="05xxxxxxxx"></div>
     <div class="f"><label>التسجيل</label><select id="lRec"><option value="">الكل</option><option value="1">مسجلة فقط</option><option value="0">بدون تسجيل</option></select></div>
@@ -1288,8 +1289,8 @@ function draw(id,type,data,extra={}){
 /* ============ CALL LOG ============ */
 let logPage=1;const PS=15;let logList=[];
 function renderLog(){
-  const f=$('lFrom').value,t=$('lTo').value,r=$('lRep').value,st=$('lSt').value,n=$('lNum').value.trim(),rec=$('lRec').value;
-  logList=CALLS.filter(c=>inRange(c,f,t)&&(!r||c.rep==r)&&(!st||c.st===st)&&(!n||c.num.includes(n))&&(rec===''||String(+c.rec)===rec));
+  const f=$('lFrom').value,t=$('lTo').value,r=$('lRep').value,st=$('lSt').value,n=$('lNum').value.trim(),rec=$('lRec').value,dr=$('lDir').value;
+  logList=CALLS.filter(c=>inRange(c,f,t)&&(!r||c.rep==r)&&(!st||c.st===st)&&(!n||c.num.includes(n))&&(rec===''||String(+c.rec)===rec)&&(!dr||(dr==='sim'?c.sim:c.dir===dr)));
   $('logCount').textContent=`النتيجة: ${num(logList.length)} مكالمة`;
   const pages=Math.max(1,Math.ceil(logList.length/PS));logPage=Math.min(logPage,pages);
   const rows=logList.slice((logPage-1)*PS,logPage*PS).map((c,i)=>{
