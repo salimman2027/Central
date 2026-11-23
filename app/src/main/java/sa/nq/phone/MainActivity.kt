@@ -438,6 +438,25 @@ class MainActivity : Activity() {
         v.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
     }
 
+    private fun route(am: AudioManager, speaker: Boolean) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                if (speaker) {
+                    am.availableCommunicationDevices.firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                        ?.let { am.setCommunicationDevice(it) }
+                } else {
+                    am.clearCommunicationDevice()
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                am.isSpeakerphoneOn = speaker
+            }
+        } catch (e: Exception) {
+            @Suppress("DEPRECATION")
+            am.isSpeakerphoneOn = speaker
+        }
+    }
+
     inner class Bridge {
         @JavascriptInterface fun onIncoming(number: String) {
             if (PhoneService.instance != null) PhoneService.incoming(number)
@@ -447,7 +466,13 @@ class MainActivity : Activity() {
         @JavascriptInterface fun onCallStateChanged(active: Boolean) {
             PhoneService.stopRing()
             val am = getSystemService(AUDIO_SERVICE) as AudioManager
-            am.mode = if (active) AudioManager.MODE_IN_COMMUNICATION else AudioManager.MODE_NORMAL
+            if (active) {
+                if (am.mode != AudioManager.MODE_IN_COMMUNICATION) am.mode = AudioManager.MODE_IN_COMMUNICATION
+                am.isMicrophoneMute = false
+            } else {
+                route(am, false)
+                am.mode = AudioManager.MODE_NORMAL
+            }
         }
 
         /** يسجّل كلام بالمايك ويحوّله لنص عربي */
@@ -586,9 +611,12 @@ class MainActivity : Activity() {
             packageManager.getPackageInfo(packageName, 0).versionName ?: ""
         } catch (e: Exception) { "" }
 
+        /** السبيكر: على أندرويد 12+ لازم setCommunicationDevice — الطريقة القديمة كانت ساعات بتقفل المايك فالطرف التاني مايسمعش */
         @JavascriptInterface fun setSpeaker(on: Boolean) {
-            @Suppress("DEPRECATION")
-            (getSystemService(AUDIO_SERVICE) as AudioManager).isSpeakerphoneOn = on
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            if (am.mode != AudioManager.MODE_IN_COMMUNICATION) am.mode = AudioManager.MODE_IN_COMMUNICATION
+            route(am, on)
+            am.isMicrophoneMute = false
         }
     }
 }

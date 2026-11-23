@@ -1250,6 +1250,9 @@ const NQPhone = {
   toggleSpeaker() {
     this.speaker = !this.speaker; $("cSpk").classList.toggle("on", this.speaker);
     if (window.Android) Android.setSpeaker(this.speaker);
+    // تأكيد إن المايك لسه شغّال بعد تغيير مخرج الصوت (لو مش عامل كتم)
+    setTimeout(() => { try { const pc = this.session && this.session.connection;
+      if (pc && !this.muted) pc.getSenders().forEach(x => { if (x.track && x.track.kind === "audio") x.track.enabled = true; }); } catch (e) {} }, 300);
   },
 
   /* الأرقام أثناء المكالمة (الرد الآلي / التحويلات): RFC2833 جوه الصوت — والسنترال والجيتواي بيفهموها؛ ولو فشلت نبعتها SIP INFO */
