@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 BUNDLE_IOS="sa.nq.phone"
 
 flutter create --org sa.nq --project-name nq_phone --platforms ios,android . >/dev/null
+rm -f test/widget_test.dart   # اختبار القالب الافتراضي (مش بتاعنا)
 flutter pub get
 
 # ---------- iOS ----------
