@@ -45,7 +45,18 @@ for perm in INTERNET RECORD_AUDIO MODIFY_AUDIO_SETTINGS WAKE_LOCK POST_NOTIFICAT
     perl -0pi -e "s|(<manifest[^>]*>)|\$1\n    <uses-permission android:name=\"android.permission.$perm\"/>|" "$M"
 done
 perl -0pi -e 's/android:label="nq_phone"/android:label="NQ Phone"/' "$M"
-sed -i.bak 's/minSdk = flutter.minSdkVersion/minSdk = 24/' android/app/build.gradle* 2>/dev/null || true; rm -f android/app/build.gradle*.bak
+G=$(ls android/app/build.gradle.kts android/app/build.gradle 2>/dev/null | head -1)
+perl -pi -e 's/minSdk = flutter\.minSdkVersion/minSdk = 24/' "$G"
+# flutter_local_notifications محتاجة core library desugaring
+if ! grep -q desugar_jdk_libs "$G"; then
+  if [[ "$G" == *.kts ]]; then
+    perl -0pi -e 's/compileOptions \{/compileOptions {\n        isCoreLibraryDesugaringEnabled = true/' "$G"
+    printf '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n' >> "$G"
+  else
+    perl -0pi -e 's/compileOptions \{/compileOptions {\n        coreLibraryDesugaringEnabled true/' "$G"
+    printf "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n" >> "$G"
+  fi
+fi
 
 dart run flutter_launcher_icons >/dev/null
 echo "✔ جاهز. iOS: افتح ios/Runner.xcworkspace في Xcode → Signing (Team) → Product › Archive → Upload."
