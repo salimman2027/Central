@@ -911,7 +911,9 @@ const store = {
 /* ---------- server settings ---------- */
 const DEFAULT_SERVER = { host: "3.89.245.93.sslip.io", port: "443", path: "/ws" };
 const IS_APP = !!window.Android;
-const APP_VER = (() => { try { return IS_APP && Android.appVersion ? "v" + Android.appVersion() : "web __VER__"; } catch (e) { return ""; } })();
+const APP_VER = (() => { try { return IS_APP && Android.appVersion ? "v" + Android.appVersion() : window.NQiOS ? NQiOS.version + " · __VER__" : "web __VER__"; } catch (e) { return ""; } })();
+/* تطبيق الآيفون (WKWebView): جلسة الصوت والسبيكر والإشعارات من iOS */
+function iosCall(on) { try { if (window.NQiOS) NQiOS.post("call", !!on); } catch (e) {} }
 document.addEventListener("DOMContentLoaded", () => { ["appVer", "topVer"].forEach(id => { const v = document.getElementById(id); if (v) v.textContent = APP_VER; }); });
 if (!IS_APP) document.body.classList.add("web");
 const CONFIG = { wss: [], domain: "", api: "", iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -1234,7 +1236,7 @@ const NQPhone = {
     if (this.session && !this._clearStale()) { $("dialErr").textContent = "فيه مكالمة لسه مفتوحة — اقفلها الأول (لو مش ظاهرة دوس اتصال تاني)"; this._stuckTap = (this._stuckTap || 0) + 1;
       if (this._stuckTap >= 2) { this._forceReset(); $("dialErr").textContent = "اتمسحت المكالمة المعلّقة — اتصل تاني"; } return; }
     this._stuckTap = 0;
-    if (window.Android) Android.onCallStateChanged(true);
+    if (window.Android) Android.onCallStateChanged(true); iosCall(true);
     const out = pbxNumber(number);
     if (out !== number) toast(`📞 بيتصل على ${out} (رقم مصري من الشريحة السعودي)`);
     this.ua.call(`sip:${out}@${CONFIG.domain}`, { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: CONFIG.iceServers } });
@@ -1242,7 +1244,7 @@ const NQPhone = {
 
   answer() {
     if (!this.session) return;
-    if (window.Android) Android.onCallStateChanged(true); else NQWeb.stopRing();
+    if (window.Android) Android.onCallStateChanged(true); else NQWeb.stopRing(); iosCall(true);
     this.session.answer({ mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: CONFIG.iceServers } });
   },
 
@@ -1256,7 +1258,7 @@ const NQPhone = {
 
   toggleSpeaker() {
     this.speaker = !this.speaker; $("cSpk").classList.toggle("on", this.speaker);
-    if (window.Android) Android.setSpeaker(this.speaker);
+    if (window.Android) Android.setSpeaker(this.speaker); else if (window.NQiOS) NQiOS.post("speaker", this.speaker);
     // تأكيد إن المايك لسه شغّال بعد تغيير مخرج الصوت (لو مش عامل كتم)
     setTimeout(() => { try { const pc = this.session && this.session.connection;
       if (pc && !this.muted) pc.getSenders().forEach(x => { if (x.track && x.track.kind === "audio") x.track.enabled = true; }); } catch (e) {} }, 300);
@@ -1280,7 +1282,7 @@ const NQPhone = {
   _forceReset() {
     const s = this.session; this.session = null; clearInterval(this.timer); this.callStart = null; this.muted = false; this.speaker = false;
     try { if (s && !s.isEnded()) s.terminate(); } catch (e) {}
-    try { if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); } else NQWeb.stopRing(); } catch (e) {}
+    try { if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); } else NQWeb.stopRing(); iosCall(false); } catch (e) {}
     show("scrDial");
   },
 
@@ -1323,7 +1325,7 @@ const NQPhone = {
     s.on("progress", () => { if (this.direction === "out") $("cState").textContent = "بيرن…"; });
     s.on("accepted", () => {
       this.callStart = Date.now();
-      if (window.Android) Android.onCallStateChanged(true); else NQWeb.stopRing(); // وقّف الرنة أول ما المكالمة تترد
+      if (window.Android) Android.onCallStateChanged(true); else NQWeb.stopRing(); iosCall(true); // وقّف الرنة أول ما المكالمة تترد
       $("cNum").textContent = this.peer; show("scrCall");
       clearInterval(this.timer);
       this.timer = setInterval(() => {
@@ -1340,7 +1342,7 @@ const NQPhone = {
       };
       this.callName = "";
       this.session = null; this.muted = false; this.speaker = false;
-      if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); } else NQWeb.stopRing();
+      if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); } else NQWeb.stopRing(); iosCall(false);
       NQHistory.add(info);
       $("dialNum").textContent = "";
       if (!info.answered && info.direction === "out") {
@@ -1576,6 +1578,7 @@ const NQWeb = {
         o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + .9); };
       beep(); clearInterval(this.timer); this.timer = setInterval(beep, 2000);
     } catch (e) {}
+    try { if (window.NQiOS && document.hidden) NQiOS.post("notify", { title: "📞 مكالمة واردة", body: num }); } catch (e) {}
     try { if (Notification.permission === "granted" && document.hidden) { this.note = new Notification("📞 مكالمة واردة", { body: num, requireInteraction: true }); this.note.onclick = () => { window.focus(); this.note.close(); }; } } catch (e) {}
     document.title = "📞 " + num;
   },
@@ -1613,7 +1616,7 @@ if (!IS_APP) {
     try { if (NQPhone.ua && !NQPhone.ua.isConnected()) NQPhone.ua.start(); } catch (e) {} } });
   document.addEventListener("click", wake, { once: true });
   // آيفون من سفاري (مش من الشاشة الرئيسية): نقوله يضيفه للشاشة الرئيسية
-  if (IS_IOS && !navigator.standalone && !store.get("nq_ios_hint", false)) setTimeout(() => {
+  if (IS_IOS && !navigator.standalone && !window.NQiOS && !store.get("nq_ios_hint", false)) setTimeout(() => {
     store.set("nq_ios_hint", true);
     toast("📲 للآيفون: دوس زرار المشاركة ⬆️ ثم «إضافة إلى الشاشة الرئيسية»");
   }, 3000);

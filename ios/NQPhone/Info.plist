@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key><string>ar</string>
+	<key>CFBundleDisplayName</key><string>NQ Phone</string>
+	<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+	<key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key><true/>
+	<key>ITSAppUsesNonExemptEncryption</key><false/>
+	<!-- عنوان السيرفر: صفحة التليفون بتتحمّل منه (أي تحديث على السيرفر بيوصل التطبيق من غير ما نرفع نسخة جديدة) -->
+	<key>NQServerURL</key><string>https://3.89.245.93.sslip.io/phone/</string>
+	<key>NSMicrophoneUsageDescription</key><string>التطبيق محتاج المايك عشان تتكلم في المكالمات.</string>
+	<key>NSCameraUsageDescription</key><string>لتصوير المستندات وإرسالها للعملاء.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key><string>لحفظ الملفات والصور اللي بتستلمها.</string>
+	<key>UIBackgroundModes</key>
+	<array><string>audio</string></array>
+	<key>UILaunchScreen</key>
+	<dict><key>UIColorName</key><string>LaunchColor</string></dict>
+	<key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array><string>UIInterfaceOrientationPortrait</string></array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string><string>UIInterfaceOrientationPortraitUpsideDown</string></array>
+	<key>UIStatusBarStyle</key><string>UIStatusBarStyleDefault</string>
+</dict>
+</plist>
