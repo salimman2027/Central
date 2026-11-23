@@ -194,6 +194,7 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   <Directory $APP/phone>
     Require all granted
     Header set Cache-Control "no-cache"
+    AddType application/manifest+json .webmanifest
   </Directory>
 
   # لوحة المكالمات

@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>NQ Phone</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NQ Phone">
+<meta name="theme-color" content="#14b8a6">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script>(function(){var mq=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)');
 function pref(){try{return localStorage.getItem('nq_theme')||'light'}catch(e){return 'light'}}
@@ -748,7 +755,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
 
 <div id="toast" class="toast"></div>
 <div class="dlbar" id="dlBar"></div>
-<audio id="remoteAudio" autoplay></audio>
+<audio id="remoteAudio" autoplay playsinline></audio>
 
 <script src="jssip.min.js"></script>
 <script src="xlsx.mini.min.js"></script>
@@ -1591,6 +1598,26 @@ const NQWeb = {
     r.start();
   }
 };
+/* ---------- آيفون / سفاري: الصوت لازم يتفتح بلمسة، والشاشة ماتطفيش والتطبيق مفتوح ---------- */
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+if (!IS_APP) {
+  const unlock = () => {
+    try { NQWeb.ctx = NQWeb.ctx || new (window.AudioContext || window.webkitAudioContext)(); if (NQWeb.ctx.state === "suspended") NQWeb.ctx.resume();
+      const b = NQWeb.ctx.createBuffer(1, 1, 22050), src = NQWeb.ctx.createBufferSource(); src.buffer = b; src.connect(NQWeb.ctx.destination); src.start(0); } catch (e) {}
+    try { const a = $("remoteAudio"); a.setAttribute("playsinline", ""); a.play().catch(() => {}); } catch (e) {}
+  };
+  ["touchend", "click"].forEach(ev => document.addEventListener(ev, unlock, { passive: true }));
+  let wl = null;
+  const wake = async () => { try { if ("wakeLock" in navigator && document.visibilityState === "visible" && !wl) { wl = await navigator.wakeLock.request("screen"); wl.addEventListener("release", () => { wl = null; }); } } catch (e) {} };
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { wake();
+    try { if (NQPhone.ua && !NQPhone.ua.isConnected()) NQPhone.ua.start(); } catch (e) {} } });
+  document.addEventListener("click", wake, { once: true });
+  // آيفون من سفاري (مش من الشاشة الرئيسية): نقوله يضيفه للشاشة الرئيسية
+  if (IS_IOS && !navigator.standalone && !store.get("nq_ios_hint", false)) setTimeout(() => {
+    store.set("nq_ios_hint", true);
+    toast("📲 للآيفون: دوس زرار المشاركة ⬆️ ثم «إضافة إلى الشاشة الرئيسية»");
+  }, 3000);
+}
 if (!IS_APP) {
   // الكيبورد: اكتب الرقم واضغط Enter
   document.addEventListener("keydown", e => {
