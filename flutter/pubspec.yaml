@@ -9,7 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_inappwebview: ^6.1.5
+  webview_flutter: ^4.10.0
+  webview_flutter_android: ^4.0.0
+  webview_flutter_wkwebview: ^3.16.0
   url_launcher: ^6.3.0
   wakelock_plus: ^1.2.8
   flutter_local_notifications: ^17.2.3

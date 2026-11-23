@@ -1,6 +1,6 @@
 # NQ Phone — Flutter (iOS + Android)
 
-التطبيق بيفتح صفحة تليفون NQ من السيرفر (`https://3.89.245.93.sslip.io/phone/`) جوه WebView،
+التطبيق بيفتح صفحة تليفون NQ من السيرفر (`https://3.89.245.93.sslip.io/phone/`) جوه WebView (webview_flutter)،
 والمكالمات **من السنترال بس** (WebRTC). أي تحديث على السيرفر بيوصل التطبيق من غير رفع نسخة جديدة.
 
 ## التجهيز (مرة واحدة — على Mac عشان iOS)
@@ -26,7 +26,8 @@ cd flutter
 ## الإعدادات
 - عنوان السيرفر: `kServerUrl` في `lib/main.dart`
 
-## الجسر بين الصفحة والتطبيق: `window.NQiOS.post(type, data)`
+## الجسر بين الصفحة والتطبيق
+التطبيق بيضيف قناة JavaScript اسمها `NQBridge`، والصفحة بتعمل منها `window.NQiOS.post(type, data)` (رسالة JSON `{t, d}`):
 | type | data | بيعمل إيه |
 |---|---|---|
 | `call` | true/false | جلسة صوت المكالمة + حساس القرب |

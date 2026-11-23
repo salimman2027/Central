@@ -12,6 +12,18 @@
 <meta name="apple-mobile-web-app-title" content="NQ Phone">
 <meta name="theme-color" content="#14b8a6">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script>/* تطبيق Flutter: قناة NQBridge → نفس جسر NQiOS (السبيكر، الصوت، الإشعارات، الملفات) */
+if (!window.NQiOS && window.NQBridge) {
+  window.NQiOS = { version: "App", post: function (t, d) { try { NQBridge.postMessage(JSON.stringify({ t: t, d: d === undefined ? null : d })); } catch (e) {} } };
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest ? e.target.closest("a[download]") : null;
+    if (!a || !/^(blob|data):/.test(a.href)) return;
+    e.preventDefault();
+    fetch(a.href).then(function (r) { return r.blob(); }).then(function (b) { var fr = new FileReader();
+      fr.onload = function () { NQiOS.post("file", { name: a.getAttribute("download") || "file", data: String(fr.result).split(",")[1] }); }; fr.readAsDataURL(b); });
+  }, true);
+}
+</script>
 <script>(function(){var mq=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)');
 function pref(){try{return localStorage.getItem('nq_theme')||'light'}catch(e){return 'light'}}
 window.applyTheme=function(){var p=pref();document.documentElement.dataset.theme=p==='auto'?(mq&&mq.matches?'dark':'light'):p;document.documentElement.dataset.themePref=p;};
