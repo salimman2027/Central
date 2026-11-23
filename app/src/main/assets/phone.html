@@ -371,6 +371,11 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   html[data-theme=light] .screen.callscr, html[data-theme=light] body.web .screen.callscr {
     background:radial-gradient(500px 360px at 50% 20%,rgba(25,230,193,.22),transparent 70%),linear-gradient(170deg,#13314a,#0a1424) !important; color:#fff; }
   html[data-theme=light] .callscr .ctrl { color:#fff; }
+  /* المايك مقفول: دايرة حمرا وعليها شرطة ✕ واضحة */
+  #cMute b { position:relative; }
+  #cMute.on b, #cMute.on b:hover { background:#dc2626 !important; color:#fff !important; border-color:#fca5a5 !important; box-shadow:0 0 0 4px rgba(220,38,38,.25); }
+  #cMute.on b::after { content:""; position:absolute; width:46px; height:4px; background:#fff; border-radius:3px; transform:rotate(-45deg); box-shadow:0 0 0 2px #dc2626; }
+  #cMute.on { color:#fca5a5; font-weight:700; opacity:1; }
   html[data-theme=light] .callscr .incall-pad .key { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.14); box-shadow:none; color:#fff; }
   html[data-theme=light] .callscr .incall-pad .key small { color:rgba(255,255,255,.6); }
 
@@ -1266,6 +1271,8 @@ const NQPhone = {
     if (!this.session) return;
     this.muted ? this.session.unmute({ audio: true }) : this.session.mute({ audio: true });
     this.muted = !this.muted; $("cMute").classList.toggle("on", this.muted);
+    $("cMute").lastChild.textContent = this.muted ? "المايك مقفول" : "كتم";
+    try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {}
   },
 
   toggleSpeaker() {
@@ -1294,6 +1301,7 @@ const NQPhone = {
   _forceReset() {
     const s = this.session; this.session = null; clearInterval(this.timer); this.callStart = null; this.muted = false; this.speaker = false;
     try { if (s && !s.isEnded()) s.terminate(); } catch (e) {}
+    try { $("cMute").classList.remove("on"); $("cMute").lastChild.textContent = "كتم"; $("cSpk").classList.remove("on"); } catch (e) {}
     try { if (window.Android) { Android.onCallStateChanged(false); Android.setSpeaker(false); } else NQWeb.stopRing(); iosCall(false); } catch (e) {}
     show("scrDial");
   },
@@ -1309,7 +1317,7 @@ const NQPhone = {
     this.peer = /^\+?\d{3,}$/.test(u) ? u : (/^\+?\d{6,}$/.test(dn) ? dn : u);
     this.callStart = null; this.started = new Date();
     this.muted = false; this.speaker = false;
-    $("cMute").classList.remove("on"); $("cSpk").classList.remove("on");
+    $("cMute").classList.remove("on"); $("cSpk").classList.remove("on"); $("cMute").lastChild.textContent = "كتم";
     $("callPad").classList.remove("on"); $("cPad").classList.remove("on"); try { $("cDtmf").textContent = ""; } catch (e) {}
 
     if (this.direction === "in") {
