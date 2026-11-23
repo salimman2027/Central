@@ -8,8 +8,6 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Generate Xcode project
-        run: brew install xcodegen && cd ios && xcodegen
       - name: Build (simulator, unsigned) to verify it compiles
         run: |
           cd ios
