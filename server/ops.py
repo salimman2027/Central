@@ -324,6 +324,20 @@ def ext_online() -> dict:
     return on
 
 
+def presence() -> dict:
+    """حالة كل تحويلة: talk (في مكالمة) / ring (بترن) / idle (متاحة) — اللي مش موجود = مش متصل"""
+    out = asterisk("core show channels concise") or ""
+    busy = {}
+    for ln in out.splitlines():
+        m = re.match(r"^PJSIP/(\d{2,6})-", ln)
+        if m:
+            f = ln.split("!")
+            busy[m.group(1)] = "talk" if (len(f) > 4 and f[4] == "Up") or busy.get(m.group(1)) == "talk" else "ring"
+    st = {e: "idle" for e in ext_online()}
+    st.update(busy)
+    return st
+
+
 def failed_streak() -> tuple[int, int]:
     """مكالمات طالعة على الجيتواي آخر 20 دقيقة: (فشلت، اترد عليها)"""
     q = CTX["query"]

@@ -94,7 +94,12 @@ def _public(it: dict, me: str, names: dict) -> dict:
 def people(request: Request):
     me = _auth(request)
     names = _names()
-    lst = [{"ext": e, "name": n} for e, n in sorted(names.items()) if e != me]
+    try:
+        import ops
+        pr = ops.presence()
+    except Exception:  # noqa: BLE001
+        pr = {}
+    lst = [{"ext": e, "name": n, "state": pr.get(e, "off")} for e, n in sorted(names.items()) if e != me]
     return {"me": me, "meName": names.get(me, ""), "people": lst}
 
 

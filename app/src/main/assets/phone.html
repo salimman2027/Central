@@ -65,6 +65,11 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   .iconbtn { width:42px; height:42px; border-radius:50%; background:#eef2f5; font-size:20px; display:flex; align-items:center; justify-content:center; color:var(--fg); }
   .display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:6px 20px; min-height:70px; }
   .display { position:relative; }
+  .pastebtn.dirbtn { inset-inline-end:auto; inset-inline-start:12px; }
+  .dir-row { display:flex; align-items:center; gap:10px; padding:11px 6px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .dir-row:active { background:rgba(16,185,129,.08); }
+  .dir-row .av { width:38px; height:38px; border-radius:50%; display:grid; place-items:center; font-weight:700; background:rgba(16,185,129,.12); color:#0f766e; flex:none; }
+  .dir-row .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-inline-end:4px; }
   .pastebtn { position:absolute; inset-inline-end:12px; top:8px; border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:99px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
   #dialName:empty, #dialErr:empty { display:none; } #dialErr { min-height:0; margin-top:4px; }
   .display .num span { cursor:text; }
@@ -386,7 +391,8 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   </div>
   <div class="ibar" id="inboxBar"></div>
   <div class="display"><div id="dialNum" class="num"></div><div id="dialName" class="who-name"></div><div id="dialErr" class="err"></div>
-    <button class="pastebtn" id="btnPaste" onclick="dialPaste()" aria-label="لصق رقم" title="لصق رقم (Ctrl+V)">📋 لصق</button></div>
+    <button class="pastebtn" id="btnPaste" onclick="dialPaste()" aria-label="لصق رقم" title="لصق رقم (Ctrl+V)">📋 لصق</button>
+    <button class="pastebtn dirbtn" onclick="NQDir.open()" aria-label="التحويلات الداخلية" title="التحويلات الداخلية">☎️ التحويلات</button></div>
   <div class="keypad" id="keypad"></div>
   <div class="dialrow">
     <button class="side app-only" onclick="pickContact()" aria-label="جهات الاتصال">👥</button>
@@ -844,6 +850,48 @@ const NQMe = {
     if (!retried && !(NQInbox.data && NQInbox.data.me) && typeof NQInbox.poll === "function") {
       Promise.resolve().then(() => NQInbox.poll()).then(() => { const x = document.getElementById("meSheet"); if (x && NQInbox.data && NQInbox.data.me) NQMe.show(true); }).catch(() => {});
     }
+  }
+};
+/* ---------- دليل التحويلات الداخلية: الاسم + التحويلة + الحالة، ودوسة تتصل ---------- */
+const NQDir = {
+  people: [], q: "",
+  ST: { idle: ["#16a34a", "متاح"], talk: ["#dc2626", "في مكالمة"], ring: ["#f59e0b", "بيرن"], off: ["#9ca3af", "مش متصل"] },
+  async open() {
+    let o = document.getElementById("dirSheet");
+    if (!o) { o = document.createElement("div"); o.id = "dirSheet"; o.onclick = e => { if (e.target === o) o.remove(); };
+      o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;display:flex;align-items:flex-end;justify-content:center"; document.body.appendChild(o); }
+    o.innerHTML = `<div style="background:var(--card,#fff);color:inherit;width:100%;max-width:440px;max-height:82vh;display:flex;flex-direction:column;border-radius:18px 18px 0 0;padding:16px 16px 18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:17px">☎️ التحويلات الداخلية</b>
+        <span><button class="iconbtn" style="width:34px;height:34px;font-size:15px" onclick="NQDir.load()" title="تحديث">↻</button>
+        <button class="iconbtn" style="width:34px;height:34px;font-size:15px" onclick="document.getElementById('dirSheet').remove()">✕</button></span></div>
+      <input id="dirQ" placeholder="🔎 دوّر بالاسم أو رقم التحويلة" value="${esc(this.q)}" oninput="NQDir.q=this.value;NQDir.render()"
+        style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:transparent;color:inherit;font:inherit;margin-bottom:6px">
+      <div id="dirList" style="overflow:auto;flex:1"><div style="opacity:.6;padding:14px;text-align:center">بيحمّل…</div></div></div>`;
+    if (this.people.length) this.render();
+    this.load();
+  },
+  async load() {
+    try { const j = await (await NQFiles.api("/people")).json(); this.people = j.people || []; this.render(); }
+    catch (e) { const l = document.getElementById("dirList"); if (l && !this.people.length) l.innerHTML = `<div style="color:#b91c1c;padding:14px;text-align:center">${esc(e.message || "مش قادر يجيب التحويلات")}</div>`; }
+  },
+  render() {
+    const l = document.getElementById("dirList"); if (!l) return;
+    const q = this.q.trim().toLowerCase(), ord = { idle: 0, ring: 1, talk: 2, off: 3 };
+    const list = this.people.filter(p => /^\d+$/.test(p.ext) && (!q || (p.name || "").toLowerCase().includes(q) || p.ext.includes(q)))
+      .sort((a, b) => (ord[a.state] ?? 3) - (ord[b.state] ?? 3) || (+a.ext - +b.ext));
+    l.innerHTML = list.map(p => { const [c, t] = this.ST[p.state] || this.ST.off;
+      return `<div class="dir-row" onclick="NQDir.call('${p.ext}')"><div class="av">${esc((p.name || p.ext).trim().charAt(0).toUpperCase())}</div>
+        <div style="flex:1;min-width:0"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name || "تحويلة " + p.ext)}</div>
+        <div style="font-size:12.5px;opacity:.75"><span class="dot" style="background:${c}"></span>${t}</div></div>
+        <b style="direction:ltr;font-size:17px">${esc(p.ext)}</b><span style="font-size:20px">📞</span></div>`; }).join("")
+      || `<div style="opacity:.6;padding:14px;text-align:center">مفيش نتايج</div>`;
+  },
+  call(ext) {
+    const p = this.people.find(x => x.ext === ext);
+    if (p && p.state === "talk" && !confirm(`${p.name || ext} في مكالمة دلوقتي — تتصل برضه؟`)) return;
+    const o = document.getElementById("dirSheet"); if (o) o.remove();
+    window._pickedName = p ? p.name : "";
+    $("dialNum").textContent = ext; NQPhone.call(ext, "pbx");
   }
 };
 function toast(t) { const e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = "none", 2500); }
