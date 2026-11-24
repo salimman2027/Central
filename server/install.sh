@@ -29,7 +29,7 @@ apt-get install -y -qq python3-venv python3-pip apache2-utils >/dev/null
 
 echo "== app files"
 mkdir -p "$APP" "$CONF" "$DATA/analysis"
-cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/ops.py "$SRC"/targets.py "$SRC"/todo.py "$SRC"/goals.py "$SRC"/workcal.py "$SRC"/wa.py "$SRC"/eng.py "$SRC"/wainbox.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
+cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/ops.py "$SRC"/targets.py "$SRC"/todo.py "$SRC"/remotedial.py "$SRC"/goals.py "$SRC"/workcal.py "$SRC"/wa.py "$SRC"/eng.py "$SRC"/wainbox.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
 sed -i "s/__VER__/$VER/g" "$APP/static/index.html"
@@ -175,6 +175,8 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/targets http://127.0.0.1:8090/app/targets
   ProxyPass        /calls-app/todo http://127.0.0.1:8090/app/todo
   ProxyPassReverse /calls-app/todo http://127.0.0.1:8090/app/todo
+  ProxyPass        /calls-app/rdial http://127.0.0.1:8090/app/rdial timeout=40
+  ProxyPassReverse /calls-app/rdial http://127.0.0.1:8090/app/rdial
   ProxyPass        /calls-app/goals http://127.0.0.1:8090/app/goals
   ProxyPassReverse /calls-app/goals http://127.0.0.1:8090/app/goals
   ProxyPass        /calls-app/wa http://127.0.0.1:8090/app/wa

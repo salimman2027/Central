@@ -198,6 +198,10 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   .sheet h3 { margin:0 0 4px; font-size:18px; } .sheet .n { direction:ltr; color:var(--muted); margin-bottom:14px; text-align:right; }
   .opt { display:flex; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; margin-bottom:10px; text-align:right; font-size:16px; color:var(--fg); }
   .opt b { font-size:24px; } .opt small { display:block; color:var(--muted); font-size:12px; }
+  .viaseg { display:flex; gap:6px; margin:8px 12px 0; padding:4px; border-radius:14px; background:var(--card,#fff); border:1px solid var(--line); }
+  .viaseg button { flex:1; border:0; background:transparent; color:inherit; font:inherit; font-size:13.5px; padding:8px 4px; border-radius:10px; cursor:pointer; opacity:.75; }
+  .viaseg button.sel { background:var(--pri); color:#fff; opacity:1; font-weight:700; box-shadow:0 2px 8px rgba(20,184,166,.35); }
+  .viaseg button.off { opacity:.4; }
   .viachip { font-size:12px; padding:7px 10px; border-radius:16px; background:#e7f3f2; color:var(--pri); white-space:nowrap; }
   .btn.ghost, html .btn.ghost { background:transparent !important; color:#0e9f87 !important; border:1.5px solid rgba(25,200,170,.55) !important; box-shadow:none !important; font-weight:700; }
   .btn.ghost:active { background:color-mix(in srgb, var(--pri, #19e6c1) 12%, transparent); }
@@ -411,7 +415,12 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
     <div class="who"><b><span id="whoExt">—</span> <span id="topVer" style="font-size:10.5px;font-weight:500;opacity:.5;border:1px solid currentColor;border-radius:6px;padding:0 5px;vertical-align:middle;direction:ltr;display:inline-block"></span></b><small id="whoSt">متصل بالسنترال</small></div>
     <button class="iconbtn todobtn" onclick="NQTodo.open()" aria-label="مهام اليوم" title="مهام اليوم" style="position:relative">✅<i class="tbadge" id="todoBadge" style="position:absolute;top:-4px;left:-4px"></i></button>
     <button class="iconbtn mebtn" onclick="NQMe.show()" aria-label="بياناتي" title="رقمي والشريحة والجهاز">؟</button>
-    <button class="viachip app-only" id="viaChip" onclick="NQVia.cycle()"></button>
+    <button class="viachip" id="viaChip" hidden onclick="NQVia.cycle()"></button>
+  </div>
+  <div class="viaseg" id="viaSeg" role="radiogroup" aria-label="تتصل منين">
+    <button data-v="pbx" onclick="NQVia.set('pbx')">☎️ السنترال</button>
+    <button data-v="sim" onclick="NQVia.set('sim')">📱 من شريحتي</button>
+    <button data-v="ask" onclick="NQVia.set('ask')">❔ اسألني</button>
   </div>
   <div class="ibar" id="inboxBar"></div>
   <div class="display"><div id="dialNum" class="num"></div><div id="dialName" class="who-name"></div><div id="dialErr" class="err"></div>
@@ -727,7 +736,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
     <h3>تتصل منين؟</h3>
     <div class="n" id="viaNum"></div>
     <button class="opt" id="viaPbx" onclick="NQVia.pick('pbx')"><b>☎️</b><div>من السنترال<small>بيتسجّل ويظهر في اللوحة ويطلع من شريحة الشركة</small></div></button>
-    <button class="opt" onclick="NQVia.pick('sim')"><b>📱</b><div>من شريحتي<small>من خط الموبايل الشخصي — مش بيتسجّل على السنترال</small></div></button>
+    <button class="opt" id="viaSim" onclick="NQVia.pick('sim')"><b>📱</b><div>من شريحتي<small>من خط الموبايل الشخصي — مش بيتسجّل على السنترال</small></div></button>
     <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-top:6px"><input type="checkbox" id="viaRemember" style="width:auto"> افتكر اختياري ومتسألنيش تاني</label>
   </div>
 </div>
@@ -1256,7 +1265,8 @@ const NQPhone = {
       return NQVia.simCall(number);
     }
     const pbxReady = !!(this.ua && this.ua.isRegistered());
-    let via = IS_APP ? (forceVia || NQPrefs.get("callVia", "ask")) : "pbx"; // اللابتوب: السنترال بس
+    // اللابتوب: السنترال — أو «من شريحتي» لو تطبيق الموبايل بتاعك (نفس التحويلة) مفتوح وجاهز
+    let via = forceVia || NQVia.cur();
     if (via === "pbx" && !pbxReady) via = "ask"; // السنترال مش متصل دلوقتي
     if (!forceVia) this.callName = window._pickedName || "";
     if (via === "ask") return NQVia.open(number);
@@ -1552,9 +1562,57 @@ const NQOwner = {
   close() { $("ownSheet").classList.remove("on"); }
 };
 
+/* ---------- اتصل من شريحتي وأنا على اللاب: اللاب بيبعت الرقم، والموبايل (نفس التحويلة) يتصل ---------- */
+const NQRemote = {
+  phone: false, running: false,
+  async api(path, body) {
+    const c = NQOwner.creds(); if (!c) throw new Error("ادخل بحسابك الأول");
+    const r = await fetch(CONFIG.api + "/rdial/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...c, ...body }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || "السيرفر مش راد"); return j;
+  },
+  async status() { if (IS_APP) return; try { this.phone = !!(await this.api("status", {})).phone; } catch (e) { this.phone = false; } try { NQVia.chip(); } catch (e) {} },
+  async dial(n) {
+    try { await this.api("send", { number: n, name: NQPhone.callName || "" }); NQPhone.callName = "";
+      $("dialNum").textContent = ""; $("dialErr").textContent = "";
+      toast("📱 موبايلك بيتصل دلوقتي على " + n + " من الشريحة");
+    } catch (e) { this.phone = false; $("dialErr").textContent = e.message; }
+  },
+  // الموبايل: بيستنى أوامر من اللاب (long-poll) ويتصل من الشريحة
+  async loop() {
+    if (!IS_APP || this.running || !window.Android || !Android.callWithSim) return;
+    this.running = true;
+    for (;;) {
+      if (!NQOwner.creds()) { await new Promise(r => setTimeout(r, 10000)); continue; }
+      try {
+        const j = await this.api("wait", {});
+        for (const it of j.items || []) { NQPhone.callName = it.name || ""; toast("💻 من اللاب: بيتصل على " + it.number); NQVia.simCall(it.number); }
+      } catch (e) { await new Promise(r => setTimeout(r, 5000)); }
+    }
+  }
+};
+setTimeout(() => { NQRemote.loop(); NQRemote.status(); }, 4000);
+if (!IS_APP) setInterval(() => NQRemote.status(), 30000);
+
 const NQVia = {
   num: "",
-  chip() { $("viaChip").textContent = VIA_LABEL[NQPrefs.get("callVia", "ask")] || VIA_LABEL.ask; },
+  key() { return IS_APP ? "callVia" : "webVia"; },
+  cur() { return NQPrefs.get(this.key(), IS_APP ? "ask" : "pbx"); },
+  set(v) {
+    if (NQPhone.simOnly && v !== "sim") { toast("حسابك بالشريحة بس"); v = "sim"; }
+    NQPrefs.set(this.key(), v); this.chip();
+    if (v === "sim" && !IS_APP && !NQRemote.phone) toast("📱 افتح تطبيق NQ Phone على موبايلك بنفس التحويلة — هو اللي هيتصل من الشريحة");
+  },
+  // شريط «تتصل منين» فوق: ظاهر دايمًا ومتعلّم عليه الاختيار
+  chip() {
+    const v = this.cur();
+    try { $("viaChip").textContent = VIA_LABEL[v] || VIA_LABEL.ask; } catch (e) {}
+    document.querySelectorAll("#viaSeg button").forEach(b => {
+      b.classList.toggle("sel", b.dataset.v === v);
+      if (b.dataset.v === "sim") { const off = !IS_APP && !NQRemote.phone; b.classList.toggle("off", off);
+        b.title = off ? "افتح التطبيق على موبايلك عشان تتصل من شريحتك" : "من خط الموبايل"; }
+      if (b.dataset.v === "pbx") b.style.display = NQPhone.simOnly ? "none" : "";
+    });
+  },
   cycle() {
     if (NQPhone.simOnly) { toast("حسابك بالشريحة بس"); return; }
     const order = ["ask", "pbx", "sim"]; const cur = NQPrefs.get("callVia", "ask");
@@ -1564,6 +1622,8 @@ const NQVia = {
   },
   open(n) {
     this.num = n; $("viaNum").textContent = n; $("viaRemember").checked = false;
+    try { $("viaSim").querySelector("small").textContent = IS_APP ? "من خط الموبايل الشخصي — مش بيتسجّل على السنترال"
+      : NQRemote.phone ? "موبايلك هيتصل بالرقم من الشريحة على طول" : "افتح تطبيق NQ Phone على موبايلك الأول"; } catch (e) {}
     const ok = !!(NQPhone.ua && NQPhone.ua.isRegistered());
     const b = $("viaPbx"); b.disabled = !ok; b.style.opacity = ok ? 1 : .45;
     b.querySelector("small").textContent = ok ? "بيتسجّل ويظهر في اللوحة ويطلع من شريحة الشركة"
@@ -1572,11 +1632,12 @@ const NQVia = {
   },
   close() { $("viaSheet").classList.remove("on"); },
   pick(v) {
-    if ($("viaRemember").checked) { NQPrefs.set("callVia", v); this.chip(); toast(v === "pbx" ? "هيتصل من السنترال دايمًا — غيّرها من الإعدادات" : "هيتصل من شريحتك دايمًا — غيّرها من الإعدادات"); }
+    if ($("viaRemember").checked) { NQPrefs.set(IS_APP ? "callVia" : "webVia", v); this.chip(); toast(v === "pbx" ? "هيتصل من السنترال دايمًا — غيّرها من الإعدادات" : "هيتصل من شريحتك دايمًا — غيّرها من الإعدادات"); }
     this.close(); NQPhone.call(this.num, v);
   },
   pending: null,
   simCall(n) {
+    if (!IS_APP) return NQRemote.dial(n);   // اللاب: الموبايل هو اللي يتصل
     if (!window.Android || !Android.callWithSim) { toast("الاتصال من الشريحة شغّال من التطبيق بس"); return; }
     this.pending = { number: n, direction: "out", via: "sim", started: new Date().toISOString(), answered: true, duration: 0, name: NQPhone.callName || "" };
     NQPhone.callName = "";

@@ -1333,6 +1333,9 @@ GOALS.CTX.update(dir=DATA_DIR, tz=TZ, calls=lambda a, b: unscoped(OPS.calls_c, a
                  reps=lambda: unscoped(config).get("reps", []), check_ext=lambda e, p: check_ext_password(e, p))
 import todo as TODO  # noqa: E402
 app.include_router(TODO.router)
+import remotedial as RDIAL  # noqa: E402
+app.include_router(RDIAL.router)
+RDIAL.CTX.update(check_ext=lambda e, p: check_ext_password(e, p))
 TODO.CTX.update(dir=DATA_DIR, tz=TZ, check_ext=lambda e, p: check_ext_password(e, p), scope=lambda: SCOPE.get(),
                 names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])})
 def _lookup_extra(number: str) -> dict:
