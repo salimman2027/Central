@@ -650,6 +650,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="wai-l card">
       <div style="display:flex;gap:6px;margin-bottom:8px"><input id="waiQ" class="ap-in" placeholder="بحث بالاسم أو الرقم أو الكلام" style="flex:1" oninput="clearTimeout(window._wq);window._wq=setTimeout(waiLoad,400)">
         <select id="waiRep" class="ap-in" style="width:130px" onchange="waiLoad()"></select></div>
+      <button class="btn sm" style="width:100%;margin-bottom:8px" onclick="waiNew()">➕ محادثة جديدة (اكتب الرقم أو اختار عميل)</button>
       <div id="waiList" class="wai-list"></div>
     </div>
     <div class="wai-r card">
@@ -659,6 +660,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
         <textarea id="waiText" class="ap-in" rows="2" placeholder="ردّ كإدارة (بيتبعت من رقم الشركة)"></textarea>
         <button class="btn" onclick="waiSend()">إرسال</button>
       </div>
+      <div class="wai-c" id="waiTpl" hidden style="flex-direction:column;align-items:stretch;gap:6px"></div>
     </div>
   </div>
 </div>
@@ -2549,8 +2551,39 @@ async function waiThread(first){
     box.innerHTML=j.items.map(m=>`<div class="wb ${m.dir}">${m.dir==='out'?`<span class="by">${esc(m.by||'الإدارة')}</span>`:''}${(m.type==='image'||m.type==='sticker')&&m.hasFile?`<a href="${API_BASE}/wai/media/${m.id}" target="_blank"><img src="${API_BASE}/wai/media/${m.id}" loading="lazy"></a>`:''}${['document','audio','video'].includes(m.type)?(m.hasFile?`<a href="${API_BASE}/wai/media/${m.id}" target="_blank">${{document:'📎',audio:'🎤',video:'🎬'}[m.type]} ${esc(m.filename||'ملف')}</a><br>`:'📎 (بيتحمّل)<br>'):''}${m.type==='template'?'📋 ':''}${esc(m.body||'')}<span class="m">${new Date(m.at).toLocaleString('ar-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} ${tick(m)}</span></div>`).join('')||'<div class="muted">مفيش رسايل</div>';
     if(bottom)box.scrollTop=box.scrollHeight;
     $('waiComp').hidden=!(ROLE==='admin'&&c.window);
+    if(ROLE==='admin'&&!c.window){ if(first)waiTplBox(ph); } else $('waiTpl').hidden=true;
   }catch(e){$('waiMsgs').innerHTML=`<div class="ai-err">✖ ${esc(e.message)}</div>`}
 }
+// ---------- محادثة جديدة / قالب (لما النافذة مقفولة): رقم + قالب معتمد + المتغيرات
+let WAI_TPLS=null;
+async function waiTemplates(){ if(WAI_TPLS)return WAI_TPLS; try{WAI_TPLS=(await (await fetch(API_BASE+'/wai/status',{cache:'no-store'})).json()).templates||[];}catch(e){WAI_TPLS=[]} return WAI_TPLS; }
+async function waiNew(){
+  WAI_CUR=null; clearInterval(WAI_T); $('waiComp').hidden=true;
+  $('waiHead').innerHTML='<b style="font-size:16px">➕ محادثة جديدة</b>';
+  const names=[...new Map((CALLS||[]).filter(c=>c.cust&&c.cust!=='—').map(c=>[c.num,c.cust])).entries()].slice(0,500);
+  $('waiMsgs').innerHTML=`<div style="max-width:420px;margin:10px auto;display:flex;flex-direction:column;gap:8px">
+    <label>رقم العميل<input id="waiNewNum" class="ap-in ltr" list="waiNewList" placeholder="05xxxxxxxx أو اسم العميل" oninput="waiNewPick(this)"></label>
+    <datalist id="waiNewList">${names.map(([n,c])=>`<option value="${esc(n)}">${esc(c)}</option>`).join('')}</datalist>
+    <label>الاسم (اختياري)<input id="waiNewName" class="ap-in"></label>
+    <div class="muted" style="font-size:12.5px">واتساب بيسمح إنك تبدأ كلام مع عميل بـ <b>قالب معتمد</b> بس. بعد ما العميل يرد، تقدر تكتب عادي لمدة 24 ساعة.</div></div>`;
+  waiTplBox(null);
+}
+function waiNewPick(el){ const o=[...document.querySelectorAll('#waiNewList option')].find(x=>x.value===el.value); if(o&&!$('waiNewName').value)$('waiNewName').value=o.textContent; }
+async function waiTplBox(phone){
+  const box=$('waiTpl'), T=await waiTemplates(); box.hidden=false;
+  if(!T.length){box.innerHTML='<div class="muted" style="font-size:13px">⏳ مفيش قوالب معتمدة لسه — اعملها في WhatsApp Manager ← Message templates (بتاخد من دقايق لـ 24 ساعة).</div>';return}
+  box.innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><select id="waiTplSel" class="ap-in" style="flex:1;min-width:160px" onchange="waiTplParams()">${T.map((t,i)=>`<option value="${i}">${esc(t.name)} (${esc(t.lang)})</option>`).join('')}</select>
+    <button class="btn" onclick="waiTplSend(${phone?`'${phone}'`:'null'})">📋 ابعت القالب</button></div><div id="waiTplPrev" class="muted" style="font-size:13px;white-space:pre-wrap"></div><div id="waiTplPs" style="display:flex;gap:6px;flex-wrap:wrap"></div>`;
+  waiTplParams();
+}
+function waiTplParams(){ const t=WAI_TPLS[+$('waiTplSel').value]; $('waiTplPrev').textContent=t.body;
+  $('waiTplPs').innerHTML=Array.from({length:t.params},(_,i)=>`<input class="ap-in wai-tp" style="flex:1;min-width:120px" placeholder="{{${i+1}}}${i===0?' — اسم العميل':''}">`).join(''); }
+async function waiTplSend(phone){
+  const t=WAI_TPLS[+$('waiTplSel').value], ps=[...document.querySelectorAll('.wai-tp')].map(x=>x.value.trim());
+  const num=phone||($('waiNewNum')?$('waiNewNum').value.trim():''); if(!num)return toast('✖ اكتب رقم العميل');
+  if(ps.some(x=>!x))return toast('✖ املا كل المتغيرات');
+  try{const r=await fetch(API_BASE+'/wai/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:num,name:($('waiNewName')||{}).value||'',template:{name:t.name,lang:t.lang,params:ps}})});const j=await r.json();if(!r.ok)throw new Error(j.detail);
+    toast('✔ القالب اتبعت'); WAI_TPLS=null; $('waiTpl').hidden=true; const ph=j.phone||String(num).replace(/\D/g,'').replace(/^0(5\d{8})$/,'966$1'); waiLoad(); waiOpen(ph);}catch(e){toast('✖ '+e.message)} }
 async function waiAssign(ext){ try{const r=await fetch(API_BASE+'/wai/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:WAI_CUR,ext})});const j=await r.json();if(!r.ok)throw new Error(j.detail);toast('✔ المحادثة اتحوّلت');waiLoad();}catch(e){toast('✖ '+e.message)} }
 async function waiSend(){ const t=$('waiText').value.trim(); if(!t)return;
   try{const r=await fetch(API_BASE+'/wai/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:WAI_CUR,text:t})});const j=await r.json();if(!r.ok)throw new Error(j.detail);$('waiText').value='';waiThread();}catch(e){toast('✖ '+e.message)} }
