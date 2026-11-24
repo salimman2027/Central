@@ -210,6 +210,12 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   </Location>
 </VirtualHost>
 EOF
+# أجهزة الشرايح (Dinstar) ممكن ماتعرفش تبعت HTTPS — مسار الأحداث بس متاح على http كمان (السيرفر بيقبل من IP الأجهزة بس)
+cat > /etc/apache2/conf-available/nq-gw-event.conf <<'GWE'
+ProxyPass        /calls-app/gw-event http://127.0.0.1:8090/app/gw-event
+ProxyPassReverse /calls-app/gw-event http://127.0.0.1:8090/app/gw-event
+GWE
+a2enconf -q nq-gw-event >/dev/null 2>&1 || true
 grep -qE '^\s*Listen\s+443' /etc/apache2/ports.conf /etc/apache2/conf-enabled/*.conf 2>/dev/null || echo "Listen 443" >> /etc/apache2/ports.conf
 a2ensite -q nq-calls >/dev/null
 apachectl configtest
