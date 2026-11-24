@@ -439,6 +439,25 @@ def api_diag():
     return out
 
 
+@router.post("/api/wai/verify")
+async def api_verify(request: Request):
+    """نقل الرقم لـ Cloud API: اطلب كود (SMS/مكالمة) ← أكّد الكود — وبعدها التسجيل بالـ PIN من /api/wai/repair"""
+    b = await request.json()
+    c = cfg()
+    if not ready():
+        raise HTTPException(400, "الواتساب مش متظبط على السيرفر")
+    act = str(b.get("action") or "")
+    if act == "request":
+        method = "VOICE" if str(b.get("method") or "").upper() == "VOICE" else "SMS"
+        return {"ok": True, **graph("POST", f"{c['phone_id']}/request_code", {"code_method": method, "language": "ar"})}
+    if act == "verify":
+        code = re.sub(r"\D", "", str(b.get("code") or ""))
+        if len(code) != 6:
+            raise HTTPException(400, "الكود 6 أرقام")
+        return {"ok": True, **graph("POST", f"{c['phone_id']}/verify_code", {"code": code})}
+    raise HTTPException(400, "action غلط")
+
+
 @router.post("/api/wai/repair")
 async def api_repair(request: Request):
     """يشترك الـ App في رسايل الـ WABA + يسجّل الرقم على Cloud API (لو فيه PIN) + يمسح المحادثة الفاضية"""

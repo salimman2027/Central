@@ -1153,8 +1153,18 @@ async function waiDiag(){ const box=$('waiDiagBox'); box.hidden=false; box.inner
    <div style="margin-top:8px">${ok(h.lastOk)} <b>آخر حاجة وصلت من Meta على الـ webhook:</b> ${h.lastOk?esc(h.lastOk.slice(0,16).replace('T',' ')):'ولا مرة — Meta مش بيبعتلنا (الـ webhook مش متظبط أو مش مشترك في messages)'} · رسايل ${h.msgs||0} · حالات ${h.statuses||0}${h.lastErr?`<div style="color:var(--red)">${esc(h.lastErr)}</div>`:''}</div>
    <div style="margin-top:6px">📊 في السيستم: واردة <b>${cnt.inn||0}</b> · صادرة <b>${cnt.outt||0}</b> · فشلت <b>${cnt.failed||0}</b></div>
    ${(d.recent||[]).filter(r=>r.error).slice(0,4).map(r=>`<div style="font-size:12px;color:var(--red)">• ${esc(r.at.slice(0,16))} ${esc(r.error)}</div>`).join('')}
+   ${d.checks.some(c=>c.name==='الرقم'&&!c.ok)?`<div class="card" style="margin:10px 0 0;padding:10px 12px;background:rgba(245,158,11,.08)"><b>📲 نقل الرقم لـ Cloud API (3 خطوات)</b>
+     <div class="muted" style="font-size:12.5px;margin:4px 0 8px">⚠️ الأول: امسح حساب واتساب من على الموبايل اللي عليه الرقم (الإعدادات ← الحساب ← حذف حسابي) — بعد ما تاخد نسخة احتياطية لو محتاجها. الرقم مايتسجّلش هنا وهو شغّال على موبايل.</div>
+     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+       <button class="btn o sm" onclick="waiCode('SMS')">1️⃣ ابعت كود SMS</button><button class="btn o sm" onclick="waiCode('VOICE')">أو مكالمة</button>
+       <input id="waiCodeIn" placeholder="الكود (6 أرقام)" inputmode="numeric" maxlength="6" style="width:130px;padding:6px 8px"> <button class="btn o sm" onclick="waiVerify()">2️⃣ أكّد الكود</button>
+       <button class="btn sm" onclick="waiRepair()">3️⃣ سجّل بالـ PIN</button></div></div>`:''}
    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn o sm" onclick="waiRepair()">🔧 اشترك في الرسايل الواردة ونضّف</button><button class="btn o sm" onclick="waiDiag()">↻ افحص تاني</button><button class="btn o sm" onclick="$('waiDiagBox').hidden=true">قفل</button></div>
    <div class="muted" style="font-size:12px;margin-top:6px">رابط الـ webhook اللي يتحط في Meta (WhatsApp → Configuration): <b dir="ltr">https://${location.host}/calls-app/wa-hook</b> واشترك في <b>messages</b>.</div>`;}
+async function waiCode(m){ if(!confirm('اتأكدت إن واتساب اتمسح من الموبايل اللي عليه الرقم؟'))return;
+  try{const r=await fetch(API_BASE+'/wai/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'request',method:m})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);toast('📩 الكود اتبعت — هيوصل على الشريحة');}catch(e){alert(e.message)} }
+async function waiVerify(){ const c=($('waiCodeIn').value||'').trim();
+  try{const r=await fetch(API_BASE+'/wai/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',code:c})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);toast('✔ الكود اتأكد — دوس 3️⃣ وحط PIN');}catch(e){alert(e.message)} }
 async function waiRepair(){
   const pin=prompt('لو الرقم لسه مش متسجّل على Cloud API اكتب PIN من 6 أرقام (لو الرقم عليه «التحقق بخطوتين» اكتب نفس الـ PIN بتاعه).\nلو متسجّل خلاص سيبها فاضية ودوس OK.','');
   if(pin===null)return;

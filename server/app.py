@@ -68,7 +68,7 @@ import contextvars  # noqa: E402
 
 SCOPE = contextvars.ContextVar("nq_scope", default=None)   # None = المدير (يشوف كله)
 HTPASSWD = Path(os.environ.get("NQ_CONF", "/etc/nq-calls")) / "htpasswd"
-LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings|ops/|wa\b|eng\b|goals/settings|goals/manual|workcal|wai/diag|wai/repair|ops/gw-events)")
+LEADER_DENY = re.compile(r"^/api/(rubric|taxonomy|teams|logins|crm/settings|ownership/settings|ops/|wa\b|eng\b|goals/settings|goals/manual|workcal|wai/diag|wai/repair|wai/verify|ops/gw-events)")
 
 
 def _teams_file() -> dict:
