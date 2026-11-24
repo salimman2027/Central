@@ -831,6 +831,7 @@ def health():
     return {"gateway": STATE["gateway"], "gatewayAt": STATE["gatewayAt"], "checked": STATE["checked"],
             "devices": [{**d, "status": g.get(d["trunk"], "none")} for d in devices()],
             "alerts": list(a["open"].values()), "log": a["log"][:15], "backup": backup_info(),
+            "sims": _jload("sim_state.json", {}),
             "telegram": tg_ready(), "lines": sorted(lines_today().values(), key=lambda x: -x["used"]),
             "disk": _disk()}
 
@@ -1103,6 +1104,16 @@ async def gw_event(request: Request):
         ext = d["exts"][port]
         key = f"sim:{ext}"
         who = names.get(ext, "")
+        if st in ("off", "on"):   # حالة كل شريحة + آخر مرة فصلت/رجعت
+            with LOCK:
+                ss = _jload("sim_state.json", {})
+                x = ss.setdefault(ext, {})
+                if x.get("state") != st:
+                    x["since"] = now().isoformat()
+                x["state"] = st
+                x["lastDown" if st == "off" else "lastUp"] = now().isoformat()
+                x.update(device=d["name"], port=port)
+                _jsave("sim_state.json", ss)
         if st == "off":
             raise_alert(key, f"📵 شريحة تحويلة {ext}{(' (' + who + ')') if who else ''} اتشالت أو وقفت — {d['name']} بورت {port}")
         elif st == "on":
