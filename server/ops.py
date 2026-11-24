@@ -1039,6 +1039,12 @@ def gw_key() -> str:
         return k
 
 
+def gw_ips() -> set:
+    """IPs الأجهزة المسجّلة على السنترال (dinastarN) — الأحداث اللي جاية منها مقبولة من غير مفتاح"""
+    out = asterisk("pjsip show contacts") or ""
+    return set(re.findall(r"Contact:\s+dinastar\d+/sip:[^@\s]*@([\d.]+)", out))
+
+
 def _flat(x, pre="") -> dict:
     out = {}
     if isinstance(x, dict):
@@ -1075,7 +1081,8 @@ def _port_events(data) -> list:
 @router.api_route("/app/gw-event", methods=["GET", "POST"])
 async def gw_event(request: Request):
     q = request.query_params
-    if q.get("k") != gw_key():
+    src = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
+    if q.get("k") != gw_key() and src not in gw_ips():
         return JSONResponse({"detail": "forbidden"}, 403)
     raw = (await request.body())[:20000].decode("utf-8", "replace")
     try:
