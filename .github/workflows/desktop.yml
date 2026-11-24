@@ -3,6 +3,8 @@ on:
   push:
     paths: ["desktop/**", ".github/workflows/desktop.yml"]
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   win:
     runs-on: windows-latest
@@ -17,3 +19,10 @@ jobs:
           npm run dist
       - uses: actions/upload-artifact@v4
         with: { name: nq-phone-windows, path: "desktop/dist/*.exe" }
+      - name: Publish to release "latest"
+        shell: bash
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          f=$(ls desktop/dist/*.exe | head -1)
+          cp "$f" NQ-Phone-Setup.exe
+          gh release upload latest NQ-Phone-Setup.exe --clobber -R ${{ github.repository }}
