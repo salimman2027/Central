@@ -1238,8 +1238,8 @@ const NQPhone = {
   },
 
   logout() {
-    this.simOnly = false;
-    store.del("nq_login"); store.del("nq_user");
+    this.simOnly = false; this._nmAsk = false;
+    store.del("nq_login"); store.del("nq_user"); store.del("nq_myname");
     if (this.ua) { try { this.ua.stop(); } catch (e) {} } this.ua = null;
     this.ext = null; $("pwd").value = "";
     this._err("اتفصل من السنترال — الاتصال هيبقى من شريحتك"); this._reg(false);
@@ -1412,9 +1412,11 @@ const NQPhone = {
   _reg(on) {
     $("regDot").classList.toggle("off", !on);
     if (!this.ext) { $("whoExt").textContent = "NQ Phone"; $("whoSt").textContent = "غير مربوط بالسنترال"; $("regDot").classList.add("off"); return; }
-    const nm = (store.get("nq_user", null) || {}).name;
+    const nm = (store.get("nq_user", null) || {}).name || store.get("nq_myname", "");
+    if (!nm && !this._nmAsk) { this._nmAsk = true;   // اسم الموظف من السيرفر (مرة واحدة)
+      NQFiles.api("/people").then(r => r.json()).then(j => { if (j.meName) { store.set("nq_myname", j.meName); this._reg(on); } }).catch(() => {}); }
     if (this.simOnly) { $("regDot").classList.remove("off"); $("whoExt").textContent = nm || ("كود " + this.ext); $("whoSt").textContent = "📱 بيتصل من شريحته"; return; }
-    $("whoExt").textContent = "تحويلة " + this.ext;
+    $("whoExt").innerHTML = "تحويلة " + esc(this.ext) + (nm ? ` <span style="font-weight:600;color:var(--pri)">· ${esc(nm)}</span>` : "");
     $("whoSt").textContent = on ? "متصل بالسنترال" : "غير متصل بالسنترال — بيحاول تاني…";
   }
 };
