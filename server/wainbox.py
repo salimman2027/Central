@@ -410,7 +410,9 @@ def api_diag():
         def phone():
             j = graph("GET", f"{c['phone_id']}?fields=display_phone_number,verified_name,quality_rating,code_verification_status,name_status,status,platform_type,throughput")
             ok = (j.get("status") in (None, "CONNECTED")) and j.get("platform_type", "CLOUD_API") == "CLOUD_API"
-            return {"ok": ok, "info": {k: j.get(k) for k in ("display_phone_number", "verified_name", "status", "quality_rating", "name_status", "code_verification_status", "platform_type")}}
+            extra = {} if ok else {"err": "الرقم مش متسجّل على Cloud API (النوع: " + str(j.get("platform_type")) + ") — دوس 🔧 وحط PIN من 6 أرقام عشان يتسجّل"
+                                   if j.get("platform_type") not in (None, "CLOUD_API") else "حالة الرقم: " + str(j.get("status"))}
+            return {"ok": ok, **extra, "info": {k: j.get(k) for k in ("display_phone_number", "verified_name", "status", "quality_rating", "name_status", "code_verification_status", "platform_type")}}
         chk("الرقم", phone)
         def tok():
             j = graph("GET", f"debug_token?input_token={urllib.parse.quote(c['token'])}")
@@ -438,12 +440,27 @@ def api_diag():
 
 
 @router.post("/api/wai/repair")
-async def api_repair():
-    """يشترك الـ App في رسايل الـ WABA (لو مش مشترك) + يمسح المحادثة الفاضية"""
+async def api_repair(request: Request):
+    """يشترك الـ App في رسايل الـ WABA + يسجّل الرقم على Cloud API (لو فيه PIN) + يمسح المحادثة الفاضية"""
+    try:
+        b = await request.json()
+    except Exception:  # noqa: BLE001
+        b = {}
     c = cfg()
     res = {}
     if c["waba"]:
-        res["subscribe"] = graph("POST", f"{c['waba']}/subscribed_apps", {})
+        try:
+            res["subscribe"] = graph("POST", f"{c['waba']}/subscribed_apps", {})
+        except HTTPException as e:
+            res["subscribeErr"] = str(e.detail)
+    pin = str(b.get("pin") or "").strip()
+    if pin:
+        if not re.fullmatch(r"\d{6}", pin):
+            raise HTTPException(400, "الـ PIN لازم 6 أرقام")
+        try:
+            res["register"] = graph("POST", f"{c['phone_id']}/register", {"messaging_product": "whatsapp", "pin": pin})
+        except HTTPException as e:
+            res["registerErr"] = str(e.detail)
     with LOCK:
         db().execute("DELETE FROM convs WHERE phone=''")
         db().commit()

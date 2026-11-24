@@ -1155,7 +1155,11 @@ async function waiDiag(){ const box=$('waiDiagBox'); box.hidden=false; box.inner
    ${(d.recent||[]).filter(r=>r.error).slice(0,4).map(r=>`<div style="font-size:12px;color:var(--red)">• ${esc(r.at.slice(0,16))} ${esc(r.error)}</div>`).join('')}
    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn o sm" onclick="waiRepair()">🔧 اشترك في الرسايل الواردة ونضّف</button><button class="btn o sm" onclick="waiDiag()">↻ افحص تاني</button><button class="btn o sm" onclick="$('waiDiagBox').hidden=true">قفل</button></div>
    <div class="muted" style="font-size:12px;margin-top:6px">رابط الـ webhook اللي يتحط في Meta (WhatsApp → Configuration): <b dir="ltr">https://${location.host}/calls-app/wa-hook</b> واشترك في <b>messages</b>.</div>`;}
-async function waiRepair(){ try{const r=await fetch(API_BASE+'/wai/repair',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);toast('✔ تم');}catch(e){alert(e.message)} waiDiag(); }
+async function waiRepair(){
+  const pin=prompt('لو الرقم لسه مش متسجّل على Cloud API اكتب PIN من 6 أرقام (لو الرقم عليه «التحقق بخطوتين» اكتب نفس الـ PIN بتاعه).\nلو متسجّل خلاص سيبها فاضية ودوس OK.','');
+  if(pin===null)return;
+  try{const r=await fetch(API_BASE+'/wai/repair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:(pin||'').trim()})});const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    const errs=[j.subscribeErr,j.registerErr].filter(Boolean);toast(errs.length?'⚠️ '+errs.join(' — '):'✔ تم');}catch(e){alert(e.message)} waiDiag(); }
 // ---------- تنبيه الأجازات في الصفحة الرئيسية
 async function holBanner(){ const box=$('holBanner'); if(!box)return;
   let d; try{const r=await fetch(API_BASE+'/calendar/upcoming?days=120',{cache:'no-store'}); if(!r.ok)return; d=await r.json();}catch(e){return}
