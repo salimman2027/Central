@@ -321,6 +321,13 @@ def whoami(request: Request):
     return {"role": "admin", "user": _session_user(request.cookies.get(COOKIE, ""))}
 
 
+@app.get("/privacy", include_in_schema=False)
+def privacy_page():
+    """سياسة الخصوصية (مطلوبة لنشر تطبيق واتساب على Meta) — مفتوحة من غير تسجيل دخول"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse((Path(__file__).parent / "static" / "privacy.html").read_text(encoding="utf-8"))
+
+
 @app.middleware("http")
 async def no_cache(request, call_next):
     resp = await call_next(request)
