@@ -1266,7 +1266,9 @@ const NQPhone = {
       $("dialErr").textContent = "خط السنترال بتاعك وصل حد المكالمات النهارده — اتصل من شريحتك";
       return IS_APP ? NQVia.open(number) : undefined;
     }
-    if (this.session && !this._clearStale()) { $("dialErr").textContent = "فيه مكالمة لسه مفتوحة — اقفلها الأول (لو مش ظاهرة دوس اتصال تاني)"; this._stuckTap = (this._stuckTap || 0) + 1;
+    if (this.session && !this._clearStale()) {
+      if (Date.now() - (this.started ? +this.started : 0) < 8000) return;   // دوسة زيادة (دبل كليك/Enter) — مانلغيش المكالمة اللي لسه بتبدأ
+      $("dialErr").textContent = "فيه مكالمة لسه مفتوحة — اقفلها الأول (لو مش ظاهرة دوس اتصال تاني)"; this._stuckTap = (this._stuckTap || 0) + 1;
       if (this._stuckTap >= 2) { this._forceReset(); $("dialErr").textContent = "اتمسحت المكالمة المعلّقة — اتصل تاني"; } return; }
     this._stuckTap = 0;
     if (window.Android) Android.onCallStateChanged(true); iosCall(true);
@@ -1281,7 +1283,7 @@ const NQPhone = {
     this.session.answer({ mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: CONFIG.iceServers } });
   },
 
-  hangup() { if (!window.Android) NQWeb.stopRing(); if (this.session) try { this.session.terminate(); } catch (e) {} },
+  hangup() { this._userHang = true; if (!window.Android) NQWeb.stopRing(); if (this.session) try { this.session.terminate(); } catch (e) {} },
 
   toggleMute() {
     if (!this.session) return;
@@ -1331,7 +1333,7 @@ const NQPhone = {
     // الجيتواي ساعات بيبعت اسم حسابه (dinastar1) مكان الرقم والرقم الحقيقي في اسم العرض
     const u = String(s.remote_identity.uri.user || ""), dn = String(s.remote_identity.display_name || "").replace(/[\s"]/g, "");
     this.peer = /^\+?\d{3,}$/.test(u) ? u : (/^\+?\d{6,}$/.test(dn) ? dn : u);
-    this.callStart = null; this.started = new Date();
+    this.callStart = null; this.started = new Date(); this._userHang = false;
     this.muted = false; this.speaker = false;
     $("cMute").classList.remove("on"); $("cSpk").classList.remove("on"); $("cMute").lastChild.textContent = "كتم";
     $("callPad").classList.remove("on"); $("cPad").classList.remove("on"); try { $("cDtmf").textContent = ""; } catch (e) {}
@@ -1386,7 +1388,9 @@ const NQPhone = {
         const ar = { 403: "السنترال رفض — التحويلة مش مسموحلها تتصل بره", 404: "الرقم مش متعرّف على السنترال", 408: "مفيش رد من الخط",
           480: "الخط مش متاح دلوقتي", 484: "الرقم ناقص أو غلط", 486: "الرقم مشغول", 487: "اتلغت", 488: "مشكلة في الصوت (codec)",
           500: "خطأ في السنترال", 502: "جهاز الشرايح (Dinstar) مش راد", 503: "الشريحة مشغولة أو مفيش شبكة على الخط", 603: "اترفضت" }[code];
+        const canceled = /^Canceled$/i.test(info.cause || "") && !code;
         $("dialErr").textContent = /Media Access/i.test(info.cause || "") ? "المايك مش مسموح للتطبيق — اسمح بيه من الإعدادات وجرّب تاني"
+          : canceled ? (this._userHang ? "" : "المكالمة اتلغت قبل ما ترن — جرّب تاني")
           : "المكالمة مكملتش: " + (ar || info.cause || "") + (code ? ` (${code}${why ? " " + why : ""})` : "");
       }
       if (!NQNotes.maybeAsk(info)) { show("scrDial"); NQDialer.after(); }

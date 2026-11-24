@@ -32,14 +32,14 @@ mkdir -p "$APP" "$CONF" "$DATA/analysis"
 cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/ops.py "$SRC"/targets.py "$SRC"/todo.py "$SRC"/goals.py "$SRC"/workcal.py "$SRC"/wa.py "$SRC"/eng.py "$SRC"/wainbox.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
-sed -i "s/__VER__/$VER/" "$APP/static/index.html"
+sed -i "s/__VER__/$VER/g" "$APP/static/index.html"
 echo "   version: $VER"
 chown -R "$RUN_USER:$RUN_USER" "$DATA"
 
 # نسخة اللابتوب من التليفون (نفس صفحة التطبيق) على https://HOST/phone/
 if [[ -d "$SRC/../app/src/main/assets" ]]; then
   rm -rf "$APP/phone"; cp -r "$SRC/../app/src/main/assets" "$APP/phone"
-  sed -i "s/__VER__/$(cat "$SRC/../VERSION" 2>/dev/null)/" "$APP/phone/phone.html"
+  sed -i "s/__VER__/$(cat "$SRC/../VERSION" 2>/dev/null)/g" "$APP/phone/phone.html"
   cp "$APP/phone/phone.html" "$APP/phone/index.html"
 fi
 
