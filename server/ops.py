@@ -1015,3 +1015,97 @@ async def app_inbox(request: Request):
                          "callbacks": [c for c in callbacks() if c["ext"] == ext],
                          "followups": followups(ext), "leads": [x for x in leads(ext) if not x["called"]]},
                         headers=HDR)
+
+
+# ------------------------------------------------------------------ أحداث أجهزة الشرايح (Dinstar Event report)
+# كل جهاز بيبعت أحداثه (تسجيل الشريحة / شيلها) على: https://<السيرفر>/calls-app/gw-event?d=<رقم الجهاز>&k=<المفتاح>
+# لما شريحة تتشال أو تقف → تنبيه (تليجرام + اللوحة)، ولما ترجع → التنبيه يتقفل.
+SIM_OFF = re.compile(r"no[\s_-]*u?sim|sim[\s_-]*(absent|remov|not[\s_-]*insert|out)|absent|removed|not[\s_-]*insert|unregister|power[\s_-]*off|no[\s_-]*card|not[\s_-]*registered|deregist", re.I)
+SIM_ON = re.compile(r"\bregistered\b|mobile[\s_-]*registered|sim[\s_-]*(ok|ready|insert)|\bready\b|\bup\b", re.I)
+
+
+def gw_key() -> str:
+    f = CTX["dir"] / "gw_key.txt"
+    try:
+        return f.read_text().strip()
+    except OSError:
+        import secrets as _s
+        k = _s.token_urlsafe(18)
+        f.write_text(k)
+        try:
+            os.chmod(f, 0o600)
+        except OSError:
+            pass
+        return k
+
+
+def _flat(x, pre="") -> dict:
+    out = {}
+    if isinstance(x, dict):
+        for k, v in x.items():
+            out.update(_flat(v, f"{pre}{k}."))
+    elif isinstance(x, list):
+        for i, v in enumerate(x):
+            out.update(_flat(v, f"{pre}{i}."))
+    else:
+        out[pre[:-1]] = x
+    return out
+
+
+def _port_events(data) -> list:
+    """بيطلّع [(port, state)] من أي شكل JSON/فورم — state = off / on / None"""
+    rows = []
+    items = data if isinstance(data, list) else (data.get("ports") or data.get("port_status") or data.get("data") or [data]) if isinstance(data, dict) else []
+    if isinstance(items, dict):
+        items = [items]
+    for it in items if isinstance(items, list) else []:
+        f = _flat(it) if isinstance(it, (dict, list)) else {"value": it}
+        port = None
+        for k, v in f.items():
+            if re.search(r"(^|\.)(port|port_?no|portid|slot|channel)$", k, re.I) and str(v).strip().lstrip("-").isdigit():
+                port = int(str(v).strip())
+                break
+        txt = " ".join(f"{k}={v}" for k, v in f.items() if not re.search(r"port|time|date|sn|mac|ip|id$", k, re.I))
+        st = "off" if SIM_OFF.search(txt) else "on" if SIM_ON.search(txt) else None
+        if port is not None:
+            rows.append((port, st, txt[:200]))
+    return rows
+
+
+@router.api_route("/app/gw-event", methods=["GET", "POST"])
+async def gw_event(request: Request):
+    q = request.query_params
+    if q.get("k") != gw_key():
+        return JSONResponse({"detail": "forbidden"}, 403)
+    raw = (await request.body())[:20000].decode("utf-8", "replace")
+    try:
+        data = json.loads(raw) if raw.strip()[:1] in "[{" else dict(urllib.parse.parse_qsl(raw)) or dict(q)
+    except ValueError:
+        data = {"raw": raw}
+    dev = int(q.get("d") or 0) if str(q.get("d") or "").isdigit() else 0
+    with LOCK:
+        log = _jload("gw_events.json", [])
+        log = ([{"at": now().isoformat(), "d": dev, "data": data if len(raw) < 4000 else raw[:4000]}] + log)[:80]
+        _jsave("gw_events.json", log)
+    devs = devices()
+    d = devs[dev - 1] if 1 <= dev <= len(devs) else None
+    names = CTX["names"]() if CTX.get("names") else {}
+    for port, st, txt in _port_events(data):
+        if not d or not (0 <= port < len(d["exts"])):
+            continue
+        ext = d["exts"][port]
+        key = f"sim:{ext}"
+        who = names.get(ext, "")
+        if st == "off":
+            raise_alert(key, f"📵 شريحة تحويلة {ext}{(' (' + who + ')') if who else ''} اتشالت أو وقفت — {d['name']} بورت {port}")
+        elif st == "on":
+            clear_alert(key, f"📶 شريحة تحويلة {ext}{(' (' + who + ')') if who else ''} رجعت تشتغل — {d['name']} بورت {port}")
+    return {"ok": True}
+
+
+@router.get("/api/ops/gw-events")
+def api_gw_events(request: Request):
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host", "")).split(",")[0].strip()
+    base = f"https://{host}/calls-app/gw-event"
+    return {"urls": [{"device": x["name"], "url": f"{base}?d={x['no']}&k={gw_key()}"} for x in devices()],
+            "events": _jload("gw_events.json", [])[:30]}

@@ -175,6 +175,8 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/targets http://127.0.0.1:8090/app/targets
   ProxyPass        /calls-app/todo http://127.0.0.1:8090/app/todo
   ProxyPassReverse /calls-app/todo http://127.0.0.1:8090/app/todo
+  ProxyPass        /calls-app/gw-event http://127.0.0.1:8090/app/gw-event
+  ProxyPassReverse /calls-app/gw-event http://127.0.0.1:8090/app/gw-event
   ProxyPass        /calls-app/rdial http://127.0.0.1:8090/app/rdial timeout=40
   ProxyPassReverse /calls-app/rdial http://127.0.0.1:8090/app/rdial
   ProxyPass        /calls-app/goals http://127.0.0.1:8090/app/goals
