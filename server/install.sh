@@ -181,6 +181,10 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/rdial http://127.0.0.1:8090/app/rdial
   ProxyPass        /calls-app/goals http://127.0.0.1:8090/app/goals
   ProxyPassReverse /calls-app/goals http://127.0.0.1:8090/app/goals
+  ProxyPass        /calls-app/wa-hook http://127.0.0.1:8090/app/wa-hook
+  ProxyPassReverse /calls-app/wa-hook http://127.0.0.1:8090/app/wa-hook
+  ProxyPass        /calls-app/wai/ http://127.0.0.1:8090/app/wai/
+  ProxyPassReverse /calls-app/wai/ http://127.0.0.1:8090/app/wai/
   ProxyPass        /calls-app/wa http://127.0.0.1:8090/app/wa
   ProxyPassReverse /calls-app/wa http://127.0.0.1:8090/app/wa
   ProxyPass        /calls-app/training http://127.0.0.1:8090/app/training
