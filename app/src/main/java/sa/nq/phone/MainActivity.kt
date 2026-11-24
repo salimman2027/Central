@@ -112,6 +112,8 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         SimRecSync.runAsync(this) { simStatusToJs() } // بعد ما يرجع من مكالمة شريحة
+        try { getSystemService(NotificationManager::class.java).cancel(3) } catch (e: Exception) {}   // إشعار "التطبيق اتقفل"
+        js("window.NQKeep && NQKeep.render()")
     }
 
     private var pendingMic: PermissionRequest? = null
@@ -260,6 +262,7 @@ class MainActivity : Activity() {
 
         askPermissions()
         PhoneService.send(this, PhoneService.ACTION_START)
+        KeepAlive.maybeShow(this)   // شاومي وغيره: Autostart + بدون قيود بطارية
         handleAction(intent)
     }
 
@@ -311,10 +314,6 @@ class MainActivity : Activity() {
         val missing = need.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 1)
 
-        val pm = getSystemService(POWER_SERVICE) as PowerManager
-        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
-        }
         if (Build.VERSION.SDK_INT >= 34) {
             val nm = getSystemService(NotificationManager::class.java)
             if (!nm.canUseFullScreenIntent()) {
@@ -458,6 +457,9 @@ class MainActivity : Activity() {
     }
 
     inner class Bridge {
+        @JavascriptInterface fun keepAlive() = runOnUiThread { KeepAlive.show(this@MainActivity) }
+        @JavascriptInterface fun keepAliveStatus(): String =
+            "{\"battery\":${KeepAlive.batteryOk(this@MainActivity)},\"autostart\":${KeepAlive.autostartOk(this@MainActivity)},\"xiaomi\":${KeepAlive.isXiaomi}}"
         @JavascriptInterface fun onIncoming(number: String) {
             if (PhoneService.instance != null) PhoneService.incoming(number)
             else PhoneService.send(this@MainActivity, PhoneService.ACTION_INCOMING, number)

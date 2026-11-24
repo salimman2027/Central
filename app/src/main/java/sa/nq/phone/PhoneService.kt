@@ -32,6 +32,7 @@ class PhoneService : Service() {
         const val ACTION_START = "start"
         const val ACTION_INCOMING = "incoming"
         const val ACTION_STOP_RING = "stop_ring"
+        const val ACTION_BOOT = "boot"
         const val EXTRA_NUMBER = "number"
 
         @Volatile var instance: PhoneService? = null
@@ -101,10 +102,31 @@ class PhoneService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startAsForeground() // أندرويد بيطلبها مع كل startForegroundService
         when (intent?.action) {
+            ACTION_BOOT -> showReopen("📞 افتح NQ Phone", "الموبايل اتعمله ريستارت — دوس عشان تتصل بالسنترال وتستقبل المكالمات")
             ACTION_INCOMING -> showIncoming(intent.getStringExtra(EXTRA_NUMBER) ?: "")
             ACTION_STOP_RING -> stopRinging()
         }
         return START_STICKY
+    }
+
+    /** الموظف شال التطبيق من التطبيقات الأخيرة (أو النظام قفله): الاتصال بالسنترال وقف —
+     *  نطلّع إشعار واضح يرجّعه بدوسة، عشان المكالمات ماتضيعش */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        showReopen("التطبيق اتقفل ⚠️ — مش هتوصلك مكالمات", "دوس هنا عشان ترجع متصل بالسنترال")
+        super.onTaskRemoved(rootIntent)
+    }
+
+    fun showReopen(title: String, text: String) {
+        try {
+            val open = PendingIntent.getActivity(this, 8, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val n = Notification.Builder(this, CH_CALL)
+                .setSmallIcon(android.R.drawable.stat_notify_error)
+                .setContentTitle(title).setContentText(text)
+                .setContentIntent(open).setAutoCancel(true)
+                .build()
+            getSystemService(NotificationManager::class.java).notify(3, n)
+        } catch (e: Exception) {}
     }
 
     fun showIncoming(number: String) {
