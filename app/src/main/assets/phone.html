@@ -1133,7 +1133,7 @@ window.onContactPicked = function (name, number) {
 function toggleCallPad() { $("callPad").classList.toggle("on"); $("cPad").classList.toggle("on"); }
 function showSettings() {
   try { NQSim.refresh(); } catch (e) {}
-  $("crmMode").checked = NQPrefs.get("crm", false);
+  $("crmMode").checked = NQPrefs.get("crm", true);
   $("crmIn").checked = NQPrefs.get("crmIn", true);
   $("callVia").value = NQPrefs.get("callVia", "ask");
   $("sGoal").value = NQPrefs.get("dailyGoal", 0) || "";
@@ -1411,7 +1411,7 @@ const NQNotes = {
   current: null, outcome: "",
   queue() { return store.get("nq_notes_q", []); },
   maybeAsk(info) {
-    if (!NQPrefs.get("crm", false) || !info.answered) return false;
+    if (!NQPrefs.get("crm", true) || !info.answered) return false;
     if (info.direction === "in" && !NQPrefs.get("crmIn", true)) return false;
     this.current = info; this.outcome = "";
     const t = new Date(info.started);
