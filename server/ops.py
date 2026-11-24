@@ -1020,8 +1020,8 @@ async def app_inbox(request: Request):
 # ------------------------------------------------------------------ أحداث أجهزة الشرايح (Dinstar Event report)
 # كل جهاز بيبعت أحداثه (تسجيل الشريحة / شيلها) على: https://<السيرفر>/calls-app/gw-event?d=<رقم الجهاز>&k=<المفتاح>
 # لما شريحة تتشال أو تقف → تنبيه (تليجرام + اللوحة)، ولما ترجع → التنبيه يتقفل.
-SIM_OFF = re.compile(r"no[\s_-]*u?sim|sim[\s_-]*(absent|remov|not[\s_-]*insert|out)|absent|removed|not[\s_-]*insert|unregister|power[\s_-]*off|no[\s_-]*card|not[\s_-]*registered|deregist", re.I)
-SIM_ON = re.compile(r"\bregistered\b|mobile[\s_-]*registered|sim[\s_-]*(ok|ready|insert)|\bready\b|\bup\b", re.I)
+SIM_OFF = re.compile(r"status=down\b|\bdown\b|<null>|no[\s_-]*u?sim|sim[\s_-]*(absent|remov|not[\s_-]*insert|out)|absent|removed|not[\s_-]*insert|unregister|power[\s_-]*off|no[\s_-]*card|not[\s_-]*registered|deregist", re.I)
+SIM_ON = re.compile(r"status=up\b|\bregistered\b|mobile[\s_-]*registered|sim[\s_-]*(ok|ready|insert)|\bready\b|\bup\b", re.I)
 
 
 def gw_key() -> str:
@@ -1061,7 +1061,7 @@ def _flat(x, pre="") -> dict:
 def _port_events(data) -> list:
     """بيطلّع [(port, state)] من أي شكل JSON/فورم — state = off / on / None"""
     rows = []
-    items = data if isinstance(data, list) else (data.get("ports") or data.get("port_status") or data.get("data") or [data]) if isinstance(data, dict) else []
+    items = data if isinstance(data, list) else (data.get("register") or data.get("ports") or data.get("port_status") or data.get("data") or [data]) if isinstance(data, dict) else []
     if isinstance(items, dict):
         items = [items]
     for it in items if isinstance(items, list) else []:
