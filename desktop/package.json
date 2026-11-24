@@ -1,0 +1,32 @@
+{
+  "name": "nq-phone",
+  "productName": "NQ Phone",
+  "version": "1.0.0",
+  "description": "NQ Phone — تليفون الشركة على السنترال",
+  "main": "main.js",
+  "author": "NQ",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "sa.nq.phone",
+    "productName": "NQ Phone",
+    "files": ["main.js", "preload.js", "build/tray.png", "build/icon.png"],
+    "directories": { "buildResources": "build", "output": "dist" },
+    "win": { "target": ["nsis"], "icon": "build/icon.ico", "artifactName": "NQ-Phone-Setup-${version}.exe" },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NQ Phone"
+    }
+  }
+}

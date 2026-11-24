@@ -944,9 +944,9 @@ const store = {
 /* ---------- server settings ---------- */
 const DEFAULT_SERVER = { host: "3.89.245.93.sslip.io", port: "443", path: "/ws" };
 const IS_APP = !!window.Android;
-const APP_VER = (() => { try { return IS_APP && Android.appVersion ? "v" + Android.appVersion() : window.NQiOS ? NQiOS.version + " · __VER__" : "web __VER__"; } catch (e) { return ""; } })();
+const APP_VER = (() => { try { return IS_APP && Android.appVersion ? "v" + Android.appVersion() : window.NQiOS ? NQiOS.version + " · __VER__" : window.NQDesk ? "Win " + NQDesk.version() + " · __VER__" : "web __VER__"; } catch (e) { return ""; } })();
 /* تطبيق الآيفون (WKWebView): جلسة الصوت والسبيكر والإشعارات من iOS */
-function iosCall(on) { try { if (window.NQiOS) NQiOS.post("call", !!on); } catch (e) {} }
+function iosCall(on) { try { if (window.NQiOS) NQiOS.post("call", !!on); if (window.NQDesk) NQDesk.callState(!!on); } catch (e) {} }
 document.addEventListener("DOMContentLoaded", () => { ["appVer", "topVer"].forEach(id => { const v = document.getElementById(id); if (v) v.textContent = APP_VER; }); });
 if (!IS_APP) document.body.classList.add("web");
 const CONFIG = { wss: [], domain: "", api: "", iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -1615,6 +1615,7 @@ const NQWeb = {
       beep(); clearInterval(this.timer); this.timer = setInterval(beep, 2000);
     } catch (e) {}
     try { if (window.NQiOS && document.hidden) NQiOS.post("notify", { title: "📞 مكالمة واردة", body: num }); } catch (e) {}
+    try { if (window.NQDesk) NQDesk.ring(num); } catch (e) {}   // تطبيق ويندوز: الشباك يطلع قدّام
     try { if (Notification.permission === "granted" && document.hidden) { this.note = new Notification("📞 مكالمة واردة", { body: num, requireInteraction: true }); this.note.onclick = () => { window.focus(); this.note.close(); }; } } catch (e) {}
     document.title = "📞 " + num;
   },
