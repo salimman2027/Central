@@ -11,7 +11,7 @@
   .devdata/data   بيانات محلية (واتساب، الأهداف، الملفات...) — منفصلة تمامًا عن السيرفر الحقيقي
   dev/.env        إعداداتك (اتعمل من dev/env.example) — مش بيترفع على جيت
 """
-import argparse, base64, getpass, hashlib, os, subprocess, sys, venv
+import argparse, base64, hashlib, os, subprocess, sys, venv
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,34 +28,36 @@ def sh(*a, **kw):
 
 def ensure_venv():
     if not PY.exists():
-        print("① بعمل بيئة بايثون (.venv) ...")
+        print("[1] Creating Python environment (.venv) ...")
         venv.create(VENV, with_pip=True)
     stamp = VENV / ".req-ok"
     req = ROOT / "server" / "requirements.txt"
     if not stamp.exists() or stamp.stat().st_mtime < req.stat().st_mtime:
-        print("② بنزّل مكتبات السيرفر ...")
+        print("[2] Installing server libraries (1-2 min first time) ...")
         sh(PY, "-m", "pip", "install", "-q", "--upgrade", "pip")
         sh(PY, "-m", "pip", "install", "-q", "-r", req, "watchfiles")
         stamp.touch()
 
 
 def set_password():
+    """باسورد للوحة على جهازك بس — بيظهر وانت بتكتبه عشان مايحصلش لخبطة (الويندوز بيقلب العربي فالرسايل هنا إنجليزي)"""
     conf = DEV / "conf"; conf.mkdir(parents=True, exist_ok=True)
-    user = input("اسم المستخدم للوحة المحلية [admin]: ").strip() or "admin"
+    print("\n=== Local dashboard login (this computer only - NOT the real server) ===")
+    user = input("Username [press Enter for admin]: ").strip() or "admin"
     while True:
-        pw = getpass.getpass("باسورد اللوحة المحلية (مش بيظهر وانت بتكتب): ")
-        if len(pw) >= 4 and pw == getpass.getpass("اكتبه تاني: "):
+        pw = input("Choose a password (4+ characters, visible): ").strip()
+        if len(pw) >= 4:
             break
-        print("مش متطابقين أو قصير — حاول تاني")
+        print("  Too short - try again.")
     h = "{SHA}" + base64.b64encode(hashlib.sha1(pw.encode()).digest()).decode()
     (conf / "htpasswd").write_text(f"{user}:{h}\n")
-    print(f"✔ اتحفظ — ادخل بـ {user}")
+    print(f"  Saved. Login with:  {user}  /  {pw}\n")
 
 
 def load_env() -> dict:
     if not ENV_FILE.exists():
         ENV_FILE.write_text((ROOT / "dev" / "env.example").read_text(encoding="utf-8"), encoding="utf-8")
-        print(f"✔ عملت {ENV_FILE.relative_to(ROOT)} من env.example — عدّله لو عاوز تربط بداتا السنترال")
+        print(f"  Created {ENV_FILE.relative_to(ROOT)} from env.example")
     env = {}
     for ln in ENV_FILE.read_text(encoding="utf-8").splitlines():
         ln = ln.strip()
@@ -79,8 +81,8 @@ def main():
                NQ_NO_MONITOR="1", PYTHONUTF8="1")
     env.update(load_env())
     if not env.get("NQ_DB_USER"):
-        print("ℹ مفيش ربط بداتا السنترال (NQ_DB_USER فاضي في dev/.env) — اللوحة هتفتح بس سجل المكالمات هيطلع خطأ.")
-    print(f"\n✔ افتح: http://localhost:{a.port}/   (Ctrl+C للإيقاف — أي تعديل في server/ بيعيد التشغيل لوحده)\n")
+        print("i  Not linked to the PBX data (NQ_DB_USER empty in dev/.env) - dashboard works, call log won't. See DEVELOPMENT.md step 5.")
+    print(f"\n>> Open http://localhost:{a.port}/   (keep this window open - Ctrl+C to stop; edits in server/ reload automatically)\n")
     if not os.environ.get("NQ_NO_BROWSER"):
         import threading, webbrowser
         threading.Timer(5, lambda: webbrowser.open(f"http://localhost:{a.port}/")).start()
