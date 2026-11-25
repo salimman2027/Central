@@ -623,11 +623,23 @@ async def app_upload(request: Request):
     except ValueError:
         raise HTTPException(400, "بيانات غلط")
     direction = "in" if h.get("x-dir") == "in" else "out"
+    cid = f"sim-{ext}-{start_ms}"
+    old = load_sim_calls().get(cid)
+    if h.get("x-meta") == "1":   # تسجيل المكالمة في السجل من غير ملف صوت
+        if old:
+            return {"ok": True, "id": cid, "dup": True}
+        st = h.get("x-status", "")
+        st = {"missed": "فائتة", "rejected": "مرفوضة", "noanswer": "لم يرد"}.get(st, "تم الرد" if duration > 0 else
+                                                                               ("فائتة" if direction == "in" else "لم يرد"))
+        rec = dict(id=cid, ext=ext, number=number, start=start_ms, duration=max(0, duration), dir=direction,
+                   status=st, file="", uploaded=dt.datetime.now(TZ).isoformat())
+        with SIM_LOCK, open(SIM_INDEX, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        return {"ok": True, "id": cid}
     suffix = Path(h.get("x-filename", "rec.m4a")).suffix.lower()
     if suffix not in AUDIO_OK:
         raise HTTPException(400, "نوع الملف مش صوت")
-    cid = f"sim-{ext}-{start_ms}"
-    if cid in load_sim_calls():
+    if old and old.get("file"):
         return {"ok": True, "id": cid, "dup": True}
     body = await request.body()
     if not body or len(body) > 60 * 1024 * 1024:
@@ -739,14 +751,14 @@ def calls(date_from: dt.date = Query(alias="from"), date_to: dt.date = Query(ali
         t = dt.datetime.fromtimestamp(r["start"] / 1000, dt.timezone.utc)
         if not (start_a <= t < end_a):
             continue
-        st = Path(r["file"]).stem
+        st = Path(r["file"]).stem if r.get("file") else ""
         out.append(dict(
-            id=r["id"], time=t.isoformat(), ext=int(r["ext"]), dir=r["dir"], status="تم الرد",
+            id=r["id"], time=t.isoformat(), ext=int(r["ext"]), dir=r["dir"], status=r.get("status") or "تم الرد",
             talkSec=int(r.get("duration") or 0), ringSec=0, number=r["number"], customer=None,
             note=match_note(notes_all, int(r["ext"]), r["number"], t), source="sim",
-            hasRecording=True, rec=st,
-            analyzed=(ANALYSIS_DIR / (st + ".json")).exists(),
-            transcribed=(ANALYSIS_DIR / (st + ".tr.json")).exists() or (ANALYSIS_DIR / (st + ".json")).exists(),
+            hasRecording=bool(st), rec=st,
+            analyzed=bool(st) and (ANALYSIS_DIR / (st + ".json")).exists(),
+            transcribed=bool(st) and ((ANALYSIS_DIR / (st + ".tr.json")).exists() or (ANALYSIS_DIR / (st + ".json")).exists()),
             supNote=(SUP_NOTES.get(r["id"]) or {}).get("text", ""),
         ))
     out.sort(key=lambda c: c["time"], reverse=True)
@@ -774,7 +786,7 @@ def rec_file(call_id: str) -> Path:
     """مسار ملف التسجيل لأي مكالمة — سنترال أو شريحة"""
     if call_id.startswith("sim-"):
         r = load_sim_calls().get(call_id)
-        p = SIM_DIR / r["file"] if r else None
+        p = SIM_DIR / r["file"] if r and r.get("file") else None
         if not p or not p.exists():
             raise HTTPException(404, "ملف التسجيل مش موجود على السيرفر")
         return p

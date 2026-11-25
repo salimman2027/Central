@@ -62,17 +62,88 @@ object SimRecSync {
         }.start()
     }
 
-    private data class CallRow(val number: String, val start: Long, val durSec: Long, val incoming: Boolean)
+    private data class CallRow(val number: String, val start: Long, val durSec: Long, val incoming: Boolean, val status: String = "")
     private data class Rec(val id: Long, val uri: Uri, val name: String, val path: String, val added: Long, val durMs: Long)
+
+    fun canReadLog(ctx: Context) =
+        ctx.checkSelfPermission(Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED
+
+    /** كل مكالمة شريحة (حتى اللي مالهاش تسجيل أو اللي محدش رد فيها) بتتسجل في سجل السيستم */
+    private fun logCalls(ctx: Context, host: String, ext: String, pass: String): String {
+        val p = prefs(ctx)
+        val now = System.currentTimeMillis()
+        val since = p.getLong("logSince", now - 3L * 24 * 3600 * 1000)
+        val logged = (p.getStringSet("logged", emptySet()) ?: emptySet()).toMutableSet()
+        val rows = mutableListOf<CallRow>()
+        ctx.contentResolver.query(
+            CallLog.Calls.CONTENT_URI,
+            arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.DATE, CallLog.Calls.DURATION, CallLog.Calls.TYPE),
+            "${CallLog.Calls.DATE} > ?", arrayOf(since.toString()), "${CallLog.Calls.DATE} ASC"
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val type = c.getInt(3)
+                val dur = c.getLong(2)
+                val st = when (type) {
+                    CallLog.Calls.INCOMING_TYPE -> if (dur > 0) "answered" else "missed"
+                    CallLog.Calls.OUTGOING_TYPE -> if (dur > 0) "answered" else "noanswer"
+                    CallLog.Calls.MISSED_TYPE -> "missed"
+                    CallLog.Calls.REJECTED_TYPE -> "rejected"
+                    else -> continue
+                }
+                rows += CallRow(c.getString(0) ?: "", c.getLong(1), dur, type != CallLog.Calls.OUTGOING_TYPE, st)
+            }
+        }
+        var err = ""
+        var newSince = since
+        for (r in rows) {
+            val key = r.start.toString()
+            if (key in logged) continue
+            if (now < r.start + r.durSec * 1000 + 15_000) break   // لسه شغالة
+            val code = postMeta(host, ext, pass, r)
+            if (code == 200) { logged += key; newSince = maxOf(newSince, r.start) }
+            else if (code == 401) { err = "رقم التحويلة أو الباسورد غلط"; break }
+            else { err = "تعذّر تسجيل المكالمات في السيستم (كود $code) — هيحاول تاني"; break }
+        }
+        p.edit().putLong("logSince", maxOf(since, newSince - 60 * 60_000))
+            .putStringSet("logged", logged.sortedBy { it.toLongOrNull() ?: 0 }.takeLast(800).toSet()).apply()
+        return err
+    }
+
+    private fun postMeta(host: String, ext: String, pass: String, r: CallRow): Int {
+        val conn = URL("https://$host/calls-app/upload").openConnection() as HttpURLConnection
+        return try {
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 30_000
+            conn.setRequestProperty("Content-Type", "application/octet-stream")
+            conn.setRequestProperty("X-Meta", "1")
+            conn.setRequestProperty("X-Ext", ext)
+            conn.setRequestProperty("X-Pass", pass)
+            conn.setRequestProperty("X-Number", r.number)
+            conn.setRequestProperty("X-Start", r.start.toString())
+            conn.setRequestProperty("X-Duration", r.durSec.toString())
+            conn.setRequestProperty("X-Dir", if (r.incoming) "in" else "out")
+            conn.setRequestProperty("X-Status", r.status)
+            conn.outputStream.use { it.write(ByteArray(0)) }
+            conn.responseCode
+        } catch (e: Exception) { -1 } finally { conn.disconnect() }
+    }
 
     private fun run(ctx: Context) {
         val p = prefs(ctx)
-        if (!p.getBoolean("enabled", false) || !hasPermissions(ctx)) return
+        if (!p.getBoolean("enabled", false) || !canReadLog(ctx)) return
         val host = p.getString("host", "") ?: ""
         val ext = p.getString("ext", "") ?: ""
         val pass = p.getString("pass", "") ?: ""
         if (host.isBlank() || ext.isBlank() || pass.isBlank()) {
             p.edit().putString("error", "حط رقم التحويلة والباسورد في الإعدادات").apply(); return
+        }
+        val logErr = logCalls(ctx, host, ext, pass)
+        if (!hasPermissions(ctx)) {   // من غير إذن الملفات الصوتية: السجل بس
+            p.edit().putLong("lastRun", System.currentTimeMillis()).putString("error", logErr)
+                .putString("info", "المكالمات بتتسجل في السيستم — اسمح بالملفات الصوتية عشان التسجيلات كمان تترفع").apply()
+            return
         }
         val now = System.currentTimeMillis()
         // أول مرة: آخر 3 أيام بس
@@ -126,7 +197,7 @@ object SimRecSync {
         val keep = done.sortedBy { it.toLongOrNull() ?: 0 }.takeLast(500).toSet()
         p.edit().putLong("since", maxOf(since, newSince - 60 * 60_000))
             .putStringSet("done", keep).putStringSet("media", usedMedia.toList().takeLast(500).toSet())
-            .putLong("lastRun", now).putString("error", error).putString("info", info)
+            .putLong("lastRun", now).putString("error", error.ifBlank { logErr }).putString("info", info)
             .putInt("calls", calls.size).apply()
     }
 

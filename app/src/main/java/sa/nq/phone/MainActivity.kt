@@ -80,8 +80,8 @@ class MainActivity : Activity() {
             return
         }
         if (requestCode == 7) {
-            if (SimRecSync.hasPermissions(this)) SimRecSync.runAsync(this) { simStatusToJs() }
-            else android.app.AlertDialog.Builder(this)
+            if (SimRecSync.canReadLog(this)) SimRecSync.runAsync(this) { simStatusToJs() }
+            if (!SimRecSync.hasPermissions(this)) android.app.AlertDialog.Builder(this)
                 .setTitle("محتاج إذن")
                 .setMessage("عشان يلاقي تسجيلات مكالمات الشريحة ويرفعها، اسمح للتطبيق بـ: سجل المكالمات، والملفات الصوتية. افتح الإعدادات ← الأذونات.")
                 .setPositiveButton("فتح الإعدادات") { _, _ ->
