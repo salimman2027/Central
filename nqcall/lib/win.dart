@@ -15,6 +15,7 @@ class Win {
   static final compact = ValueNotifier<bool>(false);
   static final pinned = ValueNotifier<bool>(Prefs.flag('pinned'));
   static final incomingNumber = ValueNotifier<String>(''); // رقم جاي من الـ CRM
+  static final serverVer = ValueNotifier<String>(''); // إصدار السيرفر (بيتعرض جنب اسم البرنامج)
   static Size _full = const Size(500, 900);
   static const _port = 47321;
   static ServerSocket? _server;
@@ -155,6 +156,15 @@ class TitleBar extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   const Text('NQ Phone', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15.5)),
+                  const SizedBox(width: 10),
+                  ValueListenableBuilder<String>(
+                    valueListenable: Win.serverVer,
+                    builder: (_, v, __) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .1), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white24)),
+                      child: Text('Win $kAppVersion${v.isNotEmpty ? ' - $v' : ''}', style: const TextStyle(color: Colors.white, fontSize: 11.5)),
+                    ),
+                  ),
                 ]),
               ),
             ),

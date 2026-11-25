@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core.dart';
+import '../native.dart';
 import '../phone.dart';
 import '../store.dart';
 import '../win.dart';
@@ -305,8 +306,8 @@ class _MainScreenState extends State<MainScreen> {
         ]),
         if (name.isNotEmpty) _WhoCard(who: _who, onCall: () => _call()),
         const SizedBox(height: 12),
-        Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, spacing: 10, runSpacing: 8, children: [
-          _LinePicker(via: e.via, onChanged: e.setVia),
+        Wrap(alignment: _mobile ? WrapAlignment.spaceBetween : WrapAlignment.end, crossAxisAlignment: WrapCrossAlignment.center, spacing: 10, runSpacing: 8, children: [
+          if (_mobile) _LinePicker(via: e.via, onChanged: e.setVia),
           _QualityBadge(q: e.quality, rtt: e.rttMs, online: e.line == LineState.online),
         ]),
         if (_err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_err, textAlign: TextAlign.center, style: const TextStyle(color: kRed, fontWeight: FontWeight.w600))),
@@ -383,7 +384,7 @@ class _MainScreenState extends State<MainScreen> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(color: const Color(0xFFE9EEEC), borderRadius: BorderRadius.circular(15)),
-      child: Row(children: [seg('pbx', 'السنترال'), seg('ext', 'التحويلات'), seg('sim', 'من شريحتي')]),
+      child: Row(children: [seg('pbx', 'السنترال'), seg('ext', 'التحويلات'), if (_mobile) seg('sim', 'من شريحتي')]),
     );
   }
 
@@ -493,17 +494,6 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
             ]),
-            if (!_mobile) ...[
-              const SizedBox(height: 16),
-              Directionality(
-                textDirection: TextDirection.rtl,
-                child: Wrap(alignment: WrapAlignment.center, spacing: 14, runSpacing: 6, children: const [
-                  _Sc('Ctrl+Enter', 'اتصال'),
-                  _Sc('Ctrl+L', 'لصق رقم'),
-                  _Sc('Ctrl+M', 'وضع مصغّر'),
-                ]),
-              ),
-            ],
           ]),
         ),
       ),
@@ -547,7 +537,7 @@ class _Header extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
             child: LayoutBuilder(builder: (context, box) => Row(children: [
-              if (box.maxWidth > 440) ...[
+              if (!Native.isDesktop && box.maxWidth > 440) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(color: Colors.white.withValues(alpha: .1), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white24)),
@@ -1012,11 +1002,4 @@ class _CallButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Sc extends StatelessWidget {
-  final String k, t;
-  const _Sc(this.k, this.t);
-  @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [Kbd(k), const SizedBox(width: 6), Text(t, style: const TextStyle(color: kMuted, fontSize: 12.5))]);
 }

@@ -21,7 +21,7 @@ if [[ -d android ]]; then
   M=android/app/src/main/AndroidManifest.xml
   for perm in INTERNET ACCESS_NETWORK_STATE RECORD_AUDIO MODIFY_AUDIO_SETTINGS WAKE_LOCK POST_NOTIFICATIONS FOREGROUND_SERVICE \
               FOREGROUND_SERVICE_SPECIAL_USE USE_FULL_SCREEN_INTENT REQUEST_IGNORE_BATTERY_OPTIMIZATIONS VIBRATE BLUETOOTH_CONNECT \
-              CHANGE_NETWORK_STATE; do
+              CHANGE_NETWORK_STATE CALL_PHONE; do
     grep -q "android.permission.$perm\"" "$M" || \
       perl -0pi -e "s|(<manifest[^>]*>)|\$1\n    <uses-permission android:name=\"android.permission.$perm\"/>|" "$M"
   done

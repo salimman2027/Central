@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import 'core.dart';
 import 'phone.dart';
+import 'win.dart';
 
 class Fav {
   final String number, name, kind; // kind: team | customer
@@ -31,6 +32,7 @@ class HomeData extends ChangeNotifier {
     refreshHistory();
     Api.serverVersion().then((v) {
       serverVer = v;
+      Win.serverVer.value = v;
       notifyListeners();
     });
     // حالة الفريق كل 20 ثانية، والسجل بعد كل مكالمة أو كل دقيقتين

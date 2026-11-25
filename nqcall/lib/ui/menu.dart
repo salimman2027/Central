@@ -45,8 +45,6 @@ class NQMenuButton extends StatelessWidget {
         _item('history', Icons.history_rounded, 'السجل', const Color(0xFFEEF1F0), kText),
         const PopupMenuDivider(),
         _item('audio', Icons.headset_mic_outlined, 'إعدادات الصوت', const Color(0xFFE8F0FE), kBlue, trailing: 'سماعة\nومايك'),
-        if (Native.isDesktop) _item('keys', Icons.keyboard_alt_outlined, 'اختصارات الكيبورد', const Color(0xFFEEF1F0), kText, trailing: 'Ctrl+/'),
-        if (Native.isDesktop) _item('compact', Icons.close_fullscreen_rounded, 'وضع مصغّر', const Color(0xFFEEF1F0), kText, trailing: 'Ctrl+M'),
       ],
     );
     if (v == null || !context.mounted) return;

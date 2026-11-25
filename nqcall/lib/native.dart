@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'core.dart';
@@ -31,6 +32,23 @@ class Native {
   static Future<void> keepAlive(bool on, {String text = ''}) async {
     if (!Platform.isAndroid) return;
     await _call(on ? 'startService' : 'stopService', {'text': text});
+  }
+
+  /// مكالمة من شريحة الموبايل (مش السنترال)
+  static Future<bool> simCall(String number) async {
+    if (Platform.isIOS) {
+      return launchUrl(Uri(scheme: 'tel', path: number));
+    }
+    if (!Platform.isAndroid) return false;
+    try {
+      await Permission.phone.request();
+    } catch (_) {}
+    try {
+      return await _ch.invokeMethod<bool>('simCall', {'number': number}) ?? false;
+    } catch (e) {
+      logd('simCall $e');
+      return false;
+    }
   }
 
   static Future<void> ignoreBatteryOptimizations() async {

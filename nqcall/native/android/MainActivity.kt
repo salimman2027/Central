@@ -47,6 +47,13 @@ class MainActivity : FlutterActivity() {
                         if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
                         result.success(true)
                     }
+                    "simCall" -> {
+                        val n = call.argument<String>("number") ?: ""
+                        val u = Uri.fromParts("tel", n, null)
+                        val canCall = checkSelfPermission(android.Manifest.permission.CALL_PHONE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        startActivity(Intent(if (canCall) Intent.ACTION_CALL else Intent.ACTION_DIAL, u).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        result.success(true)
+                    }
                     "stopService" -> { stopService(Intent(this, NQService::class.java)); result.success(true) }
                     "incoming" -> { showIncoming(call.argument<String>("title") ?: "مكالمة واردة", call.argument<String>("body") ?: ""); result.success(true) }
                     "cancelIncoming" -> {

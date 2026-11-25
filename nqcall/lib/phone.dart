@@ -336,16 +336,13 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     lastOutcome = null;
     lastNumber = raw;
 
-    // من شريحتي: الموبايل هو اللي يتصل
-    if (via == 'sim' && number.length > 5) {
-      try {
-        await Api.simDial(a, cleanPhone(raw), name: name);
-        notice = '📱 اتبعت لموبايلك — هيتصل من الشريحة دلوقتي';
-        notifyListeners();
-        return null;
-      } catch (e) {
-        return '$e';
-      }
+    // من شريحتي (الموبايل بس): المكالمة من شريحة الموبايل نفسه — الكمبيوتر دايمًا من السنترال
+    if (via == 'sim' && (Platform.isAndroid || Platform.isIOS) && number.length > 5) {
+      final ok = await Native.simCall(cleanPhone(raw));
+      if (!ok) return 'مقدرش يفتح الاتصال من الشريحة — اسمح للتطبيق بالمكالمات من الإعدادات';
+      notice = '📱 بيتصل من شريحتك…';
+      notifyListeners();
+      return null;
     }
 
     final ua = _ua;
