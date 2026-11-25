@@ -86,7 +86,6 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
   final List<String> _missed = [];
   Timer? _watch, _tick;
   StreamSubscription? _net;
-  int _restarts = 0;
   DateTime _lastStart = DateTime(2000);
 
   List<String> get missed => List.unmodifiable(_missed);
@@ -115,7 +114,6 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     final a = account;
     if (a == null) return;
     _lastStart = DateTime.now();
-    _restarts++;
     try {
       _ua?.removeSipUaHelperListener(this);
       _ua?.stop();
@@ -290,7 +288,6 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
   void registrationStateChanged(dynamic state) {
     final s = _enumName(state.state);
     if (s == 'REGISTERED') {
-      _restarts = 0;
       _setLine(LineState.online, 'متصل ✓');
       Native.keepAlive(true, text: 'متصل بالسنترال — تحويلة ${account?.ext ?? ''}');
     } else if (s.contains('FAILED')) {
@@ -451,5 +448,6 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
   void onNewNotify(dynamic ntf) {}
 
   // موجودة في نسخ sip_ua الأحدث بس
+  @override
   void onNewReinvite(dynamic event) {}
 }

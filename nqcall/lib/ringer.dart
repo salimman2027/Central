@@ -2,7 +2,7 @@
 import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'core.dart';
@@ -85,16 +85,17 @@ class Ringer {
 
   /// نغمة من الجهاز (mp3/wav/m4a...) — بننسخها جوه التطبيق عشان متضيعش
   Future<String?> pickCustom() async {
-    final r = await FilePicker.platform.pickFiles(type: FileType.audio);
-    final src = r?.files.single.path;
-    if (src == null) return null;
+    const group = XTypeGroup(label: 'نغمات', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac'], mimeTypes: ['audio/*'], uniformTypeIdentifiers: ['public.audio']);
+    final f = await openFile(acceptedTypeGroups: [group]);
+    if (f == null) return null;
     final dir = await getApplicationSupportDirectory();
-    final ext = src.contains('.') ? src.substring(src.lastIndexOf('.')) : '.mp3';
+    final name = f.name;
+    final ext = name.contains('.') ? name.substring(name.lastIndexOf('.')) : '.mp3';
     final dst = File('${dir.path}${Platform.pathSeparator}ringtone$ext');
-    await File(src).copy(dst.path);
+    await dst.writeAsBytes(await f.readAsBytes(), flush: true);
     await Prefs.setStr('ringFile', dst.path);
-    await Prefs.setStr('ringFileName', r!.files.single.name);
+    await Prefs.setStr('ringFileName', name);
     await select('custom');
-    return r.files.single.name;
+    return name;
   }
 }
