@@ -305,9 +305,8 @@ class _MainScreenState extends State<MainScreen> {
         ]),
         if (name.isNotEmpty) _WhoCard(who: _who, onCall: () => _call()),
         const SizedBox(height: 12),
-        Row(children: [
+        Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, spacing: 10, runSpacing: 8, children: [
           _LinePicker(via: e.via, onChanged: e.setVia),
-          const Spacer(),
           _QualityBadge(q: e.quality, rtt: e.rttMs, online: e.line == LineState.online),
         ]),
         if (_err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_err, textAlign: TextAlign.center, style: const TextStyle(color: kRed, fontWeight: FontWeight.w600))),
@@ -812,32 +811,47 @@ class _MissedBanner extends StatelessWidget {
         child: Container(
           decoration: const BoxDecoration(border: BorderDirectional(start: BorderSide(color: kRed, width: 4))),
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-          child: Row(children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(color: Color(0xFFFFE1E1), shape: BoxShape.circle),
-              child: const Icon(Icons.phone_missed_rounded, color: kRed),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('مكالمة فائتة: $who', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.w800, fontSize: 15.5)),
-                const SizedBox(height: 2),
-                Text([t, ringTxt, if (m.context.isNotEmpty) m.context, if (m.name.isNotEmpty) m.number].join(' · '),
-                    style: const TextStyle(color: Color(0xFF8A6A6A), fontSize: 12.5)),
-              ]),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(onPressed: onCall, style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)), child: const Text('اتصل الآن')),
-            const SizedBox(width: 6),
-            OutlinedButton(
-              onPressed: () => remindLater(context, m),
-              style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF991B1B), side: const BorderSide(color: Color(0xFFF5C2C2)), minimumSize: const Size(0, 40), backgroundColor: Colors.white),
-              child: const Text('ذكّرني'),
-            ),
-            IconButton(tooltip: 'إخفاء', onPressed: () => PhoneEngine.I.dismissMissed(m), icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF8A6A6A))),
-          ]),
+          child: LayoutBuilder(builder: (context, box) {
+            final narrow = box.maxWidth < 470;
+            final buttons = Row(mainAxisSize: MainAxisSize.min, children: [
+              FilledButton(onPressed: onCall, style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)), child: const Text('اتصل الآن')),
+              const SizedBox(width: 6),
+              OutlinedButton(
+                onPressed: () => remindLater(context, m),
+                style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF991B1B), side: const BorderSide(color: Color(0xFFF5C2C2)), minimumSize: const Size(0, 40), backgroundColor: Colors.white),
+                child: const Text('ذكّرني'),
+              ),
+            ]);
+            final info = Row(children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(color: Color(0xFFFFE1E1), shape: BoxShape.circle),
+                child: const Icon(Icons.phone_missed_rounded, color: kRed),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('مكالمة فائتة: $who', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.w800, fontSize: 15.5)),
+                  const SizedBox(height: 2),
+                  Text([t, ringTxt, if (m.context.isNotEmpty) m.context, if (m.name.isNotEmpty) m.number].join(' · '),
+                      style: const TextStyle(color: Color(0xFF8A6A6A), fontSize: 12.5)),
+                ]),
+              ),
+              if (!narrow) ...[const SizedBox(width: 8), buttons],
+              InkWell(
+                onTap: () => PhoneEngine.I.dismissMissed(m),
+                customBorder: const CircleBorder(),
+                child: const Padding(padding: EdgeInsets.all(6), child: Icon(Icons.close_rounded, size: 18, color: Color(0xFF8A6A6A))),
+              ),
+            ]);
+            if (!narrow) return info;
+            return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              info,
+              const SizedBox(height: 10),
+              Align(alignment: AlignmentDirectional.centerEnd, child: buttons),
+            ]);
+          }),
         ),
       ),
     );
