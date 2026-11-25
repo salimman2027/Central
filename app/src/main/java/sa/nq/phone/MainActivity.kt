@@ -72,11 +72,10 @@ class MainActivity : Activity() {
         if (requestCode == 5) {
             val r = pendingMic ?: return
             pendingMic = null
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                r.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-            } else {
+            val ok = webResources(r)
+            if (ok.isNotEmpty()) r.grant(ok) else {
                 r.deny()
-                micSettingsHint()
+                if (r.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) micSettingsHint()
             }
             return
         }
@@ -188,14 +187,23 @@ class MainActivity : Activity() {
     }
 
     /** الويب فيو عاوز المايك: لو أندرويد سحب الإذن (زي "المرة دي بس") نطلبه تاني بدل ما المكالمة تفشل */
+    /** المايك للمكالمات، والكاميرا لقراية الـ QR — نطلب من أندرويد اللي ناقص بس */
     private fun grantMic(request: PermissionRequest) {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)); return
-        }
+        val need = mutableListOf<String>()
+        if (request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE) &&
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) need += Manifest.permission.RECORD_AUDIO
+        if (request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE) &&
+            checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) need += Manifest.permission.CAMERA
+        if (need.isEmpty()) { val ok = webResources(request); if (ok.isNotEmpty()) request.grant(ok) else request.deny(); return }
         pendingMic?.deny()
         pendingMic = request
-        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 5)
+        requestPermissions(need.toTypedArray(), 5)
     }
+
+    private fun webResources(r: PermissionRequest): Array<String> = r.resources.filter {
+        (it == PermissionRequest.RESOURCE_AUDIO_CAPTURE && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) ||
+        (it == PermissionRequest.RESOURCE_VIDEO_CAPTURE && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    }.toTypedArray()
 
     private fun micSettingsHint() {
         if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) return
@@ -457,6 +465,12 @@ class MainActivity : Activity() {
     }
 
     inner class Bridge {
+        @JavascriptInterface fun openUrl(u: String) = runOnUiThread {
+            try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (e: Exception) {}
+        }
+        @JavascriptInterface fun copyText(t: String) = runOnUiThread {
+            (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("NQ", t))
+        }
         @JavascriptInterface fun keepAlive() = runOnUiThread { KeepAlive.show(this@MainActivity) }
         @JavascriptInterface fun keepAliveStatus(): String =
             "{\"battery\":${KeepAlive.batteryOk(this@MainActivity)},\"autostart\":${KeepAlive.autostartOk(this@MainActivity)},\"xiaomi\":${KeepAlive.isXiaomi}}"

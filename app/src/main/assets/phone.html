@@ -623,6 +623,25 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
 </section>
 
 <!-- ================= targets ================= -->
+<section id="scrQR" class="screen page">
+  <h2>📷 قراءة QR</h2>
+  <div class="card" style="padding:10px">
+    <div id="qrBox" style="position:relative;border-radius:14px;overflow:hidden;background:#0b1220;aspect-ratio:1/1;max-height:62vh;margin:0 auto">
+      <video id="qrVid" playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+      <div style="position:absolute;inset:14%;border:3px solid rgba(20,184,166,.9);border-radius:18px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)"></div>
+      <div id="qrMsg" style="position:absolute;bottom:10px;left:0;right:0;text-align:center;color:#fff;font-size:13px;text-shadow:0 1px 3px #000">وجّه الكاميرا على الكود</div>
+    </div>
+    <canvas id="qrCan" hidden></canvas>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn" style="flex:1" id="qrToggle" onclick="NQQR.toggle()">⏸ إيقاف</button>
+      <label class="btn o" style="flex:1;text-align:center;cursor:pointer">🖼️ من صورة<input type="file" accept="image/*" hidden onchange="NQQR.fromFile(this)"></label>
+    </div>
+  </div>
+  <div id="qrRes"></div>
+  <h3 style="margin:14px 4px 6px;font-size:15px">🕘 آخر حاجات اتقرت</h3>
+  <div id="qrHist"></div>
+</section>
+
 <section id="scrTargets" class="screen page">
   <h2>🎯 تارجت الاتصال</h2>
   <div class="card">
@@ -777,6 +796,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   <button data-s="scrPerf" onclick="NQPerf.open()"><b>🧠</b>أدائي<i class="tbadge" id="pBadge"></i></button>
   <button data-s="scrChats" id="waTab" hidden onclick="NQChat.list()"><b>💬</b>واتساب<i class="tbadge" id="waBadge"></i></button>
   <button data-s="scrFiles" onclick="NQFiles.open()"><b>📁</b>الملفات<i class="tbadge" id="tBadge"></i></button>
+  <button data-s="scrQR" onclick="NQQR.open()"><b>📷</b>QR</button>
   <button data-s="scrSettings" onclick="showSettings()"><b>⚙️</b>إعدادات</button>
 </nav>
 
@@ -794,7 +814,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
    - وضع CRM: بعد المكالمة يسأل عن العميل والملخص ويبعته للسيرفر
    =================================================================== */
 const $ = id => document.getElementById(id);
-const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrPerf", "scrFiles", "scrEng", "scrChats", "scrSettings"];
+const TAB_SCREENS = ["scrDial", "scrLog", "scrTargets", "scrStats", "scrPerf", "scrFiles", "scrEng", "scrChats", "scrQR", "scrSettings"];
 function show(id) {
   // خانة كتابة في شاشة اتقفلت (زي الباسورد) متفضلش واخدة الكيبورد
   const ae = document.activeElement; if (ae && ae !== document.body && ae.closest && !ae.closest("#" + id)) try { ae.blur(); } catch (e) {}
@@ -2235,6 +2255,113 @@ const NQLog = {
 };
 
 /* ---------- targets ---------- */
+/* ---------- قراءة QR: كاميرا (BarcodeDetector أو jsQR) أو صورة ← رقم/رابط/كارت/واي فاي + أكشن ---------- */
+const NQQR = {
+  stream: null, run: false, det: null, lib: null, last: "", lastAt: 0,
+  open() { show("scrQR"); this.hist(); this.start(); },
+  async loadLib() {
+    if (this.lib) return this.lib;
+    await new Promise((ok, no) => { const s = document.createElement("script"); s.src = "jsqr.js"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+    return (this.lib = window.jsQR);
+  },
+  async start() {
+    if (this.run) return;
+    $("qrMsg").textContent = "بيفتح الكاميرا…"; $("qrToggle").textContent = "⏸ إيقاف";
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false });
+    } catch (e) { $("qrMsg").textContent = "⚠️ الكاميرا مش متاحة — اسمح بيها من الإعدادات أو اختار «من صورة»"; return; }
+    const v = $("qrVid"); v.srcObject = this.stream; await v.play().catch(() => {});
+    try { if ("BarcodeDetector" in window) this.det = new BarcodeDetector({ formats: ["qr_code"] }); } catch (e) { this.det = null; }
+    if (!this.det) await this.loadLib().catch(() => {});
+    this.run = true; $("qrMsg").textContent = "وجّه الكاميرا على الكود"; this.tick();
+  },
+  stop() {
+    this.run = false; try { (this.stream && this.stream.getTracks() || []).forEach(t => t.stop()); } catch (e) {}
+    this.stream = null; $("qrToggle").textContent = "▶️ تشغيل"; $("qrMsg").textContent = "الكاميرا واقفة";
+  },
+  toggle() { this.run ? this.stop() : this.start(); },
+  async tick() {
+    if (!this.run) return;
+    if (!document.getElementById("scrQR").classList.contains("on")) return this.stop();   // سبت الشاشة ← نقفل الكاميرا
+    const v = $("qrVid"); let txt = null;
+    try {
+      if (v.readyState >= 2) {
+        if (this.det) { const r = await this.det.detect(v); if (r && r[0]) txt = r[0].rawValue; }
+        else if (this.lib) { const c = $("qrCan"), w = 480, h = Math.round(w * (v.videoHeight / v.videoWidth || 1)); c.width = w; c.height = h;
+          const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(v, 0, 0, w, h); const r = this.lib(x.getImageData(0, 0, w, h).data, w, h); if (r) txt = r.data; }
+      }
+    } catch (e) {}
+    if (txt && !(txt === this.last && Date.now() - this.lastAt < 4000)) { this.last = txt; this.lastAt = Date.now(); this.found(txt); }
+    setTimeout(() => this.tick(), 180);
+  },
+  async fromFile(inp) {
+    const f = inp.files && inp.files[0]; inp.value = ""; if (!f) return;
+    const img = new Image(); img.src = URL.createObjectURL(f); await img.decode().catch(() => {});
+    let txt = null;
+    try { if ("BarcodeDetector" in window) { const r = await new BarcodeDetector({ formats: ["qr_code"] }).detect(img); if (r[0]) txt = r[0].rawValue; } } catch (e) {}
+    if (!txt) { try { const L = await this.loadLib(), c = $("qrCan"), sc = Math.min(1, 1200 / Math.max(img.width, img.height)); c.width = img.width * sc; c.height = img.height * sc;
+      const x = c.getContext("2d"); x.drawImage(img, 0, 0, c.width, c.height); const r = L(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height); if (r) txt = r.data; } catch (e) {} }
+    URL.revokeObjectURL(img.src);
+    txt ? this.found(txt) : toast("ملقيتش QR في الصورة");
+  },
+  parse(t) {
+    const s = String(t).trim(), out = { raw: s, kind: "text", title: "نص" };
+    const num = x => { let d = String(x || "").replace(/[^\d+]/g, ""); if (d.startsWith("+966")) d = "0" + d.slice(4); else if (d.startsWith("00966")) d = "0" + d.slice(5); else if (/^9665\d{8}$/.test(d)) d = "0" + d.slice(3); return d.replace(/^\+/, ""); };
+    let m;
+    if ((m = s.match(/^tel:(.+)$/i))) return { ...out, kind: "phone", title: "رقم تليفون", phone: num(m[1]) };
+    if ((m = s.match(/^(?:https?:\/\/)?(?:wa\.me|api\.whatsapp\.com\/send\?phone=)\/?(\+?\d{8,15})/i))) return { ...out, kind: "phone", title: "رقم واتساب", phone: num(m[1]), url: /^https?:/i.test(s) ? s : "https://" + s };
+    if (/^BEGIN:VCARD/i.test(s)) { const n = (s.match(/^FN[^:]*:(.+)$/im) || s.match(/^N[^:]*:(.+)$/im) || [])[1] || ""; const tel = (s.match(/^TEL[^:]*:(.+)$/im) || [])[1];
+      return { ...out, kind: tel ? "phone" : "text", title: "كارت شخصي", name: n.replace(/;/g, " ").trim(), phone: tel ? num(tel) : "" }; }
+    if (/^MECARD:/i.test(s)) { const n = (s.match(/N:([^;]+)/i) || [])[1] || "", tel = (s.match(/TEL:([^;]+)/i) || [])[1];
+      return { ...out, kind: tel ? "phone" : "text", title: "كارت شخصي", name: n.replace(/,/g, " "), phone: tel ? num(tel) : "" }; }
+    if ((m = s.match(/^WIFI:(.*)$/i))) { const g = k => ((m[1].match(new RegExp(k + ":((?:\\\\.|[^;])*)")) || [])[1] || "").replace(/\\(.)/g, "$1");
+      return { ...out, kind: "wifi", title: "شبكة واي فاي", ssid: g("S"), pass: g("P") }; }
+    if (/^https?:\/\//i.test(s) || /^www\./i.test(s)) return { ...out, kind: "url", title: "رابط", url: /^https?:/i.test(s) ? s : "https://" + s };
+    if (/^\+?[\d\s-]{9,16}$/.test(s)) return { ...out, kind: "phone", title: "رقم تليفون", phone: num(s) };
+    return out;
+  },
+  found(t) {
+    try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
+    const r = this.parse(t);
+    const h = store.get("nq_qr", []); store.set("nq_qr", [{ t: r.raw, at: Date.now() }, ...h.filter(x => x.t !== r.raw)].slice(0, 20));
+    this.show(r); this.hist();
+  },
+  show(r) {
+    const b = (lbl, js, cls = "btn o") => `<button class="${cls}" style="flex:1;min-width:120px" onclick="${js}">${lbl}</button>`, q = x => JSON.stringify(x).replace(/"/g, "&quot;");
+    let main = "", acts = "";
+    if (r.kind === "phone") {
+      main = `<div style="font-size:26px;font-weight:700;direction:ltr;text-align:center">${esc(r.phone)}</div>${r.name ? `<div style="text-align:center">👤 ${esc(r.name)}</div>` : ""}`;
+      acts = b("📞 اتصل", `NQQR.call(${q(r.phone)},${q(r.name || "")})`, "btn") + b("💬 واتساب", `NQQR.wa(${q(r.phone)},${q(r.name || "")})`) + b("📋 نسخ", `NQQR.copy(${q(r.phone)})`);
+    } else if (r.kind === "url") {
+      main = `<div style="direction:ltr;word-break:break-all;text-align:center">${esc(r.url)}</div>`;
+      acts = b("🌐 افتح", `NQQR.openUrl(${q(r.url)})`, "btn") + b("📋 نسخ", `NQQR.copy(${q(r.url)})`);
+    } else if (r.kind === "wifi") {
+      main = `<div style="text-align:center">📶 <b>${esc(r.ssid)}</b>${r.pass ? `<div class="muted" style="direction:ltr">🔑 ${esc(r.pass)}</div>` : ""}</div>`;
+      acts = r.pass ? b("📋 نسخ الباسورد", `NQQR.copy(${q(r.pass)})`, "btn") : "";
+    } else {
+      main = `<div style="white-space:pre-wrap;word-break:break-word;max-height:160px;overflow:auto">${esc(r.raw)}</div>`;
+      acts = b("📋 نسخ", `NQQR.copy(${q(r.raw)})`, "btn");
+    }
+    $("qrRes").innerHTML = `<div class="card" style="margin-top:10px;border:2px solid var(--pri)"><div class="muted" style="font-size:12.5px;margin-bottom:6px">✅ ${esc(r.title)}</div>${main}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${acts}</div></div>`;
+  },
+  hist() {
+    const h = store.get("nq_qr", []);
+    $("qrHist").innerHTML = h.length ? h.map((x, i) => { const r = this.parse(x.t);
+      return `<div class="card" style="padding:9px 12px;margin-bottom:6px;cursor:pointer;display:flex;gap:8px;align-items:center" onclick="NQQR.show(NQQR.parse(store.get('nq_qr',[])[${i}].t))">
+        <span>${{ phone: "📞", url: "🌐", wifi: "📶", text: "📝" }[r.kind]}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:right">${esc(r.phone || r.url || r.ssid || r.raw)}</span>
+        <small class="muted">${new Date(x.at).toLocaleString("ar-EG", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</small></div>`; }).join("")
+      : `<div class="muted" style="text-align:center;padding:10px">لسه ماقريتش أي كود</div>`;
+  },
+  call(n, name) { this.stop(); NQPhone.callName = name || ""; show("scrDial"); $("dialNum").textContent = n; NQPhone.call(n); },
+  wa(n, name) {
+    if (NQChat.ready) { this.stop(); NQChat.open(String(n).replace(/^0(5\d{8})$/, "966$1"), name || ""); }
+    else this.openUrl("https://wa.me/" + String(n).replace(/^0(5\d{8})$/, "966$1").replace(/^0/, ""));
+  },
+  openUrl(u) { try { if (IS_APP && Android.openUrl) return Android.openUrl(u); } catch (e) {} try { if (window.NQiOS) return NQiOS.post("open", u); } catch (e) {} window.open(u, "_blank"); },
+  async copy(t) { try { if (IS_APP && Android.copyText) Android.copyText(t); else await navigator.clipboard.writeText(t); toast("📋 اتنسخ"); } catch (e) { toast("مش قادر أنسخ"); } }
+};
+
 const NQTargets = {
   // عملاء الجهاز ده + العملاء اللي على السيرفر (من المدير أو اللي الموظف ضافهم)
   local() { return store.get("nq_targets", []); },
