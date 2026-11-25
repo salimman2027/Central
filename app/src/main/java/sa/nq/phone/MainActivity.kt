@@ -25,6 +25,12 @@ class MainActivity : Activity() {
     private lateinit var web: WebView
     private var pendingSimNumber: String? = null
 
+    private fun ringName(): String {
+        val cur = getSharedPreferences("nq_ring", 0).getString("uri", null) ?: return "نغمة الموبايل الافتراضية"
+        if (cur == "silent") return "صامت (اهتزاز بس)"
+        return try { android.media.RingtoneManager.getRingtone(this, Uri.parse(cur))?.getTitle(this) ?: "نغمة مختارة" } catch (e: Exception) { "نغمة مختارة" }
+    }
+
     @Deprecated("startActivityForResult is enough for a contact pick")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -40,6 +46,15 @@ class MainActivity : Activity() {
             return
         }
         if (requestCode == 10) { onScanResult(resultCode, data); return }
+        if (requestCode == 12) { // نغمة الرنين
+            if (resultCode == RESULT_OK && data != null) {
+                @Suppress("DEPRECATION")
+                val u: Uri? = data.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+                getSharedPreferences("nq_ring", 0).edit().putString("uri", u?.toString() ?: "silent").apply()
+                js("window.onRingtone && onRingtone(" + org.json.JSONObject.quote(ringName()) + ")")
+            }
+            return
+        }
         if (requestCode == 11) {
             val uris = mutableListOf<Uri>()
             if (resultCode == RESULT_OK && data != null) {
@@ -495,6 +510,22 @@ class MainActivity : Activity() {
         @JavascriptInterface fun dictate(lang: String) { runOnUiThread { startDictation(lang) } }
         @JavascriptInterface fun dictateStop() { runOnUiThread { stopDictation() } }
 
+        @JavascriptInterface fun pickRingtone() = runOnUiThread {
+            val cur = getSharedPreferences("nq_ring", 0).getString("uri", null)
+            val i = Intent(android.media.RingtoneManager.ACTION_RINGTONE_PICKER)
+                .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TYPE, android.media.RingtoneManager.TYPE_RINGTONE)
+                .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TITLE, "نغمة مكالمات NQ")
+                .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                    when (cur) { null -> android.provider.Settings.System.DEFAULT_RINGTONE_URI; "silent" -> null; else -> Uri.parse(cur) })
+            try { @Suppress("DEPRECATION") startActivityForResult(i, 12) } catch (e: Exception) {
+                android.widget.Toast.makeText(this@MainActivity, "الموبايل مفيهوش شاشة اختيار النغمات", android.widget.Toast.LENGTH_LONG).show() }
+        }
+        @JavascriptInterface fun ringtoneName(): String = ringName()
+        @JavascriptInterface fun testRingtone(on: Boolean) = runOnUiThread {
+            PhoneService.send(this@MainActivity, if (on) PhoneService.ACTION_TEST_RING else PhoneService.ACTION_STOP_TEST_RING, "")
+        }
         @JavascriptInterface fun pickContact() {
             runOnUiThread {
                 @Suppress("DEPRECATION")

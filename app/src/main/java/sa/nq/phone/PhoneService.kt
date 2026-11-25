@@ -33,6 +33,8 @@ class PhoneService : Service() {
         const val ACTION_INCOMING = "incoming"
         const val ACTION_STOP_RING = "stop_ring"
         const val ACTION_BOOT = "boot"
+        const val ACTION_TEST_RING = "test_ring"
+        const val ACTION_STOP_TEST_RING = "stop_test_ring"
         const val EXTRA_NUMBER = "number"
 
         @Volatile var instance: PhoneService? = null
@@ -105,6 +107,8 @@ class PhoneService : Service() {
             ACTION_BOOT -> showReopen("📞 افتح NQ Phone", "الموبايل اتعمله ريستارت — دوس عشان تتصل بالسنترال وتستقبل المكالمات")
             ACTION_INCOMING -> showIncoming(intent.getStringExtra(EXTRA_NUMBER) ?: "")
             ACTION_STOP_RING -> stopRinging()
+            ACTION_TEST_RING -> { stopTest(); startRinging(); }
+            ACTION_STOP_TEST_RING -> stopTest()
         }
         return START_STICKY
     }
@@ -154,9 +158,23 @@ class PhoneService : Service() {
         startRinging()
     }
 
+    private fun stopTest() { ringtone?.stop(); ringtone = null; vibrator?.cancel(); vibrator = null }
+
+    /** النغمة اللي الموظف اختارها من الإعدادات (أو الافتراضية) */
+    private fun ringUri(): android.net.Uri? {
+        val cur = getSharedPreferences("nq_ring", 0).getString("uri", null)
+        return when (cur) {
+            null -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            "silent" -> null
+            else -> android.net.Uri.parse(cur)
+        }
+    }
+
     private fun startRinging() {
         if (ringtone?.isPlaying == true) return
-        ringtone = RingtoneManager.getRingtone(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))?.apply {
+        val u = ringUri()
+        ringtone = (if (u == null) null else (RingtoneManager.getRingtone(this, u)
+            ?: RingtoneManager.getRingtone(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))))?.apply {
             audioAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()

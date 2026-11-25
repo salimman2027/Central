@@ -91,9 +91,21 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   .dir-row .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-inline-end:4px; }
   .pastebtn { position:absolute; inset-inline-end:12px; top:8px; border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:99px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
   #dialName:empty, #dialErr:empty { display:none; } #dialErr { min-height:0; margin-top:4px; }
-  .display .num span { cursor:text; }
-  .display .num .caret { display:inline-block; width:2px; height:.9em; vertical-align:-.08em; margin:0 1px; background:var(--pri,#19e6c1); border-radius:2px; animation:nqBlink 1s steps(1) infinite; }
-  @keyframes nqBlink { 50% { opacity:0; } }
+  .cstat { display:inline-flex; flex-direction:column; align-items:center; gap:2px; padding:8px 14px; border-radius:14px; background:rgba(239,68,68,.1); color:var(--fg); border:1px solid rgba(239,68,68,.3); }
+  .cstat b { font-size:16px; } .cstat small { color:var(--muted); font-size:12px; }
+  .cs-busy, .cs-reject { background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.4); }
+  .cs-noans, .cs-net { background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.4); }
+  .cs-off, .cs-cancel { background:rgba(100,116,139,.14); border-color:rgba(100,116,139,.4); }
+  .ring-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:6px; }
+  .ring-opt { display:flex; justify-content:space-between; align-items:center; gap:6px; border:1px solid var(--line); background:transparent; color:var(--fg); border-radius:10px; padding:9px 11px; font:inherit; font-size:13px; cursor:pointer; text-align:start; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .ring-opt i { font-style:normal; color:var(--muted); font-size:11px; }
+  .ring-opt.on { border-color:var(--pri,#19e6c1); background:rgba(25,230,193,.1); font-weight:600; }
+  .cs-retry { margin-top:6px; border:0; border-radius:99px; padding:5px 14px; font:inherit; font-size:13px; background:var(--pri,#19e6c1); color:#04211c; cursor:pointer; }
+  .display input.numin { display:block; width:min(100%, 420px); margin:0 auto; box-sizing:border-box; border:0; border-bottom:2px solid var(--line); background:transparent !important;
+    -webkit-background-clip:border-box !important; background-clip:border-box !important; color:var(--fg) !important; caret-color:var(--pri,#19e6c1); outline:none; padding:6px 8px; font-family:inherit; border-radius:0; transition:border-color .15s; }
+  .display input.numin { margin-top:30px; }
+  .display input.numin:focus { border-bottom-color:var(--pri,#19e6c1); }
+  .display input.numin::placeholder { color:var(--muted); opacity:.55; font-size:.55em; letter-spacing:0; }
   .display .num { font-size:clamp(26px, 5vh, 38px); letter-spacing:1px; direction:ltr; min-height:48px; font-weight:300; word-break:break-all; text-align:center; }
   .keypad, .dialrow, .incall-pad, .incbtns { direction:ltr; }
   .keypad { display:grid; grid-template-columns:repeat(3, var(--k)); justify-content:space-evenly; gap:1.4vh 0; padding:4px 20px 6px; max-width:420px; width:100%; margin:0 auto; --k:min(72px, 9.2vh, 22vw); }
@@ -138,6 +150,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   /* ---------- tabs + targets + stats ---------- */
   /* نسخة اللابتوب: نفس التليفون في النص */
   body.web .app-only { display:none !important; }
+  body:not(.web) .web-only { display:none !important; }
   body.web .side.app-only { display:block !important; visibility:hidden; }
   @media (min-width: 620px) {
     body.web { background:#dfe7ea; }
@@ -423,7 +436,7 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
     <button data-v="ask" onclick="NQVia.set('ask')">❔ اسألني</button>
   </div>
   <div class="ibar" id="inboxBar"></div>
-  <div class="display"><div id="dialNum" class="num"></div><div id="dialName" class="who-name"></div><div id="dialErr" class="err"></div>
+  <div class="display"><input id="dialNum" class="num numin" type="text" dir="ltr" autocomplete="off" spellcheck="false" placeholder="اكتب الرقم" aria-label="الرقم"><div id="dialName" class="who-name"></div><div id="dialErr" class="err"></div>
     <button class="pastebtn" id="btnPaste" onclick="dialPaste()" aria-label="لصق رقم" title="لصق رقم (Ctrl+V)">📋 لصق</button>
     <button class="pastebtn dirbtn" onclick="NQDir.open()" aria-label="التحويلات الداخلية" title="التحويلات الداخلية">☎️ التحويلات</button></div>
   <div class="keypad" id="keypad"></div>
@@ -441,6 +454,23 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
     <h2 style="margin:0;font-size:20px;flex:1">⚙️ الإعدادات <span class="ver" id="appVer" style="font-size:12px;font-weight:400"></span></h2>
     <div class="seg thm" style="display:inline-flex;gap:4px"><button data-t="light" onclick="setTheme('light')">☀️ فاتح</button><button data-t="dark" onclick="setTheme('dark')">🌙 غامق</button><button data-t="auto" onclick="setTheme('auto')">🌓 زي الموبايل</button></div>
+  </div>
+  <div id="ringCard" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div><b>🎵 نغمة الرنين</b><div style="color:var(--muted);font-size:12px">للمكالمات اللي بتجيلك على السنترال</div></div>
+      <div id="ringApp" class="app-only" style="display:flex;gap:6px;align-items:center">
+        <span id="ringName" style="font-size:13px;color:var(--muted)"></span>
+        <button class="btn" style="width:auto;padding:8px 14px" onclick="Android.pickRingtone()">اختار</button>
+        <button class="btn ghost" id="ringTestA" style="width:auto;padding:8px 12px" onclick="NQTone.testApp()">▶</button>
+      </div>
+    </div>
+    <div id="ringWeb" class="web-only" style="margin-top:10px">
+      <div class="ring-grid" id="ringList"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+        <label class="btn ghost" style="width:auto;padding:7px 12px;cursor:pointer">📂 نغمة من جهازك<input type="file" accept="audio/*" hidden onchange="NQTone.upload(this)"></label>
+        <span style="font-size:12px;color:var(--muted)">🔊</span><input type="range" id="ringVol" min="0.1" max="1" step="0.05" style="flex:1;min-width:120px" oninput="NQTone.setVol(this.value)">
+      </div>
+    </div>
   </div>
   <div id="keepCard" style="display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px"></div>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 14px">
@@ -1023,32 +1053,30 @@ function buildPad(el, onKey) {
     el.appendChild(b);
   });
 }
-/* مؤشر الكتابة في الرقم: دوس على أي مكان في الرقم عشان تضيف أو تمسح من النص */
-let DC = null; // مكان المؤشر — null = آخر الرقم
-function dialCur() { const n = $("dialNum"); if (DC !== null && !n.querySelector(".caret")) DC = null; return DC === null ? n.textContent.length : Math.min(DC, n.textContent.length); }
-function dialRender(t, pos) {
-  const n = $("dialNum");
-  DC = pos == null || pos >= t.length ? null : Math.max(0, pos);
-  if (DC === null) { n.textContent = t; return; }
-  n.innerHTML = [...t].map((c, i) => (i === DC ? '<i class="caret"></i>' : "") + `<span data-i="${i}">${esc(c)}</span>`).join("");
-}
-function dialMove(d) { const n = $("dialNum"); const p = dialCur() + d; if (p < 0) return; dialRender(n.textContent, p); }
+/* خانة الرقم: input حقيقي — تكتب أو تلصق أو تحرّك المؤشر عادي. ‎.textContent‎ بيقرا/يكتب القيمة عشان باقي الكود */
+(function () {
+  const el = document.getElementById("dialNum");
+  Object.defineProperty(el, "textContent", {
+    get() { return el.value; },
+    set(v) { el.value = String(v ?? ""); el.dispatchEvent(new Event("input")); }
+  });
+  if (IS_APP || matchMedia("(pointer:coarse)").matches) el.setAttribute("inputmode", "none"); // الموبايل: لوحة الأرقام بتاعتنا بدل الكيبورد
+  el.addEventListener("input", e => {
+    if (e.isTrusted) { // كتابة من الكيبورد: نسيب الأرقام والرموز بس
+      const p = el.selectionStart, v = el.value, c = v.replace(/[^\d+*#]/g, "");
+      if (c !== v) { el.value = c; try { el.setSelectionRange(Math.max(0, p - (v.length - c.length)), Math.max(0, p - (v.length - c.length))); } catch (x) {} }
+      window._pickedName = ""; $("dialErr").textContent = "";
+    }
+  });
+  el.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("callBtn") && $("callBtn").click(); } });
+})();
 function dialKey(d) {
-  const n = $("dialNum"), t = n.textContent, p = dialCur();
-  dialRender(t.slice(0, p) + d + t.slice(p), DC === null ? null : p + 1); window._pickedName = "";
-  $("dialErr").textContent = "";
+  const n = $("dialNum"), t = n.value, f = document.activeElement === n;
+  const a = f ? n.selectionStart : t.length, b = f ? n.selectionEnd : t.length;
+  n.value = t.slice(0, a) + d + t.slice(b); n.dispatchEvent(new Event("input"));
+  if (f) try { n.setSelectionRange(a + 1, a + 1); } catch (e) {}
+  window._pickedName = ""; $("dialErr").textContent = "";
 }
-document.getElementById("dialNum").addEventListener("click", e => {
-  const n = $("dialNum"), t = n.textContent; if (!t) return;
-  const sp = e.target.closest("span[data-i]");
-  if (!sp) { dialRender(t, null); return; }
-  const r = sp.getBoundingClientRect(), i = +sp.dataset.i;
-  dialRender(t, e.clientX > r.left + r.width / 2 ? i + 1 : i);
-});
-new MutationObserver(() => { const n = $("dialNum"); // أول ما الرقم يتكتب كنص عادي نخلّي كل رقم span عشان يتداس عليه
-  if (n.firstChild && n.firstChild.nodeType === 3 && n.childNodes.length === 1) { const t = n.textContent; DC = null;
-    n.innerHTML = [...t].map((c, i) => `<span data-i="${i}">${esc(c)}</span>`).join(""); }
-}).observe(document.getElementById("dialNum"), { childList: true });
 /* اسم صاحب الرقم: من مكالماتنا والـ CRM (السيرفر) ومن جهات الاتصال (التطبيق) */
 const NQWho = {
   cache: {}, t: null,
@@ -1106,7 +1134,7 @@ const NQWho = {
     if (window._pickedName) { $("dialName").textContent = "👤 " + window._pickedName; return; }
     this.t = setTimeout(() => this.show(n, "dialName"), 400); }
 };
-new MutationObserver(() => NQWho.watchDial()).observe(document.getElementById("dialNum"), { childList: true, characterData: true, subtree: true });
+document.getElementById("dialNum").addEventListener("input", () => NQWho.watchDial());
 
 /* لصق رقم: من الزرار، أو ضغطة طويلة على الرقم، أو Ctrl+V على اللاب */
 function cleanPhone(t) {
@@ -1137,10 +1165,17 @@ document.addEventListener("paste", e => {
 });
 (function () { // ضغطة طويلة على الرقم = لصق
   const d = document.getElementById("dialNum"); let t = null;
-  d.parentNode.onpointerdown = e => { if (e.target.id === "btnPaste") return; t = setTimeout(dialPaste, 600); };
+  d.parentNode.onpointerdown = e => { if (e.target.id === "btnPaste" || e.target === d) return; t = setTimeout(dialPaste, 600); };
   d.parentNode.onpointerup = d.parentNode.onpointerleave = () => clearTimeout(t);
 })();
-function dialDel() { const n = $("dialNum"), t = n.textContent, p = dialCur(); if (p > 0) dialRender(t.slice(0, p - 1) + t.slice(p), DC === null ? null : p - 1); $("dialErr").textContent = ""; window._pickedName = ""; }
+function dialDel() {
+  const n = $("dialNum"), t = n.value, f = document.activeElement === n;
+  let a = f ? n.selectionStart : t.length, b = f ? n.selectionEnd : t.length;
+  if (a === b) { if (a === 0) return; a -= 1; }
+  n.value = t.slice(0, a) + t.slice(b); n.dispatchEvent(new Event("input"));
+  if (f) try { n.setSelectionRange(a, a); } catch (e) {}
+  $("dialErr").textContent = ""; window._pickedName = "";
+}
 (function () { // ضغطة = يمسح رقم، ضغطة طويلة = يمسح الكل
   const b = document.getElementById("btnDel"); let t = null, long = false;
   b.onpointerdown = () => { long = false; t = setTimeout(() => { long = true; $("dialNum").textContent = ""; }, 550); };
@@ -1381,6 +1416,31 @@ const NQPhone = {
     show("scrDial");
   },
 
+  /* نتيجة المكالمة الصادرة اللي مكملتش: مشغول / مقفول / لم يرد ... من كود السنترال وسبب الشبكة (Q.850) */
+  outcome(ev, info, ringAt, userHang) {
+    const m = ev && ev.message, code = m && m.status_code;
+    let q = 0;
+    try { const r = m && m.getHeader && (m.getHeader("Reason") || m.getHeader("X-Asterisk-HangupCause") || ""); const mm = /cause=(\d+)/i.exec(r || ""); if (mm) q = +mm[1]; } catch (e) {}
+    const cause = String((info && info.cause) || ""), rang = ringAt ? Math.round((Date.now() - ringAt) / 1000) : 0;
+    if (/Media Access/i.test(cause)) return { k: "mic", icon: "🎙️", t: "المايك مش مسموح للتطبيق", d: "اسمح بيه من إعدادات الموبايل/المتصفح وجرّب تاني" };
+    if (userHang || code === 487 || (/^Canceled$/i.test(cause) && !code))
+      return userHang ? (rang >= 20 ? { k: "noans", icon: "⏱️", t: "لم يرد", d: `رن ${rang} ثانية وقفلت`, retry: true } : null)
+        : { k: "cancel", icon: "↩️", t: "المكالمة اتلغت قبل ما ترن", retry: true };
+    if (q === 17 || code === 486 || code === 600) return { k: "busy", icon: "🔴", t: "الرقم مشغول", d: "العميل في مكالمة تانية — جرّب بعد شوية", retry: true };
+    if (q === 21 || code === 603) return { k: "reject", icon: "🚫", t: "العميل رفض المكالمة", retry: true };
+    if (q === 18 || q === 19 || code === 408 || (code === 480 && rang >= 15) || /No Answer|Request Timeout/i.test(cause))
+      return { k: "noans", icon: "⏱️", t: "لم يرد", d: rang ? `رن ${rang} ثانية من غير رد` : "", retry: true };
+    if (q === 20 || q === 27 || code === 480 || /Unavailable/i.test(cause))
+      return { k: "off", icon: "📴", t: "الموبايل مقفول أو خارج التغطية", retry: true };
+    if (q === 1 || q === 22 || q === 28 || code === 404 || code === 484 || /Address Incomplete|Not Found/i.test(cause))
+      return { k: "bad", icon: "❌", t: "الرقم غلط أو مش موجود", d: "اتأكد من الرقم (ومن كود الدولة لو دولي)" };
+    if (q === 34 || q === 38 || q === 41 || q === 42 || code === 503 || code === 502)
+      return { k: "net", icon: "📶", t: "الخط مشغول أو مفيش شبكة على الشريحة", d: "جرّب تاني بعد دقيقة", retry: true };
+    if (code === 403) return { k: "deny", icon: "⛔", t: "التحويلة مش مسموحلها تتصل بره" };
+    if (code === 488) return { k: "codec", icon: "🔇", t: "مشكلة في الصوت (codec)" };
+    return { k: "fail", icon: "⚠️", t: "المكالمة مكملتش", d: [cause, code ? `(${code}${m && m.reason_phrase ? " " + m.reason_phrase : ""})` : "", q ? `cause ${q}` : ""].filter(Boolean).join(" "), retry: true };
+  },
+
   /* ---- internal ---- */
   _onSession(e) {
     const s = e.session;
@@ -1418,7 +1478,8 @@ const NQPhone = {
       if (!iceCap) iceCap = setTimeout(() => { try { ev.ready(); } catch (x) {} }, 1500); });
     s.on("peerconnection", ev => this._audio(ev.peerconnection));
     if (s.connection) this._audio(s.connection);
-    s.on("progress", () => { if (this.direction === "out") $("cState").textContent = "بيرن…"; });
+    this._ringAt = 0;
+    s.on("progress", () => { if (this.direction === "out") { $("cState").textContent = "بيرن…"; if (!this._ringAt) this._ringAt = Date.now(); } });
     s.on("accepted", () => {
       this.callStart = Date.now();
       if (window.Android) Android.onCallStateChanged(true); else NQWeb.stopRing(); iosCall(true); // وقّف الرنة أول ما المكالمة تترد
@@ -1442,14 +1503,19 @@ const NQPhone = {
       NQHistory.add(info);
       $("dialNum").textContent = "";
       if (!info.answered && info.direction === "out") {
-        const code = ev && ev.message && ev.message.status_code, why = ev && ev.message && ev.message.reason_phrase;
-        const ar = { 403: "السنترال رفض — التحويلة مش مسموحلها تتصل بره", 404: "الرقم مش متعرّف على السنترال", 408: "مفيش رد من الخط",
-          480: "الخط مش متاح دلوقتي", 484: "الرقم ناقص أو غلط", 486: "الرقم مشغول", 487: "اتلغت", 488: "مشكلة في الصوت (codec)",
-          500: "خطأ في السنترال", 502: "جهاز الشرايح (Dinstar) مش راد", 503: "الشريحة مشغولة أو مفيش شبكة على الخط", 603: "اترفضت" }[code];
-        const canceled = /^Canceled$/i.test(info.cause || "") && !code;
-        $("dialErr").textContent = /Media Access/i.test(info.cause || "") ? "المايك مش مسموح للتطبيق — اسمح بيه من الإعدادات وجرّب تاني"
-          : canceled ? (this._userHang ? "" : "المكالمة اتلغت قبل ما ترن — جرّب تاني")
-          : "المكالمة مكملتش: " + (ar || info.cause || "") + (code ? ` (${code}${why ? " " + why : ""})` : "");
+        const st = NQPhone.outcome(ev, info, this._ringAt, this._userHang);
+        info.outcome = st ? st.k : "";
+        const box = $("dialErr");
+        box.innerHTML = "";
+        if (st) {
+          box.innerHTML = `<div class="cstat cs-${st.k}"><b>${st.icon} ${esc(st.t)}</b>${st.d ? `<small>${esc(st.d)}</small>` : ""}</div>`;
+          if (st.retry && info.number) {
+            const b = document.createElement("button"); b.className = "cs-retry"; b.textContent = "🔁 اتصل تاني";
+            b.onclick = () => { $("dialNum").textContent = info.number; NQPhone.call(info.number); };
+            box.firstChild.appendChild(b);
+          }
+          try { if (window.Android && Android.toast) Android.toast(st.icon + " " + st.t); } catch (e) {}
+        }
       }
       if (!NQNotes.maybeAsk(info)) { show("scrDial"); NQDialer.after(); }
     };
@@ -1719,22 +1785,84 @@ window.onDictEnd = function () {
   if (was && NQNotes.said && NQPhone.ext && NQPhone.pass) NQNotes.insight(); // يحلّل لوحده بعد التسجيل
 };
 
+/* ---------- نغمة الرنين: نغمات جاهزة (بتتولّد بالصوت) أو ملف من الجهاز ---------- */
+const NQTone = {
+  ctx: null, timer: null, el: null, playing: false,
+  // كل نغمة: نوتات [تردد Hz, بداية بالثانية, مدة] + طول الدورة
+  TONES: {
+    classic: { n: "☎️ كلاسيك", loop: 2, notes: [[440, 0, .9]] },
+    dual:    { n: "🔔 رنة مزدوجة", loop: 3, notes: [[400, 0, .4], [450, 0, .4], [400, .6, .4], [450, .6, .4]] },
+    chime:   { n: "🎐 جرس هادي", loop: 2.4, wave: "sine", decay: true, notes: [[659, 0, .5], [784, .25, .5], [988, .5, .9]] },
+    marimba: { n: "🎵 ماريمبا", loop: 2, wave: "triangle", decay: true, notes: [[523, 0, .25], [659, .18, .25], [784, .36, .25], [1047, .54, .5], [784, .9, .25], [1047, 1.08, .5]] },
+    digital: { n: "📟 ديجيتال", loop: 1.6, wave: "square", vol: .35, notes: [[1200, 0, .08], [1200, .15, .08], [1200, .3, .08], [1200, .45, .08]] },
+    urgent:  { n: "🚨 عالي ومستعجل", loop: 1, wave: "sawtooth", vol: .4, notes: [[880, 0, .2], [660, .25, .2], [880, .5, .2]] },
+    custom:  { n: "📂 نغمتي", custom: true }
+  },
+  key() { return store.get("nq_ring", "classic"); },
+  vol() { return +store.get("nq_ring_vol", .6) || .6; },
+  setVol(v) { store.set("nq_ring_vol", +v); if (this.el) this.el.volume = +v; },
+  pick(k) { store.set("nq_ring", k); this.render(); this.preview(); },
+  start() {
+    this.stop(); this.playing = true;
+    const k = this.key(), t = this.TONES[k] || this.TONES.classic;
+    if (t.custom) {
+      let url = ""; try { url = localStorage.getItem("nq_ring_file") || ""; } catch (e) {}
+      if (url) { this.el = new Audio(url); this.el.loop = true; this.el.volume = this.vol(); this.el.play().catch(() => this._synth(this.TONES.classic)); return; }
+      return this._synth(this.TONES.classic);
+    }
+    this._synth(t);
+  },
+  _synth(t) {
+    this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
+    try { this.ctx.resume(); } catch (e) {}
+    const once = () => {
+      const now = this.ctx.currentTime, V = this.vol() * (t.vol || .5) * .5;
+      for (const [f, at, d] of t.notes) {
+        const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+        o.type = t.wave || "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(0, now + at); g.gain.linearRampToValueAtTime(V, now + at + .015);
+        if (t.decay) g.gain.exponentialRampToValueAtTime(.0005, now + at + d); else { g.gain.setValueAtTime(V, now + at + d - .02); g.gain.linearRampToValueAtTime(0, now + at + d); }
+        o.connect(g); g.connect(this.ctx.destination); o.start(now + at); o.stop(now + at + d + .05);
+      }
+    };
+    once(); this.timer = setInterval(once, t.loop * 1000);
+  },
+  stop() { this.playing = false; clearInterval(this.timer); this.timer = null; try { this.el && this.el.pause(); } catch (e) {} this.el = null; clearTimeout(this.pt); },
+  preview() { this.start(); clearTimeout(this.pt); this.pt = setTimeout(() => this.stop(), 3500); },
+  upload(inp) {
+    const f = inp.files && inp.files[0]; inp.value = ""; if (!f) return;
+    if (f.size > 2.5 * 1024 * 1024) { toast("الملف كبير — اختار نغمة أقل من 2.5 ميجا"); return; }
+    const r = new FileReader();
+    r.onload = () => { try { localStorage.setItem("nq_ring_file", r.result); store.set("nq_ring_fname", f.name); this.pick("custom"); toast("🎵 اتحفظت: " + f.name); }
+      catch (e) { toast("مقدرتش أحفظ الملف — جرّب ملف أصغر"); } };
+    r.readAsDataURL(f);
+  },
+  testApp() {
+    if (!window.Android || !Android.testRingtone) return;
+    this._on = !this._on; Android.testRingtone(this._on); $("ringTestA").textContent = this._on ? "⏹" : "▶";
+    clearTimeout(this.pt); if (this._on) this.pt = setTimeout(() => { if (this._on) this.testApp(); }, 5000);
+  },
+  render() {
+    if (IS_APP) { try { $("ringName").textContent = Android.ringtoneName ? Android.ringtoneName() : ""; } catch (e) {} return; }
+    const k = this.key(), fn = store.get("nq_ring_fname", "");
+    $("ringList").innerHTML = Object.entries(this.TONES).filter(([id, t]) => !t.custom || fn).map(([id, t]) =>
+      `<button class="ring-opt${id === k ? " on" : ""}" onclick="NQTone.pick('${id}')">${t.custom ? "📂 " + esc(fn) : t.n}<i>▶</i></button>`).join("");
+    $("ringVol").value = this.vol();
+  }
+};
+window.onRingtone = function (name) { try { $("ringName").textContent = name; toast("🎵 " + name); } catch (e) {} };
+
 /* ---------- نسخة اللابتوب (المتصفح) ---------- */
 const NQWeb = {
   ctx: null, timer: null, note: null,
   ring(num) {
-    try {
-      this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
-      const beep = () => { const o = this.ctx.createOscillator(), g = this.ctx.createGain(); o.frequency.value = 440; g.gain.value = .15;
-        o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + .9); };
-      beep(); clearInterval(this.timer); this.timer = setInterval(beep, 2000);
-    } catch (e) {}
+    try { NQTone.start(); } catch (e) {}
     try { if (window.NQiOS && document.hidden) NQiOS.post("notify", { title: "📞 مكالمة واردة", body: num }); } catch (e) {}
     try { if (window.NQDesk) NQDesk.ring(num); } catch (e) {}   // تطبيق ويندوز: الشباك يطلع قدّام
     try { if (Notification.permission === "granted" && document.hidden) { this.note = new Notification("📞 مكالمة واردة", { body: num, requireInteraction: true }); this.note.onclick = () => { window.focus(); this.note.close(); }; } } catch (e) {}
     document.title = "📞 " + num;
   },
-  stopRing() { clearInterval(this.timer); this.timer = null; try { this.note && this.note.close(); } catch (e) {} document.title = "NQ Phone"; },
+  stopRing() { try { NQTone.stop(); } catch (e) {} try { this.note && this.note.close(); } catch (e) {} document.title = "NQ Phone"; },
   rec: null,
   dictate() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1779,12 +1907,7 @@ if (!IS_APP) {
     const ae = document.activeElement;
     if (!$("scrDial").classList.contains("on") || e.ctrlKey || e.metaKey || e.altKey) return;
     if (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && ae.closest(".screen.on, .sheet-bg.on")) return; // بيكتب في خانة ظاهرة
-    if (/^[0-9*#+]$/.test(e.key)) { dialKey(e.key); e.preventDefault(); }
-    else if (e.key === "Backspace") { dialDel(); e.preventDefault(); }
-    else if (e.key === "ArrowLeft" || e.key === "ArrowRight") { dialMove(e.key === "ArrowLeft" ? -1 : 1); e.preventDefault(); }
-    else if (e.key === "Home") { dialRender($("dialNum").textContent, 0); e.preventDefault(); }
-    else if (e.key === "End") { dialRender($("dialNum").textContent, null); e.preventDefault(); }
-    else if (e.key === "Delete") { const t = $("dialNum").textContent, p = dialCur(); if (p < t.length) dialRender(t.slice(0, p) + t.slice(p + 1), p); e.preventDefault(); }
+    if (/^[0-9*#+]$/.test(e.key) || e.key === "Backspace" || e.key === "Delete") { const n = $("dialNum"); n.focus(); try { n.setSelectionRange(n.value.length, n.value.length); } catch (x) {} return; } // الكتابة تروح للخانة
     else if (e.key === "Enter") { $("callBtn") && $("callBtn").click(); e.preventDefault(); }
   });
   window.addEventListener("beforeunload", e => { if (NQPhone.ua) { e.preventDefault(); e.returnValue = ""; } });
@@ -2876,6 +2999,7 @@ NQSettings.apply(NQSettings.load());
   else NQPhone._reg(false);
   if (IS_APP && Android.setCreds && s && s.ext) Android.setCreds(NQSettings.load().host, s.ext, s.password);
   if ($("simUp")) { $("simUp").checked = !!NQPrefs.get("simUpload", false); if ($("simUp").checked) NQSim.cfg(true); NQSim.refresh(); }
+  try { NQTone.render(); } catch (e) {}
 })();
 window.NQPhone = NQPhone;
 </script>
