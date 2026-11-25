@@ -1,0 +1,43 @@
+name: nq_call
+description: NQ Call — تطبيق مكالمات السنترال (Windows + Android + iOS)
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  sip_ua: ">=0.5.8 <2.0.0"
+  flutter_webrtc: any
+  http: ">=1.1.0 <2.0.0"
+  shared_preferences: ">=2.2.0 <3.0.0"
+  audioplayers: ">=5.2.0 <7.0.0"
+  file_picker: ">=8.0.0 <11.0.0"
+  path_provider: ">=2.1.0 <3.0.0"
+  connectivity_plus: ">=5.0.0 <8.0.0"
+  window_manager: ">=0.3.8 <0.6.0"
+  permission_handler: ">=11.0.0 <13.0.0"
+
+dev_dependencies:
+  flutter_lints: ">=3.0.0 <6.0.0"
+  flutter_launcher_icons: ">=0.13.1 <0.15.0"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/tones/
+    - assets/icon.png
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon.png"
+  windows:
+    generate: true
+    image_path: "assets/icon.png"
+    icon_size: 256

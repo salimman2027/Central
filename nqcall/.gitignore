@@ -1,0 +1,16 @@
+build/
+.dart_tool/
+.flutter-plugins*
+.packages
+pubspec.lock
+android/
+ios/
+windows/
+linux/
+macos/
+web/
+dist/
+test/
+analysis_options.yaml
+*.iml
+.metadata

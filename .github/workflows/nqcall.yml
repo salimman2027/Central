@@ -1,0 +1,54 @@
+name: NQ Call (native)
+on:
+  push:
+    paths: ["nqcall/**", ".github/workflows/nqcall.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - name: Setup
+        run: cd nqcall && PLATFORMS=android ./setup.sh
+      - name: Analyze
+        run: cd nqcall && flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Build APK
+        run: cd nqcall && flutter build apk --release
+      - name: Publish
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cp nqcall/build/app/outputs/flutter-apk/app-release.apk NQ-Call.apk
+          gh release upload latest NQ-Call.apk --clobber
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - name: Setup
+        shell: bash
+        run: cd nqcall && PLATFORMS=windows ./setup.sh
+      - name: Build EXE
+        run: cd nqcall; flutter build windows --release
+      - name: Installer
+        shell: pwsh
+        run: |
+          cd nqcall
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc installer.iss
+      - name: Publish
+        shell: bash
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cp nqcall/dist/NQ-Call-Setup.exe NQ-Call-Setup.exe
+          gh release upload latest NQ-Call-Setup.exe --clobber
