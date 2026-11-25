@@ -21,11 +21,11 @@ jobs:
       - name: Analyze
         run: cd nqcall && flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Build APK
-        run: cd nqcall && flutter build apk --release
+        run: cd nqcall && flutter build apk --release --split-per-abi
       - name: Publish
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          cp nqcall/build/app/outputs/flutter-apk/app-release.apk NQ-Call.apk
+          cp nqcall/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk NQ-Call.apk
           gh release upload latest NQ-Call.apk --clobber
 
   windows:
