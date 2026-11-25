@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 
 import pymysql
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 HERE = Path(__file__).resolve().parent
 CONF_DIR = Path(os.environ.get("NQ_CONF", "/etc/nq-calls"))
@@ -342,7 +342,10 @@ def db_conf() -> dict:
     if os.environ.get("NQ_DB_USER"):
         return dict(host=os.environ.get("NQ_DB_HOST", "localhost"), user=os.environ["NQ_DB_USER"],
                     password=os.environ.get("NQ_DB_PASS", ""))
-    txt = Path("/etc/freepbx.conf").read_text()
+    try:
+        txt = Path("/etc/freepbx.conf").read_text()
+    except OSError:
+        raise HTTPException(503, "مفيش ربط بداتا السنترال — حط NQ_DB_USER في dev/.env وشغّل نفق SSH (شوف DEVELOPMENT.md)")
     def get(k, default=""):
         m = re.search(rf"""\[\s*['"]{k}['"]\s*\]\s*=\s*['"]([^'"]*)['"]""", txt)
         return m.group(1) if m else default
@@ -352,6 +355,7 @@ def db_conf() -> dict:
 def query(sql: str, args: tuple, database: str | None = None) -> list:
     c = db_conf()
     con = pymysql.connect(host=c["host"], user=c["user"], password=c["password"],
+                          port=int(os.environ.get("NQ_DB_PORT", "3306")),
                           database=database or os.environ.get("NQ_CDR_DB", "asteriskcdrdb"),
                           cursorclass=pymysql.cursors.DictCursor, charset="utf8mb4")
     try:
@@ -1132,7 +1136,12 @@ def make_lessons(date_from: dt.date = Query(alias="from"), date_to: dt.date = Qu
 # ---------------- page ----------------
 @app.get("/")
 def index():
-    return FileResponse(HERE / "static" / "index.html", headers={"Cache-Control": "no-store"})
+    p = HERE / "static" / "index.html"
+    html = p.read_text(encoding="utf-8")
+    if "__VER__" in html:   # نسخة التطوير (على السيرفر install.sh بيحط الرقم)
+        v = HERE.parent / "VERSION"
+        html = html.replace("__VER__", (v.read_text().strip() if v.exists() else "dev") + "-dev")
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
 @app.exception_handler(pymysql.MySQLError)

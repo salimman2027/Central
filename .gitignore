@@ -3,3 +3,9 @@ __pycache__/
 local.properties
 .gradle/
 build/
+.venv/
+.devdata/
+dev/.env
+desktop/node_modules/
+desktop/dist/
+.idea/
