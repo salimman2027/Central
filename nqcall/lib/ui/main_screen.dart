@@ -547,7 +547,7 @@ class _Header extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
             child: LayoutBuilder(builder: (context, box) => Row(children: [
-              if (box.maxWidth > 470) ...[
+              if (box.maxWidth > 440) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(color: Colors.white.withValues(alpha: .1), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white24)),
@@ -632,7 +632,7 @@ class _LinePill extends StatelessWidget {
             _LineDot(state: state),
             const SizedBox(width: 8),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 170),
+              constraints: const BoxConstraints(maxWidth: 130),
               child: Text(bad ? 'السنترال مقطوع' : (state == LineState.connecting ? 'بيتصل…' : 'متصل بالسنترال'),
                   overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600)),
             ),
@@ -816,7 +816,7 @@ class _MissedBanner extends StatelessWidget {
           decoration: const BoxDecoration(border: BorderDirectional(start: BorderSide(color: kRed, width: 4))),
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           child: LayoutBuilder(builder: (context, box) {
-            final narrow = box.maxWidth < 400;
+            final narrow = box.maxWidth < 480;
             final buttons = Row(mainAxisSize: MainAxisSize.min, children: [
               FilledButton(onPressed: onCall, style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)), child: const Text('اتصل الآن')),
               const SizedBox(width: 6),
