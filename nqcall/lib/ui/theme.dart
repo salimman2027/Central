@@ -65,13 +65,14 @@ ThemeData buildTheme(Brightness b) {
         backgroundColor: kGreen,
         foregroundColor: Colors.white,
         minimumSize: const Size(0, 46),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, fontFamily: 'Segoe UI', fontFamilyFallback: ['Noto Sans Arabic', 'Tahoma', 'Arial']),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: kText,
+        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5, fontFamily: 'Segoe UI', fontFamilyFallback: ['Noto Sans Arabic', 'Tahoma', 'Arial']),
         side: const BorderSide(color: kLine),
         minimumSize: const Size(0, 42),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

@@ -77,7 +77,7 @@ class _CallScreenState extends State<CallScreen> {
             gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [kHeaderTop, kHeaderBottom, Color(0xFF022A14)]),
           ),
           child: SafeArea(
-            child: DefaultTextStyle(
+            child: DefaultTextStyle.merge(
               style: const TextStyle(color: Colors.white),
               child: Column(children: [
                 const TitleBar(),

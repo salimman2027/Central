@@ -12,6 +12,7 @@ import 'package:nq_call/ui/call_screen.dart';
 import 'package:nq_call/ui/login_page.dart';
 import 'package:nq_call/ui/main_screen.dart';
 import 'package:nq_call/ui/theme.dart';
+import 'package:nq_call/win.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> _font(String family, List<String> paths) async {
@@ -90,6 +91,11 @@ void main() {
     HomeData.I.stop();
     fake();
     await shot(t, const Size(412, 900), const MainScreen(), 'main_phone');
+    HomeData.I.stop();
+    fake();
+    Win.compact.value = true;
+    await shot(t, const Size(500, 64), const MainScreen(), 'compact');
+    Win.compact.value = false;
     HomeData.I.stop();
     // شاشة المكالمة الواردة
     final c = ActiveCall(null, true, '+966551234567', CallPhase.incoming)

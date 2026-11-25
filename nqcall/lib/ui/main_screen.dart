@@ -437,7 +437,7 @@ class _MainScreenState extends State<MainScreen> {
           const SizedBox(width: 6),
           Text(t, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: Color(0xFF52615A))),
           const Spacer(),
-          TextButton(onPressed: all, child: const Text('عرض الكل ←', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700))),
+          TextButton.icon(onPressed: all, iconAlignment: IconAlignment.end, icon: const Icon(Icons.west_rounded, size: 16, color: kGreen), label: const Text('عرض الكل', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700))),
         ]),
       );
 
@@ -546,26 +546,30 @@ class _Header extends StatelessWidget {
           const TitleBar(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
-            child: Row(children: [
-              Flexible(
-                child: Container(
+            child: LayoutBuilder(builder: (context, box) => Row(children: [
+              if (box.maxWidth > 470) ...[
+                Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(color: Colors.white.withValues(alpha: .1), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white24)),
-                  child: Text(ver, textDirection: TextDirection.ltr, style: const TextStyle(color: Colors.white, fontSize: 12.5), overflow: TextOverflow.ellipsis),
+                  child: Text(ver, textDirection: TextDirection.ltr, style: const TextStyle(color: Colors.white, fontSize: 12.5)),
                 ),
-              ),
-              const SizedBox(width: 10),
+                const SizedBox(width: 10),
+              ],
               if (a != null)
-                Flexible(
-                  flex: 2,
-                  child: Text('تحويلة ${a.ext}${a.name.isNotEmpty ? ' · ${a.name}' : ''}',
-                      overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                ),
-              const Spacer(),
+                Expanded(
+                  child: Tooltip(
+                    message: ver,
+                    child: Text('تحويلة ${a.ext}${a.name.isNotEmpty ? ' · ${a.name}' : ''}',
+                        overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                  ),
+                )
+              else
+                const Spacer(),
+              const SizedBox(width: 8),
               _LinePill(state: e.line, text: e.lineText, onRetry: e.reconnect, quality: e.quality),
               const SizedBox(width: 10),
               const NQMenuButton(),
-            ]),
+            ])),
           ),
         ]),
       ),
@@ -812,7 +816,7 @@ class _MissedBanner extends StatelessWidget {
           decoration: const BoxDecoration(border: BorderDirectional(start: BorderSide(color: kRed, width: 4))),
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           child: LayoutBuilder(builder: (context, box) {
-            final narrow = box.maxWidth < 470;
+            final narrow = box.maxWidth < 400;
             final buttons = Row(mainAxisSize: MainAxisSize.min, children: [
               FilledButton(onPressed: onCall, style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)), child: const Text('اتصل الآن')),
               const SizedBox(width: 6),
