@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String kAppVersion = '1.0.0';
+const String kAppVersion = '1.1.0';
 const String kDefaultHost = '3.89.245.93.sslip.io';
 
 /// التخزين المحلي (اسم الدخول، النغمة، الثيم...)
@@ -109,6 +109,60 @@ class Api {
     try {
       final j = await _post('/lookup', {'ext': a.ext, 'password': a.password, 'number': number}, timeout: 4);
       return '${j['name'] ?? ''}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// كل اللي السيرفر يعرفه عن الرقم: الاسم، الـ CRM، صاحب العميل، آخر مكالمة وآخر ملاحظة
+  static Future<Map<String, dynamic>> lookup(Account a, String number) async {
+    if (number.replaceAll(RegExp(r'\D'), '').length < 7) return {};
+    try {
+      return await _post('/lookup', {'ext': a.ext, 'password': a.password, 'number': number}, timeout: 4);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// "ذكّرني": مهمة متابعة في مهامي (بتظهر في التطبيق واللوحة)
+  static Future<void> addTask(Account a, {required String text, required DateTime when}) async {
+    final d = '${when.year}-${when.month.toString().padLeft(2, '0')}-${when.day.toString().padLeft(2, '0')}';
+    final t = '${when.hour.toString().padLeft(2, '0')}:${when.minute.toString().padLeft(2, '0')}';
+    await _post('/todo', {'ext': a.ext, 'password': a.password, 'action': 'add', 'date': d, 'time': t, 'text': text});
+  }
+
+  /// الاتصال من شريحة الموبايل: الطلب بيروح لتطبيق NQ Phone على موبايل الموظف وهو اللي يتصل
+  static Future<void> simDial(Account a, String number, {String name = ''}) async {
+    await _post('/rdial/send', {'ext': a.ext, 'password': a.password, 'number': number, 'name': name});
+  }
+
+  static Future<bool> simPhoneOnline(Account a) async {
+    try {
+      final j = await _post('/rdial/status', {'ext': a.ext, 'password': a.password}, timeout: 5);
+      return j['phone'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>> goals(Account a) => _post('/goals', {'ext': a.ext, 'password': a.password}, timeout: 15);
+  static Future<Map<String, dynamic>> me(Account a, String period) => _post('/me', {'ext': a.ext, 'password': a.password, 'period': period}, timeout: 20);
+
+  /// زمن الوصول للسيرفر بالمللي ثانية (لمؤشر جودة الاتصال) — null لو مش واصل
+  static Future<int?> ping() async {
+    final sw = Stopwatch()..start();
+    try {
+      await http.head(Uri.parse('https://${Prefs.host}/calls/privacy')).timeout(const Duration(seconds: 5));
+      return sw.elapsedMilliseconds;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String> serverVersion() async {
+    try {
+      final r = await http.get(Uri.parse('$base/version')).timeout(const Duration(seconds: 6));
+      return '${(jsonDecode(r.body) as Map)['server'] ?? ''}';
     } catch (_) {
       return '';
     }

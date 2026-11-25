@@ -15,6 +15,8 @@ enum LineState { off, connecting, online, failed }
 
 enum CallPhase { dialing, ringing, incoming, active, ended }
 
+enum Quality { unknown, excellent, good, weak, bad }
+
 /// نتيجة المكالمة اللي مكملتش
 class Outcome {
   final String key, icon, title, detail;
@@ -22,19 +24,45 @@ class Outcome {
   const Outcome(this.key, this.icon, this.title, {this.detail = '', this.retry = false});
 }
 
+/// مكالمة فايتة (للبانر الأحمر)
+class Missed {
+  final String number;
+  String name;
+  final DateTime at;
+  final int ringSec;
+  String context;
+  Missed(this.number, this.name, this.at, this.ringSec, [this.context = '']);
+}
+
 class ActiveCall {
   final dynamic call; // Call بتاع sip_ua
   final bool incoming;
   final String number;
   String name = '';
+  Map<String, dynamic> info = {}; // بيانات العميل من السيرفر (CRM، صاحبه، آخر ملاحظة)
   CallPhase phase;
   DateTime? answeredAt, ringAt;
   final DateTime started = DateTime.now();
   bool muted = false, speaker = false, held = false;
   String dtmf = '';
+  MediaStream? local;
   ActiveCall(this.call, this.incoming, this.number, this.phase);
 
   int get seconds => answeredAt == null ? 0 : DateTime.now().difference(answeredAt!).inSeconds;
+
+  /// سطر وصف العميل: الشركة / المرحلة / صاحبه
+  String get context => describe(info);
+
+  static String describe(Map<String, dynamic> j) {
+    final bits = <String>[];
+    final crm = j['crm'];
+    if (crm is Map && '${crm['potential'] ?? ''}'.isNotEmpty) bits.add('مرحلة: ${crm['potential']}');
+    final own = j['owner'];
+    if (own is Map && '${own['name'] ?? ''}'.isNotEmpty) bits.add('مسؤول: ${own['name']}');
+    final n = j['calls'];
+    if (n is num && n > 0) bits.add('$n مكالمة قبل كده');
+    return bits.join(' · ');
+  }
 }
 
 /// بيقرا حقل من أوبجكت sip_ua بأكتر من اسم (الأسماء اتغيرت بين النسخ)
@@ -64,6 +92,8 @@ dynamic _f(dynamic o, List<String> names) {
           return o.direction;
         case 'id':
           return o.id;
+        case 'peerConnection':
+          return o.peerConnection;
       }
     } catch (_) {}
   }
@@ -82,13 +112,22 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
   String lineText = 'مش متصل';
   ActiveCall? current;
   Outcome? lastOutcome;
-  String lastNumber = '';
-  final List<String> _missed = [];
-  Timer? _watch, _tick;
+  String lastNumber = '', notice = '';
+  final List<Missed> missed = [];
+  Quality quality = Quality.unknown;
+  int? rttMs;
+  double lossPct = 0;
+  int historyVersion = 0; // بيزيد بعد كل مكالمة عشان السجل يتحدث
+  Timer? _watch, _tick, _qTimer, _statsTimer;
   StreamSubscription? _net;
   DateTime _lastStart = DateTime(2000);
 
-  List<String> get missed => List.unmodifiable(_missed);
+  /// الخط الصادر: السنترال أو شريحة الموبايل (عن طريق تطبيق NQ Phone على الموبايل)
+  String get via => Prefs.str('via', 'pbx');
+  Future<void> setVia(String v) async {
+    await Prefs.setStr('via', v);
+    notifyListeners();
+  }
 
   // ---------------- الدخول والاتصال بالسنترال ----------------
   Future<void> signIn(Account a) async {
@@ -108,6 +147,9 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
       // الشبكة اتغيرت (واي فاي ↔ داتا): نعيد الاتصال على طول
       if (account != null && current == null) Future.delayed(const Duration(seconds: 1), _connect);
     });
+    _qTimer?.cancel();
+    _measure();
+    _qTimer = Timer.periodic(const Duration(seconds: 30), (_) => _measure());
   }
 
   void _connect() {
@@ -146,6 +188,7 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
   Future<void> signOut() async {
     account = null;
     _watch?.cancel();
+    _qTimer?.cancel();
     _watch = null;
     try {
       _ua?.unregister();
@@ -154,6 +197,7 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
       _ua?.stop();
     } catch (_) {}
     _ua = null;
+    missed.clear();
     await Account.clear();
     await Native.keepAlive(false);
     _setLine(LineState.off, 'مش متصل');
@@ -168,20 +212,150 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     notifyListeners();
   }
 
+  // ---------------- جودة الاتصال ----------------
+  Future<void> _measure() async {
+    if (current != null) return; // وقت المكالمة القياس من إحصائيات المكالمة نفسها
+    final ms = await Api.ping();
+    rttMs = ms;
+    lossPct = 0;
+    quality = ms == null ? Quality.bad : (ms < 180 ? Quality.excellent : (ms < 350 ? Quality.good : Quality.weak));
+    notifyListeners();
+  }
+
+  /// وقت المكالمة: التأخير وضياع الصوت من WebRTC كل 3 ثواني
+  void _startStats(ActiveCall c) {
+    _statsTimer?.cancel();
+    int lastLost = 0, lastRecv = 0;
+    _statsTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      final pc = _f(c.call, ['peerConnection']);
+      if (pc == null || current != c) return;
+      try {
+        final List<StatsReport> st = await (pc as RTCPeerConnection).getStats();
+        double? rtt;
+        int lost = 0, recv = 0;
+        for (final r in st) {
+          final v = r.values;
+          if (r.type == 'remote-inbound-rtp' && v['roundTripTime'] != null) rtt = double.tryParse('${v['roundTripTime']}');
+          if (r.type == 'candidate-pair' && rtt == null && v['currentRoundTripTime'] != null && '${v['state']}' == 'succeeded') {
+            rtt = double.tryParse('${v['currentRoundTripTime']}');
+          }
+          if (r.type == 'inbound-rtp' && '${v['kind'] ?? v['mediaType']}' == 'audio') {
+            lost = int.tryParse('${v['packetsLost'] ?? 0}') ?? 0;
+            recv = int.tryParse('${v['packetsReceived'] ?? 0}') ?? 0;
+          }
+        }
+        final dl = lost - lastLost, dr = recv - lastRecv;
+        lastLost = lost;
+        lastRecv = recv;
+        lossPct = (dl + dr) > 0 ? 100 * dl / (dl + dr) : 0;
+        if (rtt != null) rttMs = (rtt * 1000).round();
+        final r = rttMs ?? 0;
+        quality = (lossPct > 8 || r > 600)
+            ? Quality.bad
+            : (lossPct > 3 || r > 350)
+                ? Quality.weak
+                : (lossPct > 1 || r > 180)
+                    ? Quality.good
+                    : Quality.excellent;
+        notifyListeners();
+      } catch (_) {}
+    });
+  }
+
+  // ---------------- الصوت (المايك والسماعة) ----------------
+  Map<String, dynamic> get _audio {
+    final mic = Prefs.str('micId');
+    if (mic.isEmpty) return {'audio': true, 'video': false};
+    return {
+      'audio': {
+        'deviceId': mic,
+        'optional': [
+          {'sourceId': mic}
+        ]
+      },
+      'video': false
+    };
+  }
+
+  Future<MediaStream> _mic() async {
+    try {
+      return await navigator.mediaDevices.getUserMedia(_audio);
+    } catch (_) {
+      return navigator.mediaDevices.getUserMedia({'audio': true, 'video': false}); // المايك المختار اتشال؟ الافتراضي
+    }
+  }
+
+  /// السماعة اللي هتطلع منها المكالمة (كمبيوتر: سماعة رأس / سبيكر)
+  Future<void> applyOutput([String? id]) async {
+    final out = id ?? Prefs.str('spkId');
+    if (out.isEmpty) return;
+    try {
+      await Helper.selectAudioOutput(out);
+    } catch (e) {
+      logd('output $e');
+    }
+  }
+
+  Future<void> setOutput(String id) async {
+    await Prefs.setStr('spkId', id);
+    await applyOutput(id);
+    notifyListeners();
+  }
+
+  Future<void> setMic(String id) async {
+    await Prefs.setStr('micId', id);
+    notifyListeners();
+  }
+
+  static Future<List<MediaDeviceInfo>> devices() async {
+    try {
+      // على بعض الأجهزة الأسامي مش بتظهر غير بعد إذن المايك
+      final s = await navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
+      final l = await navigator.mediaDevices.enumerateDevices();
+      for (final t in s.getTracks()) {
+        t.stop();
+      }
+      await s.dispose();
+      return l;
+    } catch (_) {
+      try {
+        return await navigator.mediaDevices.enumerateDevices();
+      } catch (_) {
+        return [];
+      }
+    }
+  }
+
   // ---------------- المكالمات ----------------
-  Future<String?> dial(String raw) async {
+  Future<String?> dial(String raw, {String name = ''}) async {
     final number = pbxNumber(cleanPhone(raw));
     if (number.isEmpty) return 'اكتب الرقم الأول';
     if (current != null) return 'فيه مكالمة شغالة';
-    final ua = _ua;
-    if (ua == null || line != LineState.online) {
-      if (account != null) _connect();
-      return 'مش متصل بالسنترال — بيحاول يتصل… جرّب كمان ثانيتين';
-    }
+    final a = account;
+    if (a == null) return 'ادخل بحسابك الأول';
     lastOutcome = null;
     lastNumber = raw;
+
+    // من شريحتي: الموبايل هو اللي يتصل
+    if (via == 'sim' && number.length > 5) {
+      try {
+        await Api.simDial(a, cleanPhone(raw), name: name);
+        notice = '📱 اتبعت لموبايلك — هيتصل من الشريحة دلوقتي';
+        notifyListeners();
+        return null;
+      } catch (e) {
+        return '$e';
+      }
+    }
+
+    final ua = _ua;
+    if (ua == null || line != LineState.online) {
+      _connect();
+      return 'مش متصل بالسنترال — بيحاول يتصل… جرّب كمان ثانيتين';
+    }
     try {
-      final stream = await navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
+      final stream = await _mic();
+      _pendingLocal = stream;
       final target = 'sip:$number@${Prefs.host}';
       bool ok;
       try {
@@ -189,13 +363,29 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
       } on NoSuchMethodError {
         ok = await (ua as dynamic).call(target, voiceOnly: true, mediaStream: stream) as bool;
       }
-      if (!ok) return 'مقدرش يبدأ المكالمة';
+      if (!ok) {
+        _stopStream(stream);
+        return 'مقدرش يبدأ المكالمة';
+      }
     } catch (e) {
       final m = '$e';
       if (m.contains('Permission') || m.contains('NotAllowed')) return 'المايك مش مسموح للتطبيق — اسمح بيه من الإعدادات';
+      if (m.contains('NotFound') || m.contains('device')) return 'مفيش مايك متوصل — وصّل سماعة أو اختار المايك من إعدادات الصوت';
       return 'المكالمة مبدأتش: $m';
     }
     return null;
+  }
+
+  MediaStream? _pendingLocal;
+
+  void _stopStream(MediaStream? s) {
+    if (s == null) return;
+    try {
+      for (final t in s.getTracks()) {
+        t.stop();
+      }
+      s.dispose();
+    } catch (_) {}
   }
 
   Future<void> answer() async {
@@ -204,7 +394,8 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     await Ringer.I.stop();
     await Native.incomingDone();
     try {
-      final stream = await navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
+      final stream = await _mic();
+      c.local = stream;
       c.call.answer(_ua!.buildCallOptions(true), mediaStream: stream);
     } catch (e) {
       logd('answer $e');
@@ -223,6 +414,10 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     } catch (_) {
       _finish(c, null);
     }
+    // أمان: لو السنترال مارجّعش رد في 4 ثواني نقفل الشاشة إحنا
+    Future.delayed(const Duration(seconds: 4), () {
+      if (current == c) _finish(c, null);
+    });
   }
 
   void toggleMute() {
@@ -235,6 +430,7 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     notifyListeners();
   }
 
+  /// موبايل: سبيكر ↔ سماعة الموبايل
   void toggleSpeaker() {
     final c = current;
     if (c == null) return;
@@ -268,8 +464,14 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     notifyListeners();
   }
 
-  void clearMissed() {
-    _missed.clear();
+  void dismissMissed(Missed m) {
+    missed.remove(m);
+    notifyListeners();
+  }
+
+  void clearNotice() {
+    notice = '';
+    lastOutcome = null;
     notifyListeners();
   }
 
@@ -288,12 +490,13 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
   void registrationStateChanged(dynamic state) {
     final s = _enumName(state.state);
     if (s == 'REGISTERED') {
-      _setLine(LineState.online, 'متصل ✓');
+      _setLine(LineState.online, 'متصل بالسنترال');
       Native.keepAlive(true, text: 'متصل بالسنترال — تحويلة ${account?.ext ?? ''}');
+      applyOutput();
     } else if (s.contains('FAILED')) {
       final cause = '${_f(state.cause, ['cause']) ?? state.cause ?? ''}';
       final bad = cause.contains('Authentication') || cause.contains('Rejected') || cause.contains('Forbidden');
-      _setLine(LineState.failed, bad ? 'الحساب اتغيّر — اخرج وادخل تاني' : 'فشل الاتصال: $cause');
+      _setLine(LineState.failed, bad ? 'الحساب اتغيّر — اخرج وادخل تاني' : 'فشل الاتصال بالسنترال');
     } else if (s == 'UNREGISTERED') {
       if (account != null) _setLine(LineState.failed, 'مش متسجّل على السنترال — بيحاول تاني…');
     }
@@ -308,26 +511,33 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     if (s == 'CALL_INITIATION') {
       final incoming = '${_f(call, ['direction'])}'.toUpperCase().contains('INCOMING');
       if (c != null && '${_f(c.call, ['id'])}' != id) {
-        // مكالمة تانية وإنت في مكالمة: مشغول
+        // مكالمة تانية وإنت في مكالمة: مشغول، وتتسجل فايتة
         try {
           call.hangup({'status_code': 486});
         } catch (_) {}
-        if (incoming) _missed.add(_peer(call));
+        if (incoming) _addMissed(_peer(call), '', 0);
         notifyListeners();
         return;
       }
       final num = incoming ? _peer(call) : _target(call);
       c = ActiveCall(call, incoming, num, incoming ? CallPhase.incoming : CallPhase.dialing);
+      if (!incoming) {
+        c.local = _pendingLocal;
+        _pendingLocal = null;
+      }
       current = c;
+      notice = '';
       final disp = '${_f(call, ['remote_display_name', 'remoteDisplayName']) ?? ''}'.replaceAll('"', '');
       if (incoming && disp.isNotEmpty && !RegExp(r'^\+?\d+$').hasMatch(disp) && !disp.startsWith('dinastar')) c.name = disp;
       final a = account;
       if (a != null) {
-        Api.lookupName(a, num).then((n) {
-          if (n.isNotEmpty && current == c) {
-            c!.name = n;
-            notifyListeners();
-          }
+        Api.lookup(a, num).then((j) {
+          if (current != c) return;
+          c!.info = j;
+          final n = '${j['name'] ?? ''}';
+          if (n.isNotEmpty) c.name = n;
+          notifyListeners();
+          if (c.incoming && c.phase == CallPhase.incoming && n.isNotEmpty) Native.incoming('📞 مكالمة واردة', '$n · $num');
         });
       }
       if (incoming) {
@@ -353,6 +563,8 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
           c.answeredAt = DateTime.now();
           Ringer.I.stop();
           Native.incomingDone();
+          applyOutput();
+          _startStats(c);
           _tick?.cancel();
           _tick = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
         }
@@ -377,20 +589,29 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     notifyListeners();
   }
 
+  void _addMissed(String number, String name, int ringSec, [String ctx = '']) {
+    missed.removeWhere((m) => m.number == number);
+    missed.add(Missed(number, name, DateTime.now(), ringSec, ctx));
+    if (missed.length > 5) missed.removeAt(0);
+  }
+
   void _finish(ActiveCall c, dynamic cause, {bool failed = false}) {
+    if (current != c) return;
     _tick?.cancel();
+    _statsTimer?.cancel();
     Ringer.I.stop();
     Native.incomingDone();
+    _stopStream(c.local);
     if (c.speaker) _speaker(false);
-    if (c.incoming && c.answeredAt == null) _missed.add(c.number);
-    if (!c.incoming && c.answeredAt == null && failed) {
-      lastOutcome = outcomeOf(cause, c);
-    } else {
-      lastOutcome = null;
+    if (c.incoming && c.answeredAt == null) {
+      _addMissed(c.number, c.name, DateTime.now().difference(c.started).inSeconds, c.context);
     }
+    lastOutcome = (!c.incoming && c.answeredAt == null && failed) ? outcomeOf(cause, c) : null;
     c.phase = CallPhase.ended;
     current = null;
+    historyVersion++;
     notifyListeners();
+    Future.delayed(const Duration(seconds: 2), _measure);
   }
 
   String _peer(dynamic call) {

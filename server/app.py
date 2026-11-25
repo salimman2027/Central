@@ -1133,6 +1133,17 @@ def make_lessons(date_from: dt.date = Query(alias="from"), date_to: dt.date = Qu
     return res
 
 
+@app.get("/app/version")
+def app_version():
+    """رقم إصدار السيرفر (التطبيقات بتعرضه جنب رقم نسختها) + آخر نسخة من تطبيق الويندوز"""
+    ver = ""
+    for v in (HERE / "VERSION", HERE.parent / "VERSION"):   # السيرفر: install.sh بيحطه جنب app.py
+        if v.exists():
+            ver = v.read_text().strip()
+            break
+    return JSONResponse({"server": ver, "desktop": "1.1.0"}, headers={"Access-Control-Allow-Origin": "*"})
+
+
 # ---------------- page ----------------
 @app.get("/")
 def index():

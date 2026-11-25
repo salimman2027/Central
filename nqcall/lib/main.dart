@@ -7,22 +7,19 @@ import 'package:window_manager/window_manager.dart';
 import 'core.dart';
 import 'native.dart';
 import 'phone.dart';
+import 'store.dart';
 import 'ui/call_screen.dart';
-import 'ui/home.dart';
 import 'ui/login_page.dart';
+import 'ui/main_screen.dart';
 import 'ui/theme.dart';
+import 'win.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await Prefs.init();
-  if (Native.isDesktop) {
-    await windowManager.ensureInitialized();
-    const opts = WindowOptions(size: Size(1100, 720), minimumSize: Size(380, 600), center: true, title: 'NQ Call');
-    windowManager.waitUntilReadyToShow(opts, () async {
-      await windowManager.show();
-      await windowManager.focus();
-    });
-  }
+  // نسخة واحدة بس: لو البرنامج مفتوح، نبعتله الرقم (من الـ CRM) ونقفل
+  if (!await Win.ensureSingle(args)) exit(0);
+  await Win.init();
   runApp(const NQApp());
   final a = Account.load();
   if (a != null) PhoneEngine.I.signIn(a);
@@ -31,28 +28,34 @@ Future<void> main() async {
 
 class NQApp extends StatefulWidget {
   const NQApp({super.key});
-  static final themeMode = ValueNotifier<ThemeMode>(_loadTheme());
-  static ThemeMode _loadTheme() => switch (Prefs.str('theme', 'system')) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.system };
-  static Future<void> setTheme(String t) async {
-    await Prefs.setStr('theme', t);
-    themeMode.value = _loadTheme();
-  }
-
+  static final navKey = GlobalKey<NavigatorState>();
   @override
   State<NQApp> createState() => _NQAppState();
 }
 
-class _NQAppState extends State<NQApp> with WidgetsBindingObserver {
+class _NQAppState extends State<NQApp> with WidgetsBindingObserver, WindowListener {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (Native.isDesktop) windowManager.addListener(this);
+    PhoneEngine.I.addListener(_onEngine);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (Native.isDesktop) windowManager.removeListener(this);
+    PhoneEngine.I.removeListener(_onEngine);
     super.dispose();
+  }
+
+  bool _hadCall = false;
+  void _onEngine() {
+    // مكالمة جت والبرنامج في الوضع المصغّر: نكبّره عشان شاشة المكالمة
+    final has = PhoneEngine.I.current != null;
+    if (has && !_hadCall && Win.compact.value) Win.toggleCompact(false);
+    _hadCall = has;
   }
 
   @override
@@ -62,21 +65,49 @@ class _NQAppState extends State<NQApp> with WidgetsBindingObserver {
     if (s == AppLifecycleState.resumed && e.account != null && e.line != LineState.online && e.current == null) e.reconnect();
   }
 
+  // ---------- الشباك (ويندوز) ----------
+  @override
+  void onWindowResized() => Win.rememberSize();
+
+  @override
+  Future<void> onWindowClose() async {
+    final ctx = NQApp.navKey.currentContext;
+    if (ctx == null || PhoneEngine.I.account == null) {
+      await windowManager.destroy();
+      return;
+    }
+    final inCall = PhoneEngine.I.current != null;
+    final v = await showDialog<String>(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        title: Text(inCall ? 'فيه مكالمة شغالة!' : 'تقفل البرنامج؟'),
+        content: Text(inCall ? 'لو قفلت هتقفل المكالمة.' : 'لو قفلته مش هتوصلك مكالمات لحد ما تفتحه تاني.\nالأحسن تصغّره بس.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, 'cancel'), child: const Text('رجوع')),
+          OutlinedButton(onPressed: () => Navigator.pop(c, 'quit'), style: OutlinedButton.styleFrom(foregroundColor: kRed), child: const Text('اقفل خالص')),
+          FilledButton(onPressed: () => Navigator.pop(c, 'min'), child: const Text('صغّره بس')),
+        ],
+      ),
+    );
+    if (v == 'min') await windowManager.minimize();
+    if (v == 'quit') {
+      PhoneEngine.I.hangup();
+      await windowManager.destroy();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: NQApp.themeMode,
-      builder: (_, mode, __) => MaterialApp(
-        title: 'NQ Call',
-        debugShowCheckedModeBanner: false,
-        locale: const Locale('ar'),
-        supportedLocales: const [Locale('ar'), Locale('en')],
-        localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
-        theme: buildTheme(Brightness.light),
-        darkTheme: buildTheme(Brightness.dark),
-        themeMode: mode,
-        home: const _Root(),
-      ),
+    return MaterialApp(
+      navigatorKey: NQApp.navKey,
+      title: 'NQ Phone',
+      debugShowCheckedModeBanner: false,
+      locale: const Locale('ar'),
+      supportedLocales: const [Locale('ar'), Locale('en')],
+      localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
+      theme: buildTheme(Brightness.light),
+      themeMode: ThemeMode.light,
+      home: const _Root(),
     );
   }
 }
@@ -89,9 +120,12 @@ class _Root extends StatelessWidget {
       listenable: PhoneEngine.I,
       builder: (context, _) {
         final e = PhoneEngine.I;
-        if (e.account == null) return const LoginPage();
+        if (e.account == null) {
+          HomeData.I.stop();
+          return const LoginPage();
+        }
         return Stack(children: [
-          const HomeShell(),
+          const MainScreen(),
           if (e.current != null) Positioned.fill(child: CallScreen(call: e.current!)),
         ]);
       },
@@ -99,5 +133,4 @@ class _Root extends StatelessWidget {
   }
 }
 
-/// ويندوز: مفيش حاجة تانية — بس عشان الـ import يفضل مستخدم في كل الأنظمة
 bool get isMobile => Platform.isAndroid || Platform.isIOS;

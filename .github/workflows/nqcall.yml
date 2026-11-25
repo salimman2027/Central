@@ -8,6 +8,25 @@ permissions:
   contents: write
 
 jobs:
+  screens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - name: Fonts
+        run: sudo apt-get install -y -qq fonts-noto-core >/dev/null
+      - name: Screens
+        run: |
+          cd nqcall && flutter pub get
+          mkdir -p test && cp tool/screens_test.dart test/
+          flutter test --update-goldens test/screens_test.dart
+      - name: Publish
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cd nqcall/test/shots && for f in *.png; do cp "$f" "screen-$f"; done
+          gh release upload latest screen-*.png --clobber
+
   android:
     runs-on: ubuntu-latest
     steps:

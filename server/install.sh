@@ -32,6 +32,7 @@ mkdir -p "$APP" "$CONF" "$DATA/analysis"
 cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/ops.py "$SRC"/targets.py "$SRC"/todo.py "$SRC"/remotedial.py "$SRC"/goals.py "$SRC"/workcal.py "$SRC"/wa.py "$SRC"/eng.py "$SRC"/wainbox.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
+echo "$VER" > "$APP/VERSION" 2>/dev/null || true
 sed -i "s/__VER__/$VER/g" "$APP/static/index.html"
 echo "   version: $VER"
 chown -R "$RUN_USER:$RUN_USER" "$DATA"
@@ -165,6 +166,8 @@ cat > /etc/apache2/sites-available/nq-calls.conf <<EOF
   ProxyPassReverse /calls-app/lookup http://127.0.0.1:8090/app/lookup
   ProxyPass        /calls-app/login http://127.0.0.1:8090/app/login
   ProxyPassReverse /calls-app/login http://127.0.0.1:8090/app/login
+  ProxyPass        /calls-app/version http://127.0.0.1:8090/app/version
+  ProxyPassReverse /calls-app/version http://127.0.0.1:8090/app/version
   ProxyPass        /calls-app/me http://127.0.0.1:8090/app/me
   ProxyPassReverse /calls-app/me http://127.0.0.1:8090/app/me
   ProxyPass        /calls-app/history http://127.0.0.1:8090/app/history
