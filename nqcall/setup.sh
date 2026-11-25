@@ -16,6 +16,8 @@ if [[ -d android ]]; then
   DIR=$(dirname "$KT")
   sed "s/__PKG__/$PKG/" native/android/MainActivity.kt > "$KT"
   sed "s/__PKG__/$PKG/" native/android/NQService.kt > "$DIR/NQService.kt"
+  # بعض المكتبات (file_picker) نسخة Java/Kotlin مختلفة — نخليها تحذير بدل ما توقف البناء
+  grep -q 'kotlin.jvm.target.validation.mode' android/gradle.properties 2>/dev/null || echo 'kotlin.jvm.target.validation.mode=warning' >> android/gradle.properties
   M=android/app/src/main/AndroidManifest.xml
   for perm in INTERNET ACCESS_NETWORK_STATE RECORD_AUDIO MODIFY_AUDIO_SETTINGS WAKE_LOCK POST_NOTIFICATIONS FOREGROUND_SERVICE \
               FOREGROUND_SERVICE_SPECIAL_USE USE_FULL_SCREEN_INTENT REQUEST_IGNORE_BATTERY_OPTIMIZATIONS VIBRATE BLUETOOTH_CONNECT \
