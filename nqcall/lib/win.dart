@@ -155,16 +155,16 @@ class TitleBar extends StatelessWidget {
                     child: const Center(child: Text('N', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14))),
                   ),
                   const SizedBox(width: 10),
-                  const Text('NQ Phone', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15.5)),
+                  const Text('NQ Phone', maxLines: 1, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15.5)),
                   const SizedBox(width: 10),
-                  ValueListenableBuilder<String>(
+                  Flexible(child: ValueListenableBuilder<String>(
                     valueListenable: Win.serverVer,
                     builder: (_, v, __) => Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                       decoration: BoxDecoration(color: Colors.white.withValues(alpha: .1), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white24)),
-                      child: Text('Win $kAppVersion${v.isNotEmpty ? ' - $v' : ''}', style: const TextStyle(color: Colors.white, fontSize: 11.5)),
+                      child: Text('Win $kAppVersion${v.isNotEmpty ? ' - $v' : ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11.5)),
                     ),
-                  ),
+                  )),
                 ]),
               ),
             ),
