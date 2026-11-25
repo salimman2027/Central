@@ -81,6 +81,9 @@ def main():
     if not env.get("NQ_DB_USER"):
         print("ℹ مفيش ربط بداتا السنترال (NQ_DB_USER فاضي في dev/.env) — اللوحة هتفتح بس سجل المكالمات هيطلع خطأ.")
     print(f"\n✔ افتح: http://localhost:{a.port}/   (Ctrl+C للإيقاف — أي تعديل في server/ بيعيد التشغيل لوحده)\n")
+    if not os.environ.get("NQ_NO_BROWSER"):
+        import threading, webbrowser
+        threading.Timer(5, lambda: webbrowser.open(f"http://localhost:{a.port}/")).start()
     os.chdir(ROOT / "server")
     sys.exit(subprocess.call([str(PY), "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", str(a.port),
                               "--reload", "--reload-dir", str(ROOT / "server")], env=env))
