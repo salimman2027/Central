@@ -123,6 +123,7 @@ class MainActivity : Activity() {
     private var dictLang = "ar-EG"
 
     private fun js(code: String) = runOnUiThread { web.evaluateJavascript(code, null) }
+    private val audio by lazy { AudioRoute(this) { js(it) } }
 
     private fun startDictation(lang: String) {
         dictLang = lang
@@ -318,6 +319,7 @@ class MainActivity : Activity() {
     private fun askPermissions() {
         val need = mutableListOf(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= 33) need += Manifest.permission.POST_NOTIFICATIONS
+        if (Build.VERSION.SDK_INT >= 31) need += Manifest.permission.BLUETOOTH_CONNECT   // بلوتوث العربية والسماعات
         if (Build.VERSION.SDK_INT <= 28) need += Manifest.permission.WRITE_EXTERNAL_STORAGE
         val missing = need.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 1)
@@ -481,15 +483,13 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun onCallStateChanged(active: Boolean) {
             PhoneService.stopRing()
-            val am = getSystemService(AUDIO_SERVICE) as AudioManager
-            if (active) {
-                if (am.mode != AudioManager.MODE_IN_COMMUNICATION) am.mode = AudioManager.MODE_IN_COMMUNICATION
-                am.isMicrophoneMute = false
-            } else {
-                route(am, false)
-                am.mode = AudioManager.MODE_NORMAL
-            }
+            runOnUiThread { audio.callActive(active) }   // بلوتوث العربية/السماعات بيتوصل لوحده
         }
+        /** مخرج الصوت: earpiece / speaker / bluetooth / wired */
+        @JavascriptInterface fun setAudioRoute(kind: String) = runOnUiThread { audio.pick(kind) }
+        @JavascriptInterface fun audioRoutes(): String = audio.json()
+        /** الموبايل بيرن: زرار السماعة/العربية يرد */
+        @JavascriptInterface fun ringButtons(on: Boolean) = runOnUiThread { audio.mediaButtons(on) }
 
         /** يسجّل كلام بالمايك ويحوّله لنص عربي */
         @JavascriptInterface fun dictate(lang: String) { runOnUiThread { startDictation(lang) } }
@@ -628,11 +628,8 @@ class MainActivity : Activity() {
         } catch (e: Exception) { "" }
 
         /** السبيكر: على أندرويد 12+ لازم setCommunicationDevice — الطريقة القديمة كانت ساعات بتقفل المايك فالطرف التاني مايسمعش */
-        @JavascriptInterface fun setSpeaker(on: Boolean) {
-            val am = getSystemService(AUDIO_SERVICE) as AudioManager
-            if (am.mode != AudioManager.MODE_IN_COMMUNICATION) am.mode = AudioManager.MODE_IN_COMMUNICATION
-            route(am, on)
-            am.isMicrophoneMute = false
+        @JavascriptInterface fun setSpeaker(on: Boolean) = runOnUiThread {
+            audio.pick(if (on) "speaker" else if (audio.btName() != null) "bluetooth" else if (audio.wired()) "wired" else "earpiece")
         }
     }
 }

@@ -1323,9 +1323,36 @@ const NQPhone = {
     try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {}
   },
 
+  /* مخرج الصوت: لو فيه بلوتوث (العربية/السماعات) أو سماعة سلك ← قايمة اختيار، غير كده سبيكر/سماعة */
   toggleSpeaker() {
+    let r = null; try { r = window.Android && Android.audioRoutes ? JSON.parse(Android.audioRoutes()) : null; } catch (e) {}
+    if (r && (r.bt || r.wired)) return this.audioMenu(r);
     this.speaker = !this.speaker; $("cSpk").classList.toggle("on", this.speaker);
     if (window.Android) Android.setSpeaker(this.speaker); else if (window.NQiOS) NQiOS.post("speaker", this.speaker);
+    this._micOn();
+  },
+  audioMenu(r) {
+    const opts = [r.bt ? ["bluetooth", "🎧", r.bt] : null, r.wired ? ["wired", "🎧", "سماعة سلك"] : null, ["speaker", "🔊", "سبيكر"], ["earpiece", "📱", "سماعة الموبايل"]].filter(Boolean);
+    let o = document.getElementById("audSheet"); if (o) o.remove();
+    o = document.createElement("div"); o.id = "audSheet"; o.onclick = e => { if (e.target === o) o.remove(); };
+    o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:flex-end;justify-content:center";
+    o.innerHTML = `<div style="background:var(--card,#fff);color:var(--fg,#111);width:100%;max-width:420px;border-radius:18px 18px 0 0;padding:14px 14px 22px">
+      <b style="display:block;margin-bottom:8px">🔈 الصوت يطلع من فين؟</b>${opts.map(([k, i, n]) => `<button onclick="NQPhone.setRoute('${k}')" style="display:flex;gap:12px;align-items:center;width:100%;padding:13px 10px;border:0;border-radius:12px;margin-bottom:6px;font:inherit;font-size:16px;cursor:pointer;background:${r.current === k ? "var(--pri)" : "rgba(0,0,0,.05)"};color:${r.current === k ? "#fff" : "inherit"}"><span style="font-size:22px">${i}</span>${esc(n)}${r.current === k ? " ✓" : ""}</button>`).join("")}</div>`;
+    document.body.appendChild(o);
+  },
+  setRoute(k) { const o = document.getElementById("audSheet"); if (o) o.remove(); try { Android.setAudioRoute(k); } catch (e) {} this._micOn(); },
+  // أندرويد بيبلّغ لما مخرج الصوت يتغيّر (بلوتوث اتوصل/اتفصل)
+  onRoute(r) {
+    this.route = r; this.speaker = r.current === "speaker";
+    const L = { bluetooth: ["🎧", (r.bt || "بلوتوث").slice(0, 14)], wired: ["🎧", "سماعة"], speaker: ["🔊", "سبيكر"], earpiece: [r.bt ? "🔈" : "🔊", r.bt ? "الصوت" : "سماعة"] }[r.current] || ["🔊", "سماعة"];
+    try { $("cSpk").firstElementChild.textContent = L[0]; $("cSpk").lastChild.textContent = L[1]; $("cSpk").classList.toggle("on", r.current === "speaker" || r.current === "bluetooth"); } catch (e) {}
+  },
+  // زرار السماعة/العربية: رد لو بيرن، قفل لو في مكالمة
+  headsetButton() {
+    if (!this.session) return;
+    if (this.direction === "in" && !this.callStart) this.answer(); else this.hangup();
+  },
+  _micOn() {
     // تأكيد إن المايك لسه شغّال بعد تغيير مخرج الصوت (لو مش عامل كتم)
     setTimeout(() => { try { const pc = this.session && this.session.connection;
       if (pc && !this.muted) pc.getSenders().forEach(x => { if (x.track && x.track.kind === "audio") x.track.enabled = true; }); } catch (e) {} }, 300);
@@ -1366,6 +1393,7 @@ const NQPhone = {
     this.callStart = null; this.started = new Date(); this._userHang = false;
     this.muted = false; this.speaker = false;
     $("cMute").classList.remove("on"); $("cSpk").classList.remove("on"); $("cMute").lastChild.textContent = "كتم";
+    try { $("cSpk").firstElementChild.textContent = "🔊"; $("cSpk").lastChild.textContent = "سماعة"; } catch (e) {}
     $("callPad").classList.remove("on"); $("cPad").classList.remove("on"); try { $("cDtmf").textContent = ""; } catch (e) {}
 
     if (this.direction === "in") {
@@ -1373,7 +1401,7 @@ const NQPhone = {
       NQWho.show(this.peer, "inName").then(v => { if (v && v.name) { this.callName = v.name; $("cName").innerHTML = NQWho.html(v, this.ext); }
         const cc = NQWho.card(v, this.ext); $("inCard").innerHTML = cc; $("cCard").innerHTML = cc; });
       show("scrIncoming");
-      if (window.Android) Android.onIncoming(this.peer); else NQWeb.ring(this.peer);
+      if (window.Android) { Android.onIncoming(this.peer); try { Android.ringButtons && Android.ringButtons(true); } catch (e) {} } else NQWeb.ring(this.peer);
     } else {
       $("cNum").textContent = this.peer; $("cState").textContent = "جاري الاتصال…";
       $("cName").innerHTML = this.callName ? "👤 " + esc(this.callName) : "";
