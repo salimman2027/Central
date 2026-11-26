@@ -54,6 +54,10 @@ class MainActivity : FlutterActivity() {
                         startActivity(Intent(if (canCall) Intent.ACTION_CALL else Intent.ACTION_DIAL, u).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         result.success(true)
                     }
+                    "inSimCall" -> {
+                        val am = getSystemService(android.media.AudioManager::class.java)
+                        result.success(am.mode == android.media.AudioManager.MODE_IN_CALL)
+                    }
                     "stopService" -> { stopService(Intent(this, NQService::class.java)); result.success(true) }
                     "incoming" -> { showIncoming(call.argument<String>("title") ?: "مكالمة واردة", call.argument<String>("body") ?: ""); result.success(true) }
                     "cancelIncoming" -> {

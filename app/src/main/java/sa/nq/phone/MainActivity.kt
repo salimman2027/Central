@@ -505,6 +505,10 @@ class MainActivity : Activity() {
         @JavascriptInterface fun audioRoutes(): String = audio.json()
         /** الموبايل بيرن: زرار السماعة/العربية يرد */
         @JavascriptInterface fun ringButtons(on: Boolean) = runOnUiThread { audio.mediaButtons(on) }
+        /** الموظف في مكالمة شريحة (GSM) دلوقتي؟ — من غير صلاحيات إضافية */
+        @JavascriptInterface fun inSimCall(): Boolean = try {
+            (getSystemService(AUDIO_SERVICE) as android.media.AudioManager).mode == android.media.AudioManager.MODE_IN_CALL
+        } catch (e: Exception) { false }
 
         /** يسجّل كلام بالمايك ويحوّله لنص عربي */
         @JavascriptInterface fun dictate(lang: String) { runOnUiThread { startDictation(lang) } }

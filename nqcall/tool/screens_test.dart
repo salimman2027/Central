@@ -112,6 +112,14 @@ void main() {
       ..answeredAt = DateTime.now().subtract(const Duration(seconds: 83))
       ..muted = true;
     await shot(t, const Size(500, 900), CallScreen(call: c2), 'active');
+    PhoneEngine.I.waiting = ActiveCall(null, true, '0501112233', CallPhase.incoming)
+      ..name = 'أحمد — مؤسسة الريان'
+      ..info = {'calls': 2};
+    await shot(t, const Size(500, 900), CallScreen(call: c2), 'waiting');
+    PhoneEngine.I.waiting = null;
+    PhoneEngine.I.parked = ActiveCall(null, true, '0501112233', CallPhase.active)..name = 'أحمد — مؤسسة الريان'..answeredAt = DateTime.now().subtract(const Duration(seconds: 40));
+    await shot(t, const Size(500, 900), CallScreen(call: c2), 'parked');
+    PhoneEngine.I.parked = null;
     PhoneEngine.I.account = null;
     await shot(t, const Size(500, 800), const LoginPage(), 'login');
     await t.pumpWidget(const SizedBox());

@@ -67,6 +67,19 @@ class Ringer {
     }
   }
 
+  /// نغمة "مكالمة في الانتظار": تيتين خفاف كل كام ثانية (من غير ما تغطي على صوت العميل)
+  Future<void> startWaiting() async {
+    if (_on) return;
+    _on = true;
+    try {
+      await _p.setReleaseMode(ReleaseMode.loop);
+      await _p.setVolume((volume * .6).clamp(.15, .6));
+      await _p.play(AssetSource('tones/waiting.wav'));
+    } catch (e) {
+      logd('waiting tone $e');
+    }
+  }
+
   Future<void> stop() async {
     _on = false;
     try {

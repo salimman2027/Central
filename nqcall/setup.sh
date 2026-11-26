@@ -42,6 +42,9 @@ fi
 
 # ---------- Windows ----------
 if [[ -d windows ]]; then
+  # webview_windows بيستخدم coroutines قديمة — Visual Studio الجديد بيرفضها من غير التعريف ده
+  grep -q SILENCE_EXPERIMENTAL_COROUTINE windows/CMakeLists.txt || \
+    perl -0pi -e 's/(project\([^\n]*\)\n)/$1add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)\n/' windows/CMakeLists.txt
   # اسم الشباك والبرنامج
   perl -pi -e 's/L"nq_call"/L"NQ Call"/g' windows/runner/main.cpp 2>/dev/null || true
   perl -pi -e 's/"FileDescription", "nq_call"/"FileDescription", "NQ Call"/; s/"ProductName", "nq_call"/"ProductName", "NQ Call"/; s/"InternalName", "nq_call"/"InternalName", "NQ Call"/' windows/runner/Runner.rc 2>/dev/null || true

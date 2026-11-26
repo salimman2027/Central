@@ -51,6 +51,16 @@ class Native {
     }
   }
 
+  /// أندرويد: الموظف في مكالمة شريحة دلوقتي؟
+  static Future<bool> inSimCall() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await _ch.invokeMethod<bool>('inSimCall') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> ignoreBatteryOptimizations() async {
     if (!Platform.isAndroid) return;
     await _call('batteryExempt');

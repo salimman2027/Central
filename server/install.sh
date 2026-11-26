@@ -509,6 +509,28 @@ fi
 KEY
 chmod 755 /usr/local/bin/nq-setkey
 
+# انتظار المكالمات على السنترال: off = اللي في مكالمة ميرنش عنده تاني (المتصل ياخد مشغول / يروح للي بعده)
+cat > /usr/local/bin/nq-callwaiting <<'CW'
+#!/bin/bash
+# sudo nq-callwaiting off   -> قفل انتظار المكالمات لكل التحويلات
+# sudo nq-callwaiting on    -> رجّعه
+# sudo nq-callwaiting       -> يعرض الحالة
+MODE="${1:-show}"
+EXTS=$(asterisk -rx "pjsip show endpoints" 2>/dev/null | awk '/^ Endpoint:/{print $2}' | cut -d/ -f1 | grep -E '^[0-9]{2,6}$' | sort -u)
+[[ -z "$EXTS" ]] && { echo "✖ مش لاقي تحويلات (السنترال شغال؟)"; exit 1; }
+for e in $EXTS; do
+  case "$MODE" in
+    off) asterisk -rx "database del CW $e" >/dev/null ;;
+    on)  asterisk -rx "database put CW $e ENABLED" >/dev/null ;;
+  esac
+  v=$(asterisk -rx "database get CW $e" 2>/dev/null | sed -n 's/^Value: //p')
+  printf "  %-6s %s\n" "$e" "${v:-مقفول}"
+done
+[[ "$MODE" == off ]] && echo "✔ انتظار المكالمات اتقفل: اللي في مكالمة مش هيرن عنده مكالمة تانية"
+[[ "$MODE" == on ]] && echo "✔ انتظار المكالمات اتفتح"
+CW
+chmod 755 /usr/local/bin/nq-callwaiting
+
 echo "== check"
 # اللوحة محتاجة تسجيل دخول دلوقتي — بنتأكد إن السيرفر شغال من الصفحة الرئيسية (مش محمية)
 for i in 1 2 3 4 5 6 7 8 9 10; do

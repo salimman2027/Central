@@ -86,6 +86,15 @@ class _CallScreenState extends State<CallScreen> {
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 460),
                       child: Column(children: [
+                        if (e.waiting != null) _WaitingCard(w: e.waiting!, e: e),
+                        if (e.parked != null) _ParkedChip(p: e.parked!, e: e),
+                        if (e.busyNote.isNotEmpty && e.waiting == null)
+                          Container(
+                            margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .1), borderRadius: BorderRadius.circular(12)),
+                            child: Text(e.busyNote, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                          ),
                         const SizedBox(height: 24),
                         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                           _QualityChip(e: e, active: c.phase == CallPhase.active),
@@ -279,4 +288,116 @@ class _DtmfPad extends StatelessWidget {
       ),
     );
   }
+}
+
+/// مكالمة تانية بترن وانت في مكالمة: اللي معاك ميتقطعش — وانت تختار
+class _WaitingCard extends StatelessWidget {
+  final ActiveCall w;
+  final PhoneEngine e;
+  const _WaitingCard({required this.w, required this.e});
+  @override
+  Widget build(BuildContext context) {
+    final who = w.name.isNotEmpty ? w.name : w.number;
+    final ctx = w.context;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .3), blurRadius: 24, offset: const Offset(0, 8))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const _Pulse(),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('مكالمة تانية بترن', style: TextStyle(color: kMuted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+              Text(who, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kText, fontSize: 17, fontWeight: FontWeight.w800)),
+              if (w.name.isNotEmpty) Text(w.number, textDirection: TextDirection.ltr, style: const TextStyle(color: kMuted, fontSize: 12.5)),
+              if (ctx.isNotEmpty) Text(ctx, style: const TextStyle(color: kMuted, fontSize: 12)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center, children: [
+          FilledButton.icon(
+            onPressed: () => e.answerWaiting(),
+            icon: const Icon(Icons.pause_circle_outline_rounded, size: 19),
+            label: const Text('رد — واللي معايا انتظار'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => e.rejectWaiting(callBack: true),
+            icon: const Icon(Icons.schedule_rounded, size: 18, color: kGreen),
+            label: const Text('هرن عليه بعدين'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => e.rejectWaiting(),
+            style: OutlinedButton.styleFrom(foregroundColor: kRed),
+            icon: const Icon(Icons.call_end_rounded, size: 18),
+            label: const Text('رفض'),
+          ),
+          TextButton(onPressed: () => e.answerWaiting(endCurrent: true), child: const Text('اقفل الحالية ورد', style: TextStyle(color: kMuted))),
+        ]),
+      ]),
+    );
+  }
+}
+
+/// المكالمة اللي على الانتظار: العميل بيسمع موسيقى — دوسة تبدّل
+class _ParkedChip extends StatelessWidget {
+  final ActiveCall p;
+  final PhoneEngine e;
+  const _ParkedChip({required this.p, required this.e});
+  @override
+  Widget build(BuildContext context) {
+    final who = p.name.isNotEmpty ? p.name : p.number;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      decoration: BoxDecoration(color: kAmber.withValues(alpha: .18), borderRadius: BorderRadius.circular(14), border: Border.all(color: kAmber.withValues(alpha: .5))),
+      child: Row(children: [
+        const Icon(Icons.pause_circle_filled_rounded, color: kAmber),
+        const SizedBox(width: 8),
+        Expanded(child: Text('$who على الانتظار  ${fmtDur(p.seconds)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+        FilledButton.icon(
+          onPressed: e.swapCalls,
+          style: FilledButton.styleFrom(backgroundColor: kAmber, foregroundColor: const Color(0xFF3B2600), minimumSize: const Size(0, 36)),
+          icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+          label: const Text('بدّل'),
+        ),
+      ]),
+    );
+  }
+}
+
+class _Pulse extends StatefulWidget {
+  const _Pulse();
+  @override
+  State<_Pulse> createState() => _PulseState();
+}
+
+class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+  @override
+  void dispose() {
+    _a.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _a,
+        builder: (_, __) => Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: kCallGradient,
+            boxShadow: [BoxShadow(color: kCallA.withValues(alpha: .25 + .35 * _a.value), blurRadius: 6 + 12 * _a.value, spreadRadius: 2 * _a.value)],
+          ),
+          child: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 22),
+        ),
+      );
 }

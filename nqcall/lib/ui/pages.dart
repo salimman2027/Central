@@ -124,6 +124,23 @@ class _SettingsState extends State<_Settings> {
           const Icon(Icons.volume_up_rounded, size: 20, color: kMuted),
         ]),
       ]),
+      _card('وانت في مكالمة', icon: Icons.phone_in_talk_outlined, [
+        ListenableBuilder(
+          listenable: PhoneEngine.I,
+          builder: (context, _) => SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: PhoneEngine.I.callWaiting,
+            onChanged: (v) => PhoneEngine.I.setCallWaiting(v),
+            title: const Text('انتظار المكالمات', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(
+              PhoneEngine.I.callWaiting
+                  ? 'لو حد اتصل وانت في مكالمة: يظهرلك كارت صغير (تيت خفيفة) وتختار — ترد وتخلي اللي معاك انتظار، أو ترفض، أو «هرن عليه بعدين». المكالمة اللي معاك عمرها ما تتقطع.'
+                  : 'مقفول: لو حد اتصل وانت في مكالمة ميرنش عندك خالص — المتصل ياخد مشغول، وبيظهرلك بعد المكالمة في «فاتتك» عشان ترن عليه.',
+              style: const TextStyle(color: kMuted, height: 1.5),
+            ),
+          ),
+        ),
+      ]),
       _card('الصوت', icon: Icons.headset_mic_outlined, [
         const Text('اختيار السماعة والمايك واختبارهم', style: TextStyle(color: kMuted)),
         const SizedBox(height: 8),

@@ -828,7 +828,7 @@ class _MissedBanner extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('مكالمة فائتة: $who', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.w800, fontSize: 15.5)),
                   const SizedBox(height: 2),
-                  Text([t, ringTxt, if (m.context.isNotEmpty) m.context, if (m.name.isNotEmpty) m.number].join(' · '),
+                  Text([t, if (m.ringSec > 0) ringTxt, if (m.context.isNotEmpty) m.context, if (m.name.isNotEmpty) m.number].join(' · '),
                       style: const TextStyle(color: Color(0xFF8A6A6A), fontSize: 12.5)),
                 ]),
               ),

@@ -1444,7 +1444,18 @@ const NQPhone = {
   /* ---- internal ---- */
   _onSession(e) {
     const s = e.session;
-    if (this.session && !this._clearStale()) { s.terminate({ status_code: 486 }); return; }
+    // مكالمة تانية وانت في مكالمة (سنترال أو شريحة): متقاطعش اللي معاك — المتصل ياخد مشغول وتتسجل عندك
+    let simBusy = false;
+    try { simBusy = e.originator === "remote" && !!(window.Android && Android.inSimCall && Android.inSimCall()); } catch (x) {}
+    if ((this.session && !this._clearStale()) || simBusy) {
+      if (e.originator === "remote") {
+        let who = "";
+        try { const ru = s.remote_identity, d = String(ru.display_name || "").replace(/[\s"]/g, ""), uu = String(ru.uri.user || ""); who = /^\+?\d{3,}$/.test(uu) ? uu : (/^\+?\d{6,}$/.test(d) ? d : uu); } catch (x) {}
+        try { s.terminate({ status_code: 486 }); } catch (x) {}
+        if (who) setTimeout(() => toast(`📞 ${who} اتصل وانت في مكالمة — هتلاقيه في السجل`), 300);
+      } else { try { s.terminate({ status_code: 486 }); } catch (x) {} }
+      return;
+    }
     this.session = s;
     this.direction = e.originator === "remote" ? "in" : "out";
     // الجيتواي ساعات بيبعت اسم حسابه (dinastar1) مكان الرقم والرقم الحقيقي في اسم العرض

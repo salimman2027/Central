@@ -46,6 +46,7 @@ class ActiveCall {
   bool muted = false, speaker = false, held = false;
   String dtmf = '';
   MediaStream? local;
+  bool rejected = false; // اترفضت بإيدك (متتحسبش فايتة)
   ActiveCall(this.call, this.incoming, this.number, this.phase);
 
   int get seconds => answeredAt == null ? 0 : DateTime.now().difference(answeredAt!).inSeconds;
@@ -111,6 +112,8 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
   LineState line = LineState.off;
   String lineText = 'مش متصل';
   ActiveCall? current;
+  ActiveCall? waiting; // مكالمة تانية بترن وانت في مكالمة (انتظار المكالمات)
+  ActiveCall? parked; // مكالمة على الانتظار (Hold) وانت بتكلم في التانية
   Outcome? lastOutcome;
   String lastNumber = '', notice = '';
   final List<Missed> missed = [];
@@ -399,6 +402,112 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     }
   }
 
+  final Set<String> _simChecked = {}, _dead = {};
+
+  /// انتظار المكالمات (اختياري): لو مقفول، اللي يتصل وانت مشغول ياخد مشغول
+  bool get callWaiting => Prefs.flag('callWaiting', false);
+  Future<void> setCallWaiting(bool v) async {
+    await Prefs.setFlag('callWaiting', v);
+    notifyListeners();
+  }
+
+  /// آخر واحد اتصل وانت مشغول (رسالة صغيرة في شاشة المكالمة من غير ما تقاطعك)
+  String busyNote = '';
+
+  void _busyReject(dynamic call, bool incoming, {String ctx = 'اتصل وانت في مكالمة'}) {
+    try {
+      call.hangup({'status_code': 486});
+    } catch (_) {}
+    if (incoming) {
+      final num = _peer(call);
+      _addMissed(num, '', 0, ctx);
+      busyNote = '📞 $num $ctx — هتلاقيه في «فاتتك»';
+      final a = account;
+      if (a != null) {
+        Api.lookup(a, num).then((j) {
+          final n = '${j['name'] ?? ''}';
+          if (n.isEmpty) return;
+          for (final m in missed) {
+            if (m.number == num && m.name.isEmpty) m.name = n;
+          }
+          if (busyNote.contains(num)) busyNote = '📞 $n $ctx — هتلاقيه في «فاتتك»';
+          notifyListeners();
+        });
+      }
+      Future.delayed(const Duration(seconds: 12), () {
+        if (busyNote.contains(num)) {
+          busyNote = '';
+          notifyListeners();
+        }
+      });
+    }
+    notifyListeners();
+  }
+
+  // ---------------- انتظار المكالمات ----------------
+  /// ترد على المكالمة اللي في الانتظار: الحالية تروح Hold (العميل يسمع موسيقى الانتظار) أو تتقفل
+  Future<void> answerWaiting({bool endCurrent = false}) async {
+    final w = waiting, c = current;
+    if (w == null) return;
+    await Ringer.I.stop();
+    await Native.incomingDone();
+    if (c != null) {
+      if (endCurrent) {
+        try {
+          c.call.hangup();
+        } catch (_) {}
+        _finish(c, null);
+      } else {
+        try {
+          if (!c.held) c.call.hold();
+          c.held = true;
+        } catch (_) {}
+        _statsTimer?.cancel();
+        parked = c;
+      }
+    }
+    waiting = null;
+    current = w;
+    try {
+      final stream = await _mic();
+      w.local = stream;
+      w.call.answer(_ua!.buildCallOptions(true), mediaStream: stream);
+    } catch (e) {
+      logd('answerWaiting $e');
+    }
+    notifyListeners();
+  }
+
+  /// رفض المكالمة التانية (المتصل يسمع مشغول). callBack = تتحط في "مكالمات فايتة" عشان ترن عليه بعدين
+  void rejectWaiting({bool callBack = false}) {
+    final w = waiting;
+    if (w == null) return;
+    Ringer.I.stop();
+    w.rejected = !callBack;
+    try {
+      w.call.hangup({'status_code': 486});
+    } catch (_) {}
+    if (callBack) _addMissed(w.number, w.name, DateTime.now().difference(w.started).inSeconds, w.context.isNotEmpty ? w.context : 'رفضتها وانت في مكالمة');
+    waiting = null;
+    notifyListeners();
+  }
+
+  /// تبديل بين المكالمة الحالية واللي على الانتظار
+  void swapCalls() {
+    final c = current, p = parked;
+    if (c == null || p == null) return;
+    try {
+      if (!c.held) c.call.hold();
+      c.held = true;
+      if (p.held) p.call.unhold();
+      p.held = false;
+    } catch (_) {}
+    current = p;
+    parked = c;
+    _startStats(p);
+    notifyListeners();
+  }
+
   void hangup() {
     final c = current;
     if (c == null) return;
@@ -508,12 +617,42 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
     if (s == 'CALL_INITIATION') {
       final incoming = '${_f(call, ['direction'])}'.toUpperCase().contains('INCOMING');
       if (c != null && '${_f(c.call, ['id'])}' != id) {
-        // مكالمة تانية وإنت في مكالمة: مشغول، وتتسجل فايتة
-        try {
-          call.hangup({'status_code': 486});
-        } catch (_) {}
-        if (incoming) _addMissed(_peer(call), '', 0);
-        notifyListeners();
+        // مكالمة تانية وانت في مكالمة: متقطعش اللي معاك أبدًا.
+        // الافتراضي: المتصل ياخد مشغول وتظهرلك بعدين في "فاتتك" عشان ترن عليه. (انتظار المكالمات اختياري من الإعدادات)
+        if (incoming && callWaiting && waiting == null && parked == null) {
+          final w = ActiveCall(call, true, _peer(call), CallPhase.incoming);
+          final disp = '${_f(call, ['remote_display_name', 'remoteDisplayName']) ?? ''}'.replaceAll('"', '');
+          if (disp.isNotEmpty && !RegExp(r'^\+?\d+$').hasMatch(disp) && !disp.startsWith('dinastar')) w.name = disp;
+          waiting = w;
+          Ringer.I.startWaiting();
+          Native.incoming('📞 مكالمة تانية في الانتظار', w.name.isNotEmpty ? '${w.name} · ${w.number}' : w.number);
+          final a = account;
+          if (a != null) {
+            Api.lookup(a, w.number).then((j) {
+              if (waiting != w) return;
+              w.info = j;
+              final n = '${j['name'] ?? ''}';
+              if (n.isNotEmpty) w.name = n;
+              notifyListeners();
+            });
+          }
+          notifyListeners();
+          return;
+        }
+        _busyReject(call, incoming);
+        return;
+      }
+      // أندرويد: لو الموظف في مكالمة من الشريحة، مكالمة السنترال متقاطعهاش
+      if (incoming && Platform.isAndroid && !_simChecked.contains(id)) {
+        _simChecked.add(id);
+        Native.inSimCall().then((busy) {
+          if (_dead.contains(id)) return; // المتصل قفل قبل ما نخلص الفحص
+          if (busy) {
+            _busyReject(call, true, ctx: 'اتصل وانت في مكالمة شريحة');
+          } else {
+            callStateChanged(call, state);
+          }
+        });
         return;
       }
       final num = incoming ? _peer(call) : _target(call);
@@ -544,7 +683,14 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
       notifyListeners();
       return;
     }
-    if (c == null || '${_f(c.call, ['id'])}' != id) return;
+    String cid(ActiveCall? x) => x == null ? '' : '${_f(x.call, ['id'])}';
+    if (cid(c) != id) {
+      c = cid(waiting) == id ? waiting : (cid(parked) == id ? parked : null);
+    }
+    if (c == null) {
+      if (s == 'ENDED' || s == 'FAILED') _dead.add(id);
+      return;
+    }
 
     switch (s) {
       case 'PROGRESS':
@@ -561,7 +707,7 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
           Ringer.I.stop();
           Native.incomingDone();
           applyOutput();
-          _startStats(c);
+          if (c == current) _startStats(c);
           _tick?.cancel();
           _tick = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
         }
@@ -593,19 +739,46 @@ class PhoneEngine extends ChangeNotifier implements SipUaHelperListener {
   }
 
   void _finish(ActiveCall c, dynamic cause, {bool failed = false}) {
+    if (c.phase == CallPhase.ended) return;
+    final wasMissed = c.incoming && c.answeredAt == null;
+    c.phase = CallPhase.ended;
+    _stopStream(c.local);
+    // المكالمة اللي كانت في الانتظار أو على الـ Hold خلصت: الحالية تفضل زي ما هي
+    if (c == waiting || c == parked) {
+      if (c == waiting) {
+        waiting = null;
+        Ringer.I.stop();
+        if (wasMissed && !c.rejected) _addMissed(c.number, c.name, DateTime.now().difference(c.started).inSeconds, c.context);
+      } else {
+        parked = null;
+      }
+      historyVersion++;
+      notifyListeners();
+      return;
+    }
     if (current != c) return;
     _tick?.cancel();
     _statsTimer?.cancel();
     Ringer.I.stop();
     Native.incomingDone();
-    _stopStream(c.local);
     if (c.speaker) _speaker(false);
-    if (c.incoming && c.answeredAt == null) {
+    if (wasMissed && !c.rejected) {
       _addMissed(c.number, c.name, DateTime.now().difference(c.started).inSeconds, c.context);
     }
     lastOutcome = (!c.incoming && c.answeredAt == null && failed) ? outcomeOf(cause, c) : null;
-    c.phase = CallPhase.ended;
     current = null;
+    // كان فيه عميل على الانتظار؟ يرجع هو المكالمة الحالية (لسه على الـ Hold لحد ما تدوس "استكمال")
+    if (parked != null) {
+      current = parked;
+      parked = null;
+      _tick = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
+      _startStats(current!);
+    } else if (waiting != null) {
+      // الحالية خلصت والتانية لسه بترن: ترجع رنة عادية
+      current = waiting;
+      waiting = null;
+      Ringer.I.start();
+    }
     historyVersion++;
     notifyListeners();
     Future.delayed(const Duration(seconds: 2), _measure);
