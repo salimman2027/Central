@@ -167,6 +167,16 @@ def progress(kind: str = "month", ref: dt.date | None = None) -> dict:
             continue
         r["calls"] += 1
         r["answered"] += c.get("status") == "تم الرد"
+    # البيانات الافتتاحية (مكالمات المندوب قبل السيستم) بتتحسب في الفترة اللي فيها تاريخ بدايته
+    try:
+        import opening as _op
+        for e, r in act.items():
+            o = _op.totals(e, a, upto)
+            if o:
+                r["calls"] += int(o.get("out", 0)) + int(o.get("in", 0))
+                r["answered"] += int(o.get("ans", 0))
+    except Exception:  # noqa: BLE001
+        pass
     lo = dt.datetime.combine(a, dt.time.min, CTX["tz"])
     hi = dt.datetime.combine(b + dt.timedelta(days=1), dt.time.min, CTX["tz"])
     for x in CTX["appointments"]():

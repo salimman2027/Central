@@ -547,6 +547,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <button class="btn o" onclick="quick(0)">اليوم</button>
     <button class="btn o" onclick="quick(6)">آخر 7 أيام</button>
     <span class="sp" style="flex:1"></span>
+    <button class="btn o adm-only" onclick="opOpen()">📥 البيانات الافتتاحية</button>
     <button class="btn o" onclick="tvOpen()">📺 شاشة التلفزيون</button>
   </div>
   <div id="holBanner" style="display:none"></div>
@@ -671,6 +672,7 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
     <div class="f"><label>التاريخ</label><input type="date" id="glDate"></div>
     <div class="f"><label>الفئة</label><select id="glCat"></select></div>
     <span class="sp" style="flex:1"></span>
+    <button class="btn o adm-only" onclick="opOpen()">📥 البيانات الافتتاحية</button>
     <button class="btn o adm-only" onclick="glManual()">💰 إدخال المبيعات والعملاء</button>
     <button class="btn o adm-only" onclick="glSettings()">⚙️ تحديد الأهداف</button>
   </div>
@@ -754,6 +756,12 @@ html[data-theme=light] .crm-f select,html[data-theme=light] .crm-sales select{ba
   <h3 style="margin-top:0">💰 المبيعات والعملاء المحققين</h3>
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><label>الشهر</label><input type="month" id="glManMonth" onchange="glManual(this.value)"><span class="muted" style="font-size:12px">بيتحفظ لوحده أول ما تكتب</span></div>
   <div class="crm-tw"><table class="crm-tbl" id="glManTbl"></table></div>
+</div></div>
+<div class="modal" id="opModal" onclick="modalBg(event,this)"><div class="mbox" style="max-width:1120px;width:97vw;max-height:90vh;overflow:auto">
+  <h3 style="margin-top:0">📥 البيانات الافتتاحية للمكالمات</h3>
+  <div class="muted" style="font-size:13px;line-height:1.8;margin-bottom:10px">مكالمات كل مندوب <b>من قبل ما يبدأ على السيستم</b>. الأرقام دي بتتضاف للوحة والتقارير والتارجت في <b>الشهر اللي بدأ فيه</b> (بتاريخ بدايته).<br>
+  تاريخ البداية بيتملي لوحده بتاريخ أول مكالمة للمندوب على السيستم — تقدر تغيّره. بيتحفظ لوحده أول ما تكتب.</div>
+  <div class="crm-tw"><table class="crm-tbl" id="opTbl"></table></div>
 </div></div>
 <div class="page" id="p-tg">
   <div class="filters">
@@ -1122,6 +1130,16 @@ let TEAMS=[], REPS=[], CATS=[], AI_ENABLED=false;
 async function loadConfig(){
   const r=await fetch(API_BASE+'/config'); const c=await r.json();
   TEAMS=c.teams||[]; REPS=c.reps||[]; CATS=c.categories||[]; AI_ENABLED=!!c.aiEnabled;
+  await loadOpening();
+}
+/* ===== البيانات الافتتاحية: مكالمات المندوب قبل السيستم — بتتضاف للفترة اللي فيها تاريخ بدايته ===== */
+let OPENING={}, OP_FIRST={};
+async function loadOpening(){try{const j=await (await fetch(API_BASE+'/opening',{cache:'no-store'})).json();OPENING=j.items||{};OP_FIRST=j.first||{};}catch(e){}}
+function opAdd(s,repIds,f,t,dir){
+  if(dir)return s; // فلتر صادر/وارد: الافتتاحي مش متقسّم كده
+  repIds.forEach(id=>{const o=OPENING[String(id)];if(!o||!o.date||o.date<f||o.date>t)return;
+    const tot=(o.out||0)+(o['in']||0);s.tot+=tot;s.out+=o.out||0;s['in']+=o['in']||0;s.ans+=o.ans||0;s.no+=o.no||0;s.miss+=o.miss||0;s.talk+=o.talk||0;s.op=(s.op||0)+tot;});
+  s.aht=s.ans?s.talk/s.ans:0;s.rate=s.tot?Math.round(s.ans/s.tot*100):0;return s;
 }
 const today=new Date();today.setHours(0,0,0,0);
 let CALLS=[];
@@ -1239,10 +1257,13 @@ function stats(list){
 let charts={};
 function quick(n){const a=new Date(today);a.setDate(a.getDate()-n);$('dFrom').value=iso(a);$('dTo').value=iso(today);refresh()}
 function renderAll(){
-  const list=filtered(),s=stats(list);
+  const list=filtered();
+  const _f=$('dFrom').value,_t=$('dTo').value,_tm=$('fTeam').value,_rp=$('fRep').value,_dr=$('fDir').value;
+  const scopeIds=REPS.filter(r=>(!_tm||r.team===_tm)&&(!_rp||r.id==_rp)&&(_rp||_tm||catOk(r))).map(r=>r.id);
+  const s=opAdd(stats(list),scopeIds,_f,_t,_dr);
   const days=Math.max(1,Math.round((new Date($('dTo').value)-new Date($('dFrom').value))/864e5)+1);
   $('kpis').innerHTML=`
-  <div class="kpi"><div class="l">إجمالي المكالمات</div><div class="v">${num(s.tot)}</div><div class="s">${num(s.uniq.size)} رقم مختلف</div></div>
+  <div class="kpi"><div class="l">إجمالي المكالمات</div><div class="v">${num(s.tot)}</div><div class="s">${num(s.uniq.size)} رقم مختلف${s.op?` · <span title="مكالمات قبل السيستم (البيانات الافتتاحية)">📥 منها ${num(s.op)} افتتاحي</span>`:''}</div></div>
   <div class="kpi"><div class="l">مكالمات صادرة</div><div class="v">${num(s.out)}</div><div class="s">${s.tot?Math.round(s.out/s.tot*100):0}% من الإجمالي</div></div>
   <div class="kpi blue"><div class="l">مكالمات واردة</div><div class="v">${num(s.in)}</div><div class="s">فائتة: ${s.miss}</div></div>
   <div class="kpi green"><div class="l">تم الرد</div><div class="v">${num(s.ans)}</div><div class="s">نسبة الرد ${s.rate}%</div></div>
@@ -1252,7 +1273,7 @@ function renderAll(){
 
   // team cards
   $('teamCards').innerHTML=TEAMS.filter(t=>(!$('fTeam').value||t.id===$('fTeam').value)&&($('fTeam').value||catOk({team:t.id}))).map(t=>{
-    const ts=stats(list.filter(c=>repOf(c.rep).team===t.id));
+    const ts=opAdd(stats(list.filter(c=>repOf(c.rep).team===t.id)),REPS.filter(r=>r.team===t.id).map(r=>r.id),_f,_t,_dr);
     const members=REPS.filter(r=>r.team===t.id).map(r=>r.name).join('، ');
     return `<div class="tm"><div class="n">${t.name}</div><div class="muted">${members}</div>
       <div class="row"><span>إجمالي المكالمات</span><b>${num(ts.tot)}</b></div>
@@ -1268,7 +1289,7 @@ function renderAll(){
     if(!reps.length)return;
     rows+=`<tr class="team"><td colspan="15">${t.name} — التيم ليدر: ${t.leader}</td></tr>`;
     reps.sort((a,b)=>stats(list.filter(c=>c.rep===b.id)).tot-stats(list.filter(c=>c.rep===a.id)).tot).forEach(r=>{
-      const x=stats(list.filter(c=>c.rep===r.id));const pct=Math.min(100,Math.round(x.out/target*100));
+      const x=opAdd(stats(list.filter(c=>c.rep===r.id)),[r.id],_f,_t,_dr);const pct=Math.min(100,Math.round(x.out/target*100));
       rows+=`<tr><td class="c"><b>${r.id}</b></td><td>${r.name}${r.lead?' <span class="badge b-out">ليدر</span>':''}</td>
       <td class="c">${x.tot}</td><td class="c">${x.out}</td><td class="c">${x.in}</td><td class="c">${x.ans}</td><td class="c">${x.no+x.rej}</td><td class="c">${x.miss}</td>
       <td class="c">${x.rate}%</td><td class="c">${fmt(x.talk)}</td><td class="c">${ms(x.aht)}</td><td class="c">${x.uniq.size}</td>
@@ -1355,10 +1376,10 @@ function renderReport(){
   const n=new Date();$('rPrint').textContent=dmy(n)+' '+n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   let i=0,rows='';
   REPS.filter(r=>!tmv||r.team===tmv).forEach(r=>{
-    const s=stats(list.filter(c=>c.rep===r.id));i++;
+    const s=opAdd(stats(list.filter(c=>c.rep===r.id)),[r.id],f,t);i++;
     rows+=`<tr><td>${i}</td><td><b>${r.id}</b></td><td class="r">${r.name}</td><td class="r">${teamOf(r.team).name}</td><td>${dash(s.tot)}</td><td>${dash(s.out)}</td><td>${dash(s.in)}</td><td>${dash(s.ans)}</td><td>${dash(s.no+s.rej)}</td><td>${dash(s.miss)}</td><td>${s.tot?s.rate+'%':'—'}</td><td>${s.talk?fmt(s.talk):'—'}</td><td>${s.aht?ms(s.aht):'—'}</td><td>${dash(s.rec)}</td></tr>`;
   });
-  const s=stats(list);
+  const s=opAdd(stats(list),REPS.filter(r=>!tmv||r.team===tmv).map(r=>r.id),f,t);
   $('rTbl').innerHTML=`<tr><th>م</th><th>الكود</th><th class="r">المندوب</th><th class="r">الفريق</th><th>إجمالي المكالمات</th><th>صادرة</th><th>واردة</th><th>تم الرد</th><th>لم يرد / مرفوضة</th><th>فائتة</th><th>نسبة الرد</th><th>مدة التحدث</th><th>متوسط المكالمة</th><th>مكالمات مسجّلة</th></tr>${rows}
   <tr class="tot"><td></td><td></td><td class="r"><b>الإجمالي</b></td><td></td><td><b>${num(s.tot)}</b></td><td><b>${s.out}</b></td><td><b>${s.in}</b></td><td><b>${s.ans}</b></td><td><b>${s.no+s.rej}</b></td><td><b>${s.miss}</b></td><td><b>${s.rate}%</b></td><td><b>${fmt(s.talk)}</b></td><td><b>${ms(s.aht)}</b></td><td><b>${s.rec}</b></td></tr>`;
 }
@@ -2069,6 +2090,36 @@ async function glManual(mon){
 async function glManSave(inp){const tr=inp.closest('tr');const ok=tr.querySelector('.gm-ok');ok.textContent='…';
   try{const r=await fetch(API_BASE+'/goals/manual',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({month:$('glManMonth').value,ext:tr.dataset.e,sales:tr.querySelector('.gm-s').value,closed:tr.querySelector('.gm-c').value})});
     if(!r.ok)throw new Error((await r.json()).detail);ok.textContent='✔';ok.style.color='var(--green)';loadGoals();}catch(e){ok.textContent='✖ '+e.message;ok.style.color='var(--red)'}}
+
+/* ===================== البيانات الافتتاحية ===================== */
+async function opOpen(){
+  await loadOpening();
+  const n=(k,v,w)=>`<input type="number" min="0" step="${k==='talk'?'any':'1'}" class="op-${k}" value="${v??''}" style="width:${w||72}px" oninput="opTot(this)" onchange="opSave(this)">`;
+  $('opTbl').innerHTML=`<thead><tr><th>المندوب</th><th>الفرقة</th><th>تاريخ البداية</th><th>صادرة</th><th>واردة</th><th>اترد عليها</th><th>لم يرد / مرفوضة</th><th>فائتة</th><th>مدة التحدث (دقيقة)</th><th>الإجمالي</th><th></th></tr></thead><tbody>${REPS.map(r=>{
+    const o=OPENING[String(r.id)]||{},t=TEAMS.find(x=>x.id===r.team),d=o.date||OP_FIRST[String(r.id)]||'';
+    return `<tr data-e="${esc(r.id)}"><td><b>${esc(r.name)}</b> <span class="muted">${esc(r.id)}</span></td><td>${esc(t?t.name:'—')}</td>
+    <td><input type="date" class="op-date" value="${esc(d)}" onchange="opSave(this)" title="${OP_FIRST[String(r.id)]?'أول مكالمة على السيستم: '+OP_FIRST[String(r.id)]:''}"></td>
+    <td>${n('out',o.out)}</td><td>${n('in',o['in'])}</td><td>${n('ans',o.ans)}</td><td>${n('no',o.no)}</td><td>${n('miss',o.miss)}</td><td>${n('talk',o.talk!=null?Math.round(o.talk/60):'',90)}</td>
+    <td class="op-tot" style="font-weight:800">${o.date?((o.out||0)+(o['in']||0)):'—'}</td>
+    <td style="white-space:nowrap"><span class="op-ok"></span> ${o.date?`<button class="btn o" style="padding:3px 8px" title="مسح" onclick="opDel(this)">🗑</button>`:''}</td></tr>`}).join('')}</tbody>`;
+  $('opModal').classList.add('show');
+}
+function opTot(inp){const tr=inp.closest('tr'),v=k=>+tr.querySelector('.op-'+k).value||0;tr.querySelector('.op-tot').textContent=v('out')+v('in');}
+async function opSave(inp){
+  const tr=inp.closest('tr'),ok=tr.querySelector('.op-ok'),g=k=>tr.querySelector('.op-'+k).value;
+  if(!['out','in','ans','no','miss','talk'].some(k=>g(k)!=='')){ok.textContent='';return;}  // لسه مفيش أرقام
+  if(!g('date')){ok.textContent='✖ اختار تاريخ البداية';ok.style.color='var(--red)';return;}
+  ok.textContent='…';ok.style.color='';
+  try{const r=await fetch(API_BASE+'/opening',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ext:tr.dataset.e,date:g('date'),out:g('out'),in:g('in'),ans:g('ans'),no:g('no'),miss:g('miss'),talk:g('talk')})});
+    const j=await r.json();if(!r.ok)throw new Error(j.detail||r.status);
+    OPENING[tr.dataset.e]=j;ok.textContent='✔';ok.style.color='var(--green)';renderAll();if(typeof loadGoals==='function')loadGoals();
+  }catch(e){ok.textContent='✖ '+e.message;ok.style.color='var(--red)'}
+}
+async function opDel(btn){
+  const tr=btn.closest('tr');if(!confirm('تمسح البيانات الافتتاحية للمندوب ده؟'))return;
+  try{const r=await fetch(API_BASE+'/opening',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ext:tr.dataset.e,delete:true})});if(!r.ok)throw new Error((await r.json()).detail);
+    delete OPENING[tr.dataset.e];renderAll();opOpen();}catch(e){alert(e.message)}
+}
 
 /* ===================== التعارضات ===================== */
 let CF={items:[],counts:{}}, CF_S='pending';

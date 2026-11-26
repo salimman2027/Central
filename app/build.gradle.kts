@@ -11,8 +11,8 @@ android {
         applicationId = "sa.nq.phone"
         minSdk = 26
         targetSdk = 34
-        versionCode = 72
-        versionName = "6.7.0"
+        versionCode = 73
+        versionName = "6.7.1"
     }
     buildTypes {
         release { isMinifyEnabled = false }

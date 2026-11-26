@@ -1366,6 +1366,9 @@ app.include_router(WCAL.router)
 WCAL.CTX.update(dir=DATA_DIR, tz=TZ)
 import goals as GOALS  # noqa: E402
 app.include_router(GOALS.router)
+import opening as OPENING  # noqa: E402
+app.include_router(OPENING.router)
+OPENING.CTX.update(dir=DATA_DIR, tz=TZ, calls=lambda a, b: unscoped(OPS.calls_c, a, b), scope=lambda: SCOPE.get())
 GOALS.CTX.update(dir=DATA_DIR, tz=TZ, calls=lambda a, b: unscoped(OPS.calls_c, a, b), scope=lambda: SCOPE.get(),
                  appointments=lambda: OPS.CTX["appointments"](), teams=_teams_file,
                  names=lambda: {str(r.get("id")): r.get("name", "") for r in unscoped(config).get("reps", [])},

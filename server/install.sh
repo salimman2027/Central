@@ -29,7 +29,7 @@ apt-get install -y -qq python3-venv python3-pip apache2-utils >/dev/null
 
 echo "== app files"
 mkdir -p "$APP" "$CONF" "$DATA/analysis"
-cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/ops.py "$SRC"/targets.py "$SRC"/todo.py "$SRC"/remotedial.py "$SRC"/goals.py "$SRC"/workcal.py "$SRC"/wa.py "$SRC"/eng.py "$SRC"/wainbox.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
+cp -r "$SRC"/app.py "$SRC"/files_api.py "$SRC"/rubric.py "$SRC"/taxonomy.py "$SRC"/appointments.py "$SRC"/ownership.py "$SRC"/rep_portal.py "$SRC"/training.py "$SRC"/ops.py "$SRC"/targets.py "$SRC"/todo.py "$SRC"/remotedial.py "$SRC"/goals.py "$SRC"/opening.py "$SRC"/workcal.py "$SRC"/wa.py "$SRC"/eng.py "$SRC"/wainbox.py "$SRC"/analyzer.py "$SRC"/requirements.txt "$SRC"/static "$APP"/
 [[ -f "$CONF/reps.json" ]] || cp "$SRC/reps.example.json" "$CONF/reps.json"
 VER="$(cat "$SRC/../VERSION" 2>/dev/null || echo "?")"
 echo "$VER" > "$APP/VERSION" 2>/dev/null || true
