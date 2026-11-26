@@ -1,7 +1,7 @@
 ﻿; ملف التثبيت للويندوز (Inno Setup) — بيتبني تلقائي من GitHub Actions
 #define AppVer GetEnv("NQ_VER")
 #if AppVer == ""
-  #define AppVer "1.1.1"
+  #define AppVer "1.2.0"
 #endif
 
 [Setup]

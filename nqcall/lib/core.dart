@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String kAppVersion = '1.1.1';
+const String kAppVersion = '1.2.0';
 const String kDefaultHost = '3.89.245.93.sslip.io';
 
 /// التخزين المحلي (اسم الدخول، النغمة، الثيم...)

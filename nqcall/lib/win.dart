@@ -148,12 +148,7 @@ class TitleBar extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(left: 14),
                 child: Row(children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(7), border: Border.all(color: Colors.white54)),
-                    child: const Center(child: Text('N', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14))),
-                  ),
+                  ClipRRect(borderRadius: BorderRadius.circular(7), child: Image.asset('assets/logo.png', width: 26, height: 26, filterQuality: FilterQuality.medium)),
                   const SizedBox(width: 10),
                   const Text('NQ Phone', maxLines: 1, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15.5)),
                   const SizedBox(width: 10),

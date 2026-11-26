@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../native.dart';
 import '../win.dart';
+import 'dashboard_page.dart';
 import 'pages.dart';
 import 'theme.dart';
 
@@ -37,6 +38,7 @@ class NQMenuButton extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 300, maxWidth: 340),
       position: RelativeRect.fromLTRB(pos.dx, pos.dy, overlay.size.width - pos.dx - box.size.width, 0),
       items: [
+        _item('dash', Icons.space_dashboard_outlined, 'لوحة التحكم', const Color(0xFFE7F6EE), kGreen, trailing: 'المكالمات\nوالتقارير'),
         _item('settings', Icons.settings_outlined, 'إعدادات', const Color(0xFFEEF1F0), kText),
         _item('files', Icons.folder_outlined, 'الملفات', const Color(0xFFFFF4E0), const Color(0xFFD9900F)),
         _item('wa', Icons.chat_bubble_outline_rounded, 'واتساب', const Color(0xFFFFEAF3), const Color(0xFFDB2777)),
@@ -49,6 +51,8 @@ class NQMenuButton extends StatelessWidget {
     );
     if (v == null || !context.mounted) return;
     switch (v) {
+      case 'dash':
+        openDashboard(context);
       case 'settings':
         openSettings(context);
       case 'files':

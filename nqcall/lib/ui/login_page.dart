@@ -51,14 +51,8 @@ class _LoginPageState extends State<LoginPage> {
                 padding: const EdgeInsets.fromLTRB(24, 18, 24, 34),
                 child: Column(children: [
                   Container(
-                    width: 78,
-                    height: 78,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .12),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: Colors.white38, width: 1.5),
-                    ),
-                    child: const Center(child: Text('NQ', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800))),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .25), blurRadius: 22, offset: const Offset(0, 8))]),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(22), child: Image.asset('assets/logo.png', width: 92, height: 92, filterQuality: FilterQuality.medium)),
                   ),
                   const SizedBox(height: 14),
                   const Text('NQ Phone', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
